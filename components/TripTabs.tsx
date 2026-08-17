@@ -12,6 +12,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
     { href: `/trips/${tripId}/ideas`, label: 'Ideas' },
     { href: `/trips/${tripId}/checklists`, label: 'Checklists' },
     { href: `/trips/${tripId}/blog`, label: 'Blog' },
+    { href: `/trips/${tripId}/budget`, label: 'Budget' },
     { href: `/trips/${tripId}/overview`, label: 'Overview' },
   ];
 

@@ -15,9 +15,29 @@ export interface TimelineDay {
   connectsBelow: boolean;
 }
 
-interface SectionRange {
+export interface SectionRange {
   startDate: Date;
   endDate: Date;
+}
+
+/**
+ * AD-2: "Membership is computed as ... always timezone-localized ... never
+ * a raw UTC comparison" -- the one containment check every Section-
+ * membership-by-date read path shares. `dateKey` is a caller-computed
+ * `YYYY-MM-DD` (via dateKeyOfDateColumn for a calendar day, or
+ * dateKeyInTimezone for an Entry's own timestamp -- see lib/budget.ts,
+ * which reuses this exact function against an Entry's `startAt` anchor
+ * date rather than reimplementing the containment predicate). Returns the
+ * matching Section's index into `sections`, or `null` when no Section
+ * covers that day.
+ */
+export function sectionIndexForDateKey(dateKey: string, sections: SectionRange[]): number | null {
+  const index = sections.findIndex(
+    (section) =>
+      dateKeyOfDateColumn(section.startDate) <= dateKey &&
+      dateKey <= dateKeyOfDateColumn(section.endDate),
+  );
+  return index === -1 ? null : index;
 }
 
 /**
@@ -67,14 +87,10 @@ export function buildTimelineDays(
 
   while (cursor.getTime() <= end.getTime()) {
     const dateKey = dateKeyOfDateColumn(cursor);
-    const sectionIndex = sections.findIndex(
-      (section) =>
-        dateKeyOfDateColumn(section.startDate) <= dateKey &&
-        dateKey <= dateKeyOfDateColumn(section.endDate),
-    );
+    const sectionIndex = sectionIndexForDateKey(dateKey, sections);
     rawDays.push({
       dateKey,
-      sectionIndex: sectionIndex === -1 ? null : sectionIndex,
+      sectionIndex,
       isToday: dateKey === todayKey,
     });
     cursor.setUTCDate(cursor.getUTCDate() + 1);
