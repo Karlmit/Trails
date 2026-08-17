@@ -3,6 +3,7 @@ import { stayCreateSchema, STAY_SUBTYPES } from '@/lib/entry-types/stay.schema';
 import { transportCreateSchema } from '@/lib/entry-types/transport.schema';
 import { activityCreateSchema } from '@/lib/entry-types/activity.schema';
 import { noteCreateSchema } from '@/lib/entry-types/note.schema';
+import { blogPostCreateSchema, blogPostUpdateSchema } from '@/lib/entry-types/blog-post.schema';
 
 const TRIP_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -216,6 +217,82 @@ describe('lib/entry-types/*.schema.ts', () => {
         expect(result.data.contactName).toBe('Concierge');
         expect(result.data.contactEmail).toBe('concierge@example.com');
       }
+    });
+  });
+
+  // FR-18, spec-blog: title + content (description) + a required single
+  // associated date only -- no subtype/Location/Expense/booking/Contact
+  // (Intent: "no location/expense/booking/contact"), narrower even than
+  // Note (which keeps Contact per FR-15).
+  describe('blogPostCreateSchema (FR-18)', () => {
+    const base = { tripId: TRIP_ID, title: 'A journal entry', startAt: '2026-08-05T00:00:00.000Z' };
+
+    it('accepts a title and date only', () => {
+      const result = blogPostCreateSchema.safeParse(base);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts title/content/date together', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, description: 'What a day.' });
+      expect(result.success).toBe(true);
+    });
+
+    // I/O matrix: "Missing date -> 400."
+    it('rejects a missing startAt', () => {
+      const result = blogPostCreateSchema.safeParse({ tripId: TRIP_ID, title: 'A journal entry' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a missing title', () => {
+      const result = blogPostCreateSchema.safeParse({ tripId: TRIP_ID, startAt: '2026-08-05T00:00:00.000Z' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a Location field (Blog Post carries none)', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, locationName: 'Somewhere' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects Expense fields (Blog Post carries none)', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, expenseAmount: 10, expenseCurrency: 'USD' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a bookingReference field (Blog Post carries none)', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, bookingReference: 'ABC123' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects Contact fields (Blog Post carries none, unlike Note)', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, contactName: 'Someone' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a subtype field (Blog Post has no Entry Subtype)', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, subtype: 'HOTEL' });
+      expect(result.success).toBe(false);
+    });
+
+    // AD-10, Boundaries: "published_at is never client-settable through the
+    // normal create/edit form" -- `publishedAt` isn't a field on this schema
+    // at all, so `.strict()` rejects it exactly like any other unknown key.
+    it('rejects a publishedAt field on create (400 via .strict())', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, publishedAt: '2026-08-01T00:00:00.000Z' });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('blogPostUpdateSchema (FR-18/FR-19 boundary)', () => {
+    // I/O matrix: "Attempt to set publishedAt via the normal edit form ...
+    // 400 if sent as an unrecognized field, per the existing .strict() convention."
+    it('rejects a publishedAt field on update (400 via .strict())', () => {
+      const result = blogPostUpdateSchema.safeParse({ publishedAt: '2026-08-01T00:00:00.000Z' });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts a partial update to just the title', () => {
+      const result = blogPostUpdateSchema.safeParse({ title: 'Renamed' });
+      expect(result.success).toBe(true);
     });
   });
 });

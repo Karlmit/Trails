@@ -398,6 +398,23 @@ p {
   color: var(--color-text-soft);
 }
 
+/* Blog Post Draft/Published (FR-19, AD-10) -- must read as visually
+   distinct at a glance on the Blog list (both states show side by side
+   there), separate from Trip Status/Idea Priority above (semantically
+   unrelated). Published reuses the brand-deep dark-green tone (also this
+   spec's Timeline dot color, lib/entry-types/colors.ts) so the two
+   "this is live" signals visually agree; Draft stays deliberately muted. */
+.badge-draft {
+  background: var(--color-surface-cool);
+  color: var(--color-text-soft);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.badge-published {
+  background: var(--color-brand-deep);
+  color: #fff;
+}
+
 /* Main content shell */
 .page {
   max-width: 960px;

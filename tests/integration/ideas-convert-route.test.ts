@@ -181,6 +181,26 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
     expect(body.tripId).toBe(tripId);
   });
 
+  // spec-blog: BLOG_POST joined CREATABLE_ENTRY_TYPES (it's creatable/
+  // editable through the timeline-entries API now), but converting an Idea
+  // into a Blog Post is explicitly out of this endpoint's scope -- see the
+  // route's own comment.
+  it('rejects entryType=BLOG_POST (400) -- Idea conversion never produces a Blog Post', async () => {
+    const res = await convertIdea(
+      jsonRequest(
+        `http://localhost/api/v1/ideas/${ideaId}/convert`,
+        'POST',
+        { entryType: 'BLOG_POST', title: 'Cooking class', startAt: '2026-08-05T10:00:00.000Z' },
+        token,
+      ),
+      ideaParams(ideaId),
+    );
+    expect(res.status).toBe(400);
+
+    const stillThere = await testPrisma().idea.findUnique({ where: { id: ideaId } });
+    expect(stillThere).not.toBeNull();
+  });
+
   it('404s for an unknown Idea id', async () => {
     const res = await convertIdea(
       jsonRequest(

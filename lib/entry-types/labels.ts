@@ -11,6 +11,7 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
   TRANSPORT: 'Transport',
   ACTIVITY: 'Activity',
   NOTE: 'Note',
+  BLOG_POST: 'Blog Post',
 };
 
 export const SUBTYPES_BY_ENTRY_TYPE: Record<string, readonly string[]> = {
@@ -18,6 +19,7 @@ export const SUBTYPES_BY_ENTRY_TYPE: Record<string, readonly string[]> = {
   TRANSPORT: TRANSPORT_MODES,
   ACTIVITY: ACTIVITY_SUBTYPES,
   NOTE: [],
+  BLOG_POST: [],
 };
 
 const RAW_LABELS: Record<string, string> = {

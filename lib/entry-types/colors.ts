@@ -9,6 +9,11 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
   TRANSPORT: 'var(--color-brand-uplift)',
   ACTIVITY: 'var(--color-brand)',
   NOTE: 'var(--color-text-soft)',
+  // spec-blog: only ever rendered here once Published (AD-10) -- a Draft
+  // never reaches this function, since it never reaches the Timeline.
+  // Gold is deliberately not used (DESIGN.md reserves it for the Trip
+  // Active-status badge's own ceremony moment, not a general accent).
+  BLOG_POST: 'var(--color-brand-deep)',
 };
 
 export function entryTypeColor(entryType: string): string {

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { buildTimelineDays, layoutTimelineEntries, type EntryForLayout } from '@/lib/timeline';
+import { timelineVisibleEntryWhere } from '@/lib/entry-types';
+
+// AD-10, spec-blog: the shared Prisma `where` predicate both the Timeline
+// Server Component and GET /api/v1/timeline-entries use -- unit-tested here
+// against Prisma's actual query engine (via an in-memory-shaped filter) is
+// out of scope for a pure unit test, so this just locks down the predicate's
+// *shape*, which is what both read paths actually depend on; the
+// behavioral guarantee itself (a Draft never appears, a Published one does)
+// is covered end-to-end in
+// tests/integration/timeline-entries-route.test.ts and
+// tests/integration/timeline-entries-publish-route.test.ts.
+describe('timelineVisibleEntryWhere (AD-10)', () => {
+  it('unconditionally includes Stay/Transport/Activity/Note, and only a Published BlogPost', () => {
+    const where = timelineVisibleEntryWhere();
+    expect(where.OR).toEqual([
+      { entryType: { in: ['STAY', 'TRANSPORT', 'ACTIVITY', 'NOTE'] } },
+      { entryType: 'BLOG_POST', publishedAt: { not: null } },
+    ]);
+  });
+});
 
 function dateOnly(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);

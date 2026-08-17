@@ -21,10 +21,17 @@ interface RouteParams {
   params: Promise<{ entryId: string }>;
 }
 
-function revalidateEntry(tripId: string, entryId: string) {
+function revalidateEntry(tripId: string, entryId: string, entryType?: string) {
   // AD-12: revalidate every Server Component route this mutation affects.
   revalidatePath(`/trips/${tripId}/timeline`);
-  revalidatePath(`/trips/${tripId}/entries/${entryId}`);
+  if (entryType === 'BLOG_POST') {
+    // Blog Posts render on their own dedicated pages, never
+    // /entries/[entryId] (see entries/[entryId]/page.tsx's explicit guard).
+    revalidatePath(`/trips/${tripId}/blog`);
+    revalidatePath(`/trips/${tripId}/blog/${entryId}`);
+  } else {
+    revalidatePath(`/trips/${tripId}/entries/${entryId}`);
+  }
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -35,10 +42,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!isUuid(entryId)) return Errors.notFound('Entry not found');
 
   const entry = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
-  // Blog Post rows aren't readable through this spec's endpoint yet (no
-  // create path ever produces one) -- same guard as PATCH below, applied
-  // consistently across every read/write path so a future BLOG_POST row is
-  // never returned through this API before its own spec (FR-18-20) exists.
+  // AD-7: any authenticated User has full access to Trip-owned content --
+  // this single-entry GET intentionally returns a Draft Blog Post too (its
+  // own management surface, /trips/[tripId]/blog, needs to read one by id).
+  // AD-10's unconditional Draft exclusion is specifically about *Timeline
+  // rendering*, not every read path -- see timelineVisibleEntryWhere.
   if (!entry || !isCreatableEntryType(entry.entryType)) {
     return Errors.notFound('Entry not found');
   }
@@ -54,9 +62,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!isUuid(entryId)) return Errors.notFound('Entry not found');
 
   const existing = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
-  // Blog Post rows aren't manageable through this spec's endpoint yet (no
-  // create path ever produces one) -- treat as not-found rather than
-  // guessing at a Draft/Publish edit contract that isn't specified here.
+  // Editing a Draft (or Published) Blog Post's title/content/date goes
+  // through this same PATCH -- `publishedAt` itself is never a field on
+  // blogPostUpdateSchema (AD-10, Boundaries: "published_at is never
+  // client-settable through the normal create/edit form"), so it can only
+  // ever change via the dedicated publish/unpublish route.
   if (!existing || !isCreatableEntryType(existing.entryType)) {
     return Errors.notFound('Entry not found');
   }
@@ -128,7 +138,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data: toEntryUpdateData(parsed),
     });
 
-    revalidateEntry(existing.tripId, entryId);
+    revalidateEntry(existing.tripId, entryId, entryType);
 
     return NextResponse.json(serializeTimelineEntry(entry));
   } catch (err) {
@@ -147,9 +157,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isUuid(entryId)) return Errors.notFound('Entry not found');
 
   const existing = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
-  // Blog Post rows aren't deletable through this spec's endpoint yet -- same
-  // guard as GET/PATCH above, applied consistently across every read/write
-  // path.
+  // Deleting a Blog Post (Draft or Published) goes through this same
+  // endpoint -- same guard as GET/PATCH above, applied consistently across
+  // every read/write path.
   if (!existing || !isCreatableEntryType(existing.entryType)) {
     return Errors.notFound('Entry not found');
   }
@@ -158,13 +168,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     await prisma.timelineEntry.delete({ where: { id: entryId } });
   } catch (err) {
     if (isRecordNotFoundError(err)) {
-      revalidateEntry(existing.tripId, entryId);
+      revalidateEntry(existing.tripId, entryId, existing.entryType);
       return new NextResponse(null, { status: 204 });
     }
     throw err;
   }
 
-  revalidateEntry(existing.tripId, entryId);
+  revalidateEntry(existing.tripId, entryId, existing.entryType);
 
   return new NextResponse(null, { status: 204 });
 }

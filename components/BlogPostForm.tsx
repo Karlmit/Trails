@@ -1,0 +1,142 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState, type FormEvent } from 'react';
+
+export interface BlogPostDTO {
+  id: string;
+  tripId: string;
+  title: string;
+  description: string | null;
+  startAt: string;
+  publishedAt: string | null;
+}
+
+interface BlogPostFormProps {
+  tripId: string;
+  mode: 'create' | 'edit';
+  post?: BlogPostDTO;
+  onSaved?: (post: BlogPostDTO) => void;
+  onCancel?: () => void;
+}
+
+// spec-blog, FR-18: create/edit form for a Blog Post -- deliberately minimal
+// (title, content, one required date), matching blog-post.schema.ts's shape
+// exactly. No subtype/Location/Expense/booking/Contact fields (Intent:
+// "no location/expense/booking/contact"), and no `publishedAt` field
+// anywhere on this form -- that's the dedicated Publish/Unpublish action's
+// job alone (AD-10; see components/BlogPostDetailPanel.tsx), never this
+// create/edit path. Same `datetime-local` round-trip convention as
+// EntryForm.tsx.
+function toDateTimeLocal(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPostFormProps) {
+  const router = useRouter();
+  const [title, setTitle] = useState(post?.title ?? '');
+  const [description, setDescription] = useState(post?.description ?? '');
+  const [startAt, setStartAt] = useState(toDateTimeLocal(post?.startAt ?? null));
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    if (!startAt) {
+      // FR-18 Consequence: "cannot be saved without an associated date; the
+      // system rejects the save and prompts for one rather than defaulting
+      // silently to today's date."
+      setError('An associated date is required.');
+      return;
+    }
+
+    const body: Record<string, unknown> = {
+      title,
+      description: description || null,
+      startAt: new Date(startAt).toISOString(),
+    };
+
+    if (mode === 'create') {
+      body.tripId = tripId;
+      body.entryType = 'BLOG_POST';
+    }
+
+    setSubmitting(true);
+    try {
+      const url =
+        mode === 'create' ? '/api/v1/timeline-entries' : `/api/v1/timeline-entries/${post!.id}`;
+      const method = mode === 'create' ? 'POST' : 'PATCH';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(responseBody?.error?.message ?? 'Could not save this Blog Post.');
+        return;
+      }
+
+      if (mode === 'create') {
+        router.push(`/trips/${tripId}/blog/${responseBody.id}`);
+      } else {
+        onSaved?.(responseBody);
+      }
+      router.refresh();
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card stack">
+      {error && <div className="form-error-banner">{error}</div>}
+
+      <div className="field">
+        <label htmlFor="blog-title">Title</label>
+        <input id="blog-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+      </div>
+
+      <div className="field">
+        <label htmlFor="blog-date">Date</label>
+        <input
+          id="blog-date"
+          type="datetime-local"
+          value={startAt}
+          onChange={(e) => setStartAt(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="field">
+        <label htmlFor="blog-content">Content</label>
+        <textarea
+          id="blog-content"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={8}
+        />
+      </div>
+
+      <div className="row">
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Saving…' : mode === 'create' ? 'Save Draft' : 'Save changes'}
+        </button>
+        {onCancel && (
+          <button type="button" className="btn btn-dark-outline" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}

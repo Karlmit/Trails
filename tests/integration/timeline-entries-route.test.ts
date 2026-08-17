@@ -276,12 +276,54 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rejects entryType=BLOG_POST as unsupported (400)', async () => {
+  // spec-blog, FR-18: creating a Blog Post always starts it as a Draft
+  // (`publishedAt` is never a field on this create path at all, AD-10) --
+  // matches the I/O matrix's "Create Blog Post" row exactly.
+  it('creates a Blog Post as a Draft (201), which never appears on the list (AD-10)', async () => {
     const res = await createEntry(
       jsonRequest(
         'http://localhost/api/v1/timeline-entries',
         'POST',
         { tripId, entryType: 'BLOG_POST', title: 'A journal entry', startAt: '2026-08-05T00:00:00.000Z' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.entryType).toBe('BLOG_POST');
+    expect(body.publishedAt).toBeNull();
+
+    const listRes = await listEntries(
+      jsonRequest(`http://localhost/api/v1/timeline-entries?tripId=${tripId}`, 'GET', undefined, token),
+    );
+    const listBody = await listRes.json();
+    expect(listBody.find((e: { id: string }) => e.id === body.id)).toBeUndefined();
+  });
+
+  it('rejects a Blog Post create missing its required date (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        { tripId, entryType: 'BLOG_POST', title: 'A journal entry' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a Blog Post create/edit that supplies publishedAt directly (400, .strict())', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'BLOG_POST',
+          title: 'A journal entry',
+          startAt: '2026-08-05T00:00:00.000Z',
+          publishedAt: '2026-08-05T00:00:00.000Z',
+        },
         token,
       ),
     );
@@ -402,51 +444,74 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
     expect(res.status).toBe(401);
   });
 
-  // Item 2: BLOG_POST rows aren't manageable through this spec's endpoints
-  // yet -- excluded consistently across every read/write path, not just
-  // creation (no create path in this API ever produces one, so the row is
-  // seeded directly via Prisma here).
-  describe('BLOG_POST exclusion (item 2)', () => {
-    let blogPostId: string;
+  // spec-blog, AD-10: "Excluding Draft Blog Posts from Timeline rendering is
+  // an unconditional base-query filter, applied to every viewer including
+  // authenticated Users -- it is not part of Guest filtering." This is the
+  // crux the spec calls out explicitly -- covered against the list endpoint
+  // here (the Timeline Server Component's own query is covered by
+  // tests/timeline.test.ts's layoutTimelineEntries/timelineVisibleEntryWhere
+  // coverage), and against direct read/write access, which -- unlike
+  // Timeline rendering -- a Draft Blog Post is NOT excluded from (its own
+  // management surface, /trips/[tripId]/blog, must be able to read/edit/
+  // delete a Draft).
+  describe('BLOG_POST Draft/Published (AD-10)', () => {
+    let draftId: string;
+    let publishedId: string;
 
     beforeEach(async () => {
-      const row = await testPrisma().timelineEntry.create({
+      const draft = await testPrisma().timelineEntry.create({
         data: {
           tripId,
           entryType: 'BLOG_POST',
-          title: 'A journal entry',
+          title: 'Draft entry',
           startAt: new Date('2026-08-05T00:00:00.000Z'),
         },
       });
-      blogPostId = row.id;
+      draftId = draft.id;
+
+      const published = await testPrisma().timelineEntry.create({
+        data: {
+          tripId,
+          entryType: 'BLOG_POST',
+          title: 'Published entry',
+          startAt: new Date('2026-08-06T00:00:00.000Z'),
+          publishedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+      });
+      publishedId = published.id;
     });
 
-    it('excludes it from the list endpoint', async () => {
+    it('excludes the Draft from the list endpoint but includes the Published one', async () => {
       const res = await listEntries(
         jsonRequest(`http://localhost/api/v1/timeline-entries?tripId=${tripId}`, 'GET', undefined, token),
       );
       expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.find((e: { id: string }) => e.id === blogPostId)).toBeUndefined();
+      const ids = (await res.json()).map((e: { id: string }) => e.id);
+      expect(ids).not.toContain(draftId);
+      expect(ids).toContain(publishedId);
     });
 
-    it('404s a direct GET for it', async () => {
+    it('still allows a direct GET of the Draft (its own management surface needs this, unlike the Timeline)', async () => {
       const res = await getEntry(
-        jsonRequest(`http://localhost/api/v1/timeline-entries/${blogPostId}`, 'GET', undefined, token),
-        entryParams(blogPostId),
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${draftId}`, 'GET', undefined, token),
+        entryParams(draftId),
       );
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(200);
     });
 
-    it('404s a DELETE for it (never deletable through this API)', async () => {
-      const res = await deleteEntry(
-        jsonRequest(`http://localhost/api/v1/timeline-entries/${blogPostId}`, 'DELETE', undefined, token),
-        entryParams(blogPostId),
+    it('allows editing and deleting a Draft directly', async () => {
+      const patchRes = await patchEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${draftId}`, 'PATCH', { title: 'Renamed draft' }, token),
+        entryParams(draftId),
       );
-      expect(res.status).toBe(404);
+      expect(patchRes.status).toBe(200);
+      expect((await patchRes.json()).title).toBe('Renamed draft');
 
-      const stillThere = await testPrisma().timelineEntry.findUnique({ where: { id: blogPostId } });
-      expect(stillThere).not.toBeNull();
+      const deleteRes = await deleteEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${draftId}`, 'DELETE', undefined, token),
+        entryParams(draftId),
+      );
+      expect(deleteRes.status).toBe(204);
     });
   });
 

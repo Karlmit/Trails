@@ -5,7 +5,7 @@ import { buildTimelineDays, layoutTimelineEntries, type EntryForLayout } from '@
 import { sectionColor, sectionColorSolid } from '@/lib/section-colors';
 import { entryTypeColor } from '@/lib/entry-types/colors';
 import { subtypeLabel } from '@/lib/entry-types/labels';
-import { CREATABLE_ENTRY_TYPES } from '@/lib/entry-types';
+import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 import { isUuid } from '@/lib/uuid';
 import Link from 'next/link';
 import { TimelineAutoScroll } from '@/components/TimelineAutoScroll';
@@ -45,12 +45,12 @@ export default async function TimelinePage({ params }: PageProps) {
     where: { id: tripId },
     include: {
       sections: { orderBy: { startDate: 'asc' } },
-      // Blog Post rows (AD-1) aren't manageable through this spec yet --
-      // same exclusion as the API routes' `isCreatableEntryType` guard, so
-      // one is never rendered on the Timeline before its own spec
-      // (FR-18-20) gives it a real Draft/Publish contract.
+      // AD-10: a Draft Blog Post is unconditionally excluded from the
+      // Timeline, for every viewer (not just Guests) -- `timelineVisibleEntryWhere()`
+      // is the one shared predicate for this, also used by GET
+      // /api/v1/timeline-entries, so the two read paths can't drift.
       timelineEntries: {
-        where: { entryType: { in: [...CREATABLE_ENTRY_TYPES] } },
+        where: timelineVisibleEntryWhere(),
         orderBy: { startAt: 'asc' },
       },
     },
@@ -116,7 +116,7 @@ export default async function TimelinePage({ params }: PageProps) {
                     segment ? (
                       <Link
                         key={laneIndex}
-                        href={`/trips/${tripId}/entries/${segment.entryId}`}
+                        href={entryDetailHref(tripId, segment.entryType, segment.entryId)}
                         className={`timeline-lane-segment${segment.isStart ? ' is-start' : ''}${
                           segment.isEnd ? ' is-end' : ''
                         }`}
@@ -146,7 +146,11 @@ export default async function TimelinePage({ params }: PageProps) {
                   {day.dots.length > 0 ? (
                     <div className="entry-dot-list">
                       {day.dots.map((dot) => (
-                        <Link key={dot.id} href={`/trips/${tripId}/entries/${dot.id}`} className="entry-chip">
+                        <Link
+                          key={dot.id}
+                          href={entryDetailHref(tripId, dot.entryType, dot.id)}
+                          className="entry-chip"
+                        >
                           <span
                             className="entry-chip-dot"
                             style={{ ['--dot-color' as string]: entryTypeColor(dot.entryType) }}

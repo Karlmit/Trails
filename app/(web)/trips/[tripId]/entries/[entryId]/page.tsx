@@ -16,9 +16,9 @@ export default async function EntryDetailPage({ params }: PageProps) {
 
   const entry = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
   if (!entry || entry.tripId !== tripId) notFound();
-  // Blog Post rows aren't manageable through this spec's view/edit page yet
-  // (FR-18-20 is a later spec) -- guard defensively even though no create
-  // path in this spec ever produces one.
+  // spec-blog: a Blog Post has its own dedicated view/edit/publish/delete
+  // page (/trips/[tripId]/blog/[entryId]) with its own Draft/Published
+  // affordances -- never this generic Entry detail page, which has neither.
   if (entry.entryType === 'BLOG_POST') notFound();
 
   const dto = {

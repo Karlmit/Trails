@@ -13,6 +13,7 @@ import {
   CREATE_SCHEMAS,
   entryOutsideTripRangeError,
   isCreatableEntryType,
+  timelineVisibleEntryWhere,
   toEntryCreateData,
   type ParsedEntryFields,
 } from '@/lib/entry-types';
@@ -32,11 +33,12 @@ export async function GET(request: NextRequest) {
   if (!isUuid(tripId)) return Errors.validation('tripId query parameter must be a valid UUID');
 
   const entries = await prisma.timelineEntry.findMany({
-    // Blog Post rows (AD-1) aren't manageable through this spec's endpoints
-    // yet -- see the CREATABLE_ENTRY_TYPES comment; excluded from the list
-    // read too, not just from creation, so one is never returned before its
-    // own spec (FR-18-20) gives it a real read contract.
-    where: { tripId, entryType: { in: [...CREATABLE_ENTRY_TYPES] } },
+    // AD-10: a Draft Blog Post (`publishedAt IS NULL`) is unconditionally
+    // excluded from this list, for every authenticated User -- not just
+    // Guests. `timelineVisibleEntryWhere()` is the one shared predicate for
+    // this (see its definition), also used by the Timeline Server
+    // Component, so the two read paths can't drift.
+    where: { tripId, ...timelineVisibleEntryWhere() },
     orderBy: { startAt: 'asc' },
   });
   return NextResponse.json(entries.map(serializeTimelineEntry));
@@ -96,8 +98,12 @@ export async function POST(request: NextRequest) {
       data: toEntryCreateData(entryType, parsed),
     });
 
-    // AD-12: revalidate the Timeline this Entry now renders on.
+    // AD-12: revalidate the Timeline this Entry now renders on (a Draft
+    // Blog Post never actually changes what the Timeline shows, per AD-10,
+    // but revalidating unconditionally here matches every other type and
+    // costs nothing). A Blog Post also needs its own list page revalidated.
     revalidatePath(`/trips/${tripId}/timeline`);
+    if (entryType === 'BLOG_POST') revalidatePath(`/trips/${tripId}/blog`);
 
     return NextResponse.json(serializeTimelineEntry(entry), { status: 201 });
   } catch (err) {

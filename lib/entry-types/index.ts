@@ -3,21 +3,35 @@ import type { z } from 'zod';
 import { isDateTimeOrderValid } from '@/lib/validation';
 import { dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
 import { activityCreateSchema, activityUpdateSchema } from './activity.schema';
+import { blogPostCreateSchema, blogPostUpdateSchema } from './blog-post.schema';
 import { noteCreateSchema, noteUpdateSchema } from './note.schema';
 import { stayCreateSchema, stayUpdateSchema } from './stay.schema';
 import { transportCreateSchema, transportUpdateSchema } from './transport.schema';
 
-// AD-1: `entry_type` is `Stay | Transport | Activity | Note | BlogPost`, but
-// this spec (FR-11-FR-15) only ever creates/edits the first four -- Blog
-// Post creation is a later spec (FR-18-20), so it is deliberately absent
-// from these maps. Posting `entryType: "BLOG_POST"` here 400s as an
-// unsupported type rather than silently accepting a row this spec's UI/API
-// never finishes (no Draft/Publish flow exists yet).
-export const CREATABLE_ENTRY_TYPES = ['STAY', 'TRANSPORT', 'ACTIVITY', 'NOTE'] as const;
+// AD-1: `entry_type` is `Stay | Transport | Activity | Note | BlogPost`.
+// spec-blog (FR-18-20) adds BlogPost as a fifth creatable/editable type --
+// "creatable" here means "has its own Zod schema and can be
+// created/read/updated/deleted through app/api/v1/timeline-entries", a
+// distinct concept from "appears in the generic /entries/new type picker"
+// (components/EntryForm.tsx keeps its own separate, still-4-type picker --
+// Blog Posts are only ever created from /trips/[tripId]/blog, never from
+// that generic picker).
+export const CREATABLE_ENTRY_TYPES = ['STAY', 'TRANSPORT', 'ACTIVITY', 'NOTE', 'BLOG_POST'] as const;
 export type CreatableEntryType = (typeof CREATABLE_ENTRY_TYPES)[number];
 
 export function isCreatableEntryType(value: string): value is CreatableEntryType {
   return (CREATABLE_ENTRY_TYPES as readonly string[]).includes(value);
+}
+
+// spec-blog: Blog Posts live under their own /blog/[entryId] page, never
+// /entries/[entryId] (which explicitly 404s a BLOG_POST row) -- any UI
+// linking to an entry's detail page (e.g. the Timeline's dots/lane
+// segments) must branch on entryType, not assume one route for all
+// CREATABLE_ENTRY_TYPES.
+export function entryDetailHref(tripId: string, entryType: string, entryId: string): string {
+  return entryType === 'BLOG_POST'
+    ? `/trips/${tripId}/blog/${entryId}`
+    : `/trips/${tripId}/entries/${entryId}`;
 }
 
 // One Zod schema per entry_type (AD-1), selected by the discriminator.
@@ -26,6 +40,7 @@ export const CREATE_SCHEMAS = {
   TRANSPORT: transportCreateSchema,
   ACTIVITY: activityCreateSchema,
   NOTE: noteCreateSchema,
+  BLOG_POST: blogPostCreateSchema,
 } satisfies Record<CreatableEntryType, z.ZodTypeAny>;
 
 export const UPDATE_SCHEMAS = {
@@ -33,7 +48,35 @@ export const UPDATE_SCHEMAS = {
   TRANSPORT: transportUpdateSchema,
   ACTIVITY: activityUpdateSchema,
   NOTE: noteUpdateSchema,
+  BLOG_POST: blogPostUpdateSchema,
 } satisfies Record<CreatableEntryType, z.ZodTypeAny>;
+
+// AD-10: "Excluding Draft Blog Posts (published_at IS NULL) from Timeline
+// rendering is an unconditional base-query filter, applied to every viewer
+// including authenticated Users -- it is not part of Guest filtering."
+// Stay/Transport/Activity/Note render on the Timeline unconditionally;
+// BlogPost renders there only once Published. This is the one shared
+// predicate every Timeline-rendering read path uses -- the Timeline Server
+// Component (app/(web)/trips/[tripId]/timeline/page.tsx) and the
+// timeline-entries list Route Handler (GET /api/v1/timeline-entries) both
+// call this rather than each re-implementing "exclude Draft Blog Posts"
+// inline and risking drift. Derived from `CREATABLE_ENTRY_TYPES` (rather
+// than hand-duplicated) specifically *excluding* BLOG_POST, so a future
+// 6th entry type added only to `CREATABLE_ENTRY_TYPES` can't silently
+// become unconditionally Timeline-visible (or vanish from it) with no
+// deliberate decision made here.
+const TIMELINE_ALWAYS_VISIBLE_ENTRY_TYPES = CREATABLE_ENTRY_TYPES.filter(
+  (type) => type !== 'BLOG_POST',
+);
+
+export function timelineVisibleEntryWhere(): Prisma.TimelineEntryWhereInput {
+  return {
+    OR: [
+      { entryType: { in: [...TIMELINE_ALWAYS_VISIBLE_ENTRY_TYPES] } },
+      { entryType: 'BLOG_POST', publishedAt: { not: null } },
+    ],
+  };
+}
 
 export { STAY_SUBTYPES } from './stay.schema';
 export { TRANSPORT_MODES } from './transport.schema';
@@ -169,7 +212,7 @@ export function mergedDateOrderError(
       ? null
       : 'End must be on or after the start';
   }
-  return null; // NOTE never has an endAt (no schema field for it).
+  return null; // NOTE and BLOG_POST never have an endAt (no schema field for it).
 }
 
 /**

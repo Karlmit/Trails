@@ -10,6 +10,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
     { href: `/trips/${tripId}/timeline`, label: 'Timeline' },
     { href: `/trips/${tripId}/sections`, label: 'Sections' },
     { href: `/trips/${tripId}/ideas`, label: 'Ideas' },
+    { href: `/trips/${tripId}/blog`, label: 'Blog' },
     { href: `/trips/${tripId}/overview`, label: 'Overview' },
   ];
 

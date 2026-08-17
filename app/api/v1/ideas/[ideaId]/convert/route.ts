@@ -55,9 +55,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // converting Idea's own Trip -- never taken from the caller, so a stray
   // or stale value in the (pre-filled) form body can't retarget the new
   // Entry at a different Trip than the Idea it's replacing.
+  //
+  // spec-blog: BLOG_POST joined CREATABLE_ENTRY_TYPES (it's now creatable/
+  // editable through the timeline-entries API), but converting an Idea into
+  // a Blog Post is outside this spec's scope -- never offered by the
+  // conversion UI (components/EntryForm.tsx's own picker still only lists
+  // the original 4 types) and not part of FR-17's design. Excluded here
+  // explicitly so this endpoint's accepted set stays exactly what it was.
+  const CONVERT_ENTRY_TYPES = CREATABLE_ENTRY_TYPES.filter((type) => type !== 'BLOG_POST');
   const { entryType, tripId: _ignoredTripId, ...rest } = body as Record<string, unknown>;
-  if (typeof entryType !== 'string' || !isCreatableEntryType(entryType)) {
-    return Errors.validation(`entryType must be one of: ${CREATABLE_ENTRY_TYPES.join(', ')}`);
+  if (
+    typeof entryType !== 'string' ||
+    !isCreatableEntryType(entryType) ||
+    entryType === 'BLOG_POST'
+  ) {
+    return Errors.validation(`entryType must be one of: ${CONVERT_ENTRY_TYPES.join(', ')}`);
   }
 
   let parsed: ParsedEntryFields;
