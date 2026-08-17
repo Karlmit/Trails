@@ -1,0 +1,479 @@
+/* Trails design tokens, per /workspace/DESIGN.md.
+   Palette values are carried over 1:1 from DESIGN.md's reference system,
+   renamed to neutral roles (no brand-name references). Rules applied:
+   warm-neutral canvas (never stark white), a tiered brand-green system
+   (not one flat accent), gold reserved for exactly one ceremonial moment
+   (the Active-trip / current-position marker), full-pill buttons with a
+   scale(0.95) active press, 12px card radius, solid color-block surfaces
+   only (no gradients anywhere), and heading hierarchy carried by weight +
+   color rather than size (h1/h2 share size; only weight/color differ). */
+
+:root {
+  /* Canvas & surfaces */
+  --color-canvas: #f2f0eb;
+  --color-canvas-alt: #edebe9;
+  --color-surface: #ffffff;
+  --color-surface-cool: #f9f9f9;
+
+  /* Tiered brand green system -- each mapped to one surface role */
+  --color-brand: #006241; /* headings, primary brand signal */
+  --color-brand-accent: #00754a; /* primary CTA fill */
+  --color-brand-deep: #1e3932; /* dark bands, nav-on-dark */
+  --color-brand-uplift: #2b5148; /* decorative / secondary dark accent */
+  --color-brand-mint: #d4e9e2; /* valid-state tint, light wash */
+
+  /* Reserved ceremonial accent -- Active Trip / current-position marker only */
+  --color-gold: #cba258;
+  --color-gold-light: #dfc49d;
+  --color-gold-lightest: #faf6ee;
+
+  /* Text */
+  --color-text: rgba(0, 0, 0, 0.87);
+  --color-text-soft: rgba(0, 0, 0, 0.58);
+  --color-text-on-dark: rgba(255, 255, 255, 1);
+  --color-text-on-dark-soft: rgba(255, 255, 255, 0.7);
+
+  /* Semantic */
+  --color-danger: #c82014;
+  --color-danger-tint: hsl(4 82% 43% / 6%);
+
+  /* Radius */
+  --radius-card: 12px;
+  --radius-pill: 50px;
+  --radius-input: 4px;
+
+  /* Shadows -- whisper-soft, layered, never one heavy drop shadow */
+  --shadow-card: 0 0 0.5px rgba(0, 0, 0, 0.14), 0 1px 1px rgba(0, 0, 0, 0.24);
+  --shadow-nav: 0 1px 3px rgba(0, 0, 0, 0.1), 0 2px 2px rgba(0, 0, 0, 0.06), 0 0 2px rgba(0, 0, 0, 0.07);
+  --shadow-fab: 0 0 6px rgba(0, 0, 0, 0.24), 0 8px 12px rgba(0, 0, 0, 0.14);
+
+  /* Spacing scale, rem-anchored */
+  --space-1: 0.4rem;
+  --space-2: 0.8rem;
+  --space-3: 1.6rem;
+  --space-4: 2.4rem;
+  --space-5: 3.2rem;
+  --space-6: 4rem;
+  --space-7: 4.8rem;
+  --space-8: 5.6rem;
+  --space-9: 6.4rem;
+
+  --tracking-tight: -0.01em;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-trails), 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: var(--tracking-tight);
+  min-height: 100vh;
+}
+
+a {
+  color: var(--color-brand-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Heading hierarchy is carried by weight + color, not size (h1 and h2
+   intentionally share size). */
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-2) 0;
+  line-height: 1.3;
+  letter-spacing: var(--tracking-tight);
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-brand);
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+p {
+  margin: 0 0 var(--space-3) 0;
+}
+
+.text-soft {
+  color: var(--color-text-soft);
+}
+
+/* Buttons -- full-pill, universal scale(0.95) active press */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-pill);
+  padding: 0.9rem 1.6rem;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--color-brand-accent);
+  color: #fff;
+  border-color: var(--color-brand-accent);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-brand-accent);
+  border-color: var(--color-brand-accent);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.btn-dark-outline {
+  background: transparent;
+  color: var(--color-text);
+  border-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Cards */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+}
+
+/* Inputs */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.field input,
+.field textarea,
+.field select {
+  border: 1px solid #d6dbde;
+  border-radius: var(--radius-input);
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
+  min-height: 44px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--color-brand-accent);
+}
+
+.field-error {
+  color: var(--color-danger);
+  font-size: 0.85rem;
+}
+
+.form-error-banner {
+  background: var(--color-danger-tint);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  border-radius: var(--radius-input);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: 0.9rem;
+}
+
+/* Top nav */
+.top-nav {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-nav);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-4);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.top-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  color: var(--color-brand);
+  font-size: 1.1rem;
+}
+
+.top-nav-brand img {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+}
+
+.top-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Trip tab nav */
+.trip-tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+}
+
+.trip-tab {
+  padding: var(--space-3) var(--space-2);
+  font-weight: 600;
+  color: var(--color-text-soft);
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+
+.trip-tab.active {
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand-accent);
+}
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.badge-upcoming {
+  background: var(--color-brand-mint);
+  color: var(--color-brand-deep);
+}
+
+.badge-active {
+  background: var(--color-gold-lightest);
+  color: var(--color-gold);
+  border: 1px solid var(--color-gold);
+}
+
+.badge-completed {
+  background: var(--color-surface-cool);
+  color: var(--color-text-soft);
+}
+
+/* Main content shell */
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-9);
+}
+
+.page-wide {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-9);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-9) var(--space-4);
+  color: var(--color-text-soft);
+}
+
+/* Floating add action -- the "Frap" equivalent per DESIGN.md/PRD (a
+   floating add-Entry/add-Section action reachable while scrolling). */
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-brand-accent);
+  color: #fff;
+  border: none;
+  box-shadow: var(--shadow-fab);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+/* Timeline */
+.timeline-section-band {
+  border-left: 6px solid var(--band-color, var(--color-brand-mint));
+  padding-left: var(--space-3);
+}
+
+.timeline-day {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  scroll-margin-top: 96px;
+}
+
+.timeline-day-date {
+  min-width: 84px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.timeline-day.is-today .timeline-day-date {
+  color: var(--color-gold);
+}
+
+.timeline-day-empty {
+  color: var(--color-text-soft);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.timeline-current-marker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-gold);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.timeline-current-marker::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-gold);
+}
+
+.section-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.section-legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  color: var(--color-text-soft);
+}
+
+.section-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--swatch-color, var(--color-brand-mint));
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.trip-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.trip-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}

@@ -1,0 +1,106 @@
+// Trails — foundation schema (User, Session, Trip, Section only).
+// TimelineEntry and everything else in AD-1/AD-4 lands in a later spec.
+//
+// AD-2's Section EXCLUDE USING gist constraint (btree_gist) is not
+// representable in the Prisma schema language. It is added as raw SQL in
+// prisma/migrations/20260817131140_init/migration.sql and is authoritative
+// there — this file intentionally does not model it. Only
+// `prisma migrate deploy` (never `migrate dev`/`db push`) is run against
+// real databases (AD-13), so this permanent, documented drift never
+// triggers a reset.
+//
+// That migration also documents one disclosed, verified deviation from
+// AD-2's literal SQL text ('[)' instead of '[]' in the daterange bound) —
+// needed so touching-endpoint Sections are allowed per FR-5, since '[]' is
+// inclusive-inclusive and Postgres does not collapse it at a shared
+// boundary date. Flagged for human confirmation, see migration.sql.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  USER
+
+  @@map("user_role")
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole  @default(USER)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  token     String    @unique
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+enum TripVisibility {
+  PUBLIC
+  PRIVATE
+
+  @@map("trip_visibility")
+}
+
+model Trip {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  destination String?
+  // Stored as a plain calendar date; "today" for Status/auto-scroll is
+  // always computed server-side against `timezone` (AD-8), never against
+  // these dates in UTC or in the browser's local zone.
+  startDate   DateTime       @map("start_date") @db.Date
+  endDate     DateTime       @map("end_date") @db.Date
+  // Required IANA timezone identifier, e.g. "Asia/Bangkok" (AD-8).
+  timezone    String
+  description String?
+  coverImage  String?        @map("cover_image")
+  visibility  TripVisibility @default(PRIVATE)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sections Section[]
+
+  @@map("trips")
+}
+
+model Section {
+  id     String @id @default(uuid()) @db.Uuid
+  tripId String @map("trip_id") @db.Uuid
+
+  name      String
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // No FK from anything else to Section (AD-2) — Trip -> Section is the
+  // only relation involving this model.
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("sections")
+}

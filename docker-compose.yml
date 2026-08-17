@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trails
+      POSTGRES_PASSWORD: trails
+      POSTGRES_DB: trails
+    volumes:
+      # Postgres 18's image expects the volume at /var/lib/postgresql (not
+      # .../data) so it can manage major-version-specific subdirectories
+      # itself (pg_ctlcluster-compatible layout).
+      - pg-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trails -d trails"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://trails:trails@db:5432/trails?schema=public
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+    healthcheck:
+      # No curl/wget in the node:24-bookworm-slim runner image -- use Node's
+      # built-in fetch instead. Hits the public /login page (no session
+      # required, AD-7) so readiness doesn't depend on auth state.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/login').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      # AD-5's mandatory upload path shape (/data/uploads/{trip_id}/...) --
+      # not written to yet in this spec (no Attachment feature exists
+      # until TimelineEntry lands), but declared now per the architecture's
+      # structural seed so the volume already exists and is never
+      # accidentally recreated non-persistent later.
+      - uploads:/data/uploads
+
+volumes:
+  pg-data:
+  uploads:
