@@ -1,4 +1,4 @@
-import type { Section, TimelineEntry, Trip } from '@prisma/client';
+import type { Idea, Section, TimelineEntry, Trip } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
 export function serializeTrip(trip: Trip) {
@@ -69,5 +69,27 @@ export function serializeTimelineEntry(entry: TimelineEntry) {
     publishedAt: entry.publishedAt ? entry.publishedAt.toISOString() : null,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
+  };
+}
+
+// FR-16/FR-17, spec-ideas: same shape/conventions as serializeSection above.
+export function serializeIdea(idea: Idea) {
+  return {
+    id: idea.id,
+    tripId: idea.tripId,
+    title: idea.title,
+    category: idea.category,
+    priority: idea.priority,
+    weatherSuitability: idea.weatherSuitability,
+    weatherTags: idea.weatherTags,
+    locationName: idea.locationName,
+    locationAddress: idea.locationAddress,
+    locationLat: decimalToNumber(idea.locationLat),
+    locationLng: decimalToNumber(idea.locationLng),
+    locationMapLink: idea.locationMapLink,
+    estimatedExpenseAmount: decimalToNumber(idea.estimatedExpenseAmount),
+    estimatedExpenseCurrency: idea.estimatedExpenseCurrency,
+    createdAt: idea.createdAt.toISOString(),
+    updatedAt: idea.updatedAt.toISOString(),
   };
 }

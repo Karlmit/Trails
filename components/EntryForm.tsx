@@ -35,6 +35,15 @@ interface EntryFormProps {
   tripId: string;
   mode: 'create' | 'edit';
   entry?: EntryDTO;
+  // spec-ideas (FR-17): pre-fills a *create*-mode form (e.g. from an Idea's
+  // title/estimated expense) without supplying a full EntryDTO -- ignored
+  // when `entry` is also given (edit mode always wins).
+  initialValues?: Partial<EntryDTO>;
+  // spec-ideas (FR-17): submits to a different endpoint than the default
+  // create/edit routes (the Idea convert endpoint) while keeping every
+  // other create-mode behavior -- including the on-success redirect to the
+  // new Entry -- identical.
+  apiUrl?: string;
   onSaved?: (entry: EntryDTO) => void;
   onCancel?: () => void;
 }
@@ -56,31 +65,34 @@ function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-export function EntryForm({ tripId, mode, entry, onSaved, onCancel }: EntryFormProps) {
+export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved, onCancel }: EntryFormProps) {
   const router = useRouter();
-  const [entryType, setEntryType] = useState<CreatableEntryType>(entry?.entryType ?? 'ACTIVITY');
-  const [subtype, setSubtype] = useState(entry?.subtype ?? '');
-  const [title, setTitle] = useState(entry?.title ?? '');
-  const [description, setDescription] = useState(entry?.description ?? '');
-  const [startAt, setStartAt] = useState(toDateTimeLocal(entry?.startAt ?? null));
-  const [endAt, setEndAt] = useState(toDateTimeLocal(entry?.endAt ?? null));
-  const [locationName, setLocationName] = useState(entry?.locationName ?? '');
-  const [locationAddress, setLocationAddress] = useState(entry?.locationAddress ?? '');
-  const [locationMapLink, setLocationMapLink] = useState(entry?.locationMapLink ?? '');
-  const [bookingReference, setBookingReference] = useState(entry?.bookingReference ?? '');
+  // `entry` (edit mode) always wins; `initialValues` only ever seeds a
+  // create-mode form (spec-ideas' convert step).
+  const seed = entry ?? initialValues;
+  const [entryType, setEntryType] = useState<CreatableEntryType>(seed?.entryType ?? 'ACTIVITY');
+  const [subtype, setSubtype] = useState(seed?.subtype ?? '');
+  const [title, setTitle] = useState(seed?.title ?? '');
+  const [description, setDescription] = useState(seed?.description ?? '');
+  const [startAt, setStartAt] = useState(toDateTimeLocal(seed?.startAt ?? null));
+  const [endAt, setEndAt] = useState(toDateTimeLocal(seed?.endAt ?? null));
+  const [locationName, setLocationName] = useState(seed?.locationName ?? '');
+  const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
+  const [locationMapLink, setLocationMapLink] = useState(seed?.locationMapLink ?? '');
+  const [bookingReference, setBookingReference] = useState(seed?.bookingReference ?? '');
   const [expenseAmount, setExpenseAmount] = useState(
-    entry?.expenseAmount != null ? String(entry.expenseAmount) : '',
+    seed?.expenseAmount != null ? String(seed.expenseAmount) : '',
   );
-  const [expenseCurrency, setExpenseCurrency] = useState(entry?.expenseCurrency ?? '');
-  const [expensePaymentStatus, setExpensePaymentStatus] = useState(entry?.expensePaymentStatus ?? '');
-  const [expensePaymentNote, setExpensePaymentNote] = useState(entry?.expensePaymentNote ?? '');
-  const [contactName, setContactName] = useState(entry?.contactName ?? '');
-  const [contactPhone, setContactPhone] = useState(entry?.contactPhone ?? '');
-  const [contactEmail, setContactEmail] = useState(entry?.contactEmail ?? '');
-  const [notes, setNotes] = useState(entry?.notes ?? '');
-  const [postTripNotes, setPostTripNotes] = useState(entry?.postTripNotes ?? '');
+  const [expenseCurrency, setExpenseCurrency] = useState(seed?.expenseCurrency ?? '');
+  const [expensePaymentStatus, setExpensePaymentStatus] = useState(seed?.expensePaymentStatus ?? '');
+  const [expensePaymentNote, setExpensePaymentNote] = useState(seed?.expensePaymentNote ?? '');
+  const [contactName, setContactName] = useState(seed?.contactName ?? '');
+  const [contactPhone, setContactPhone] = useState(seed?.contactPhone ?? '');
+  const [contactEmail, setContactEmail] = useState(seed?.contactEmail ?? '');
+  const [notes, setNotes] = useState(seed?.notes ?? '');
+  const [postTripNotes, setPostTripNotes] = useState(seed?.postTripNotes ?? '');
 
-  const typeDetails = entry?.typeDetails ?? {};
+  const typeDetails = seed?.typeDetails ?? {};
   const [roomInfo, setRoomInfo] = useState(str(typeDetails.roomInfo));
   const [terminal, setTerminal] = useState(str(typeDetails.terminal));
   const [gate, setGate] = useState(str(typeDetails.gate));
@@ -184,7 +196,8 @@ export function EntryForm({ tripId, mode, entry, onSaved, onCancel }: EntryFormP
 
     setSubmitting(true);
     try {
-      const url = mode === 'create' ? '/api/v1/timeline-entries' : `/api/v1/timeline-entries/${entry!.id}`;
+      const url =
+        apiUrl ?? (mode === 'create' ? '/api/v1/timeline-entries' : `/api/v1/timeline-entries/${entry!.id}`);
       const method = mode === 'create' ? 'POST' : 'PATCH';
 
       const response = await fetch(url, {

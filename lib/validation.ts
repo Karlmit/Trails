@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { locationFields } from '@/lib/entry-types/shared-fields.schema';
 
 // Shared cross-field helpers used by the Trip/Section Zod schemas (AD-1's
 // "one Zod schema" convention, applied here even though TimelineEntry
@@ -119,3 +120,76 @@ export const sectionUpdateSchema = z
       !data.startDate || !data.endDate || data.endDate.getTime() >= data.startDate.getTime(),
     { message: 'End date must be on or after the start date', path: ['endDate'] },
   );
+
+// FR-16/FR-17, spec-ideas: Idea CRUD, mirroring the Section schema shape
+// above (a single flat schema, not AD-1's per-type-discriminator pattern --
+// Idea has only one shape). Scoped to spec-ideas.md's literal field list.
+
+export const IDEA_PRIORITIES = ['MUST_DO', 'WOULD_LIKE', 'MAYBE'] as const;
+export const WEATHER_SUITABILITIES = ['INDOOR', 'OUTDOOR', 'EITHER'] as const;
+
+// Estimated expense (FR-16): amount+currency travel together or not at all,
+// same "both or neither" rule as TimelineEntry's Expense (FR-22) --
+// duplicated here (rather than imported from lib/entry-types/shared-fields.schema.ts)
+// since the field names differ (estimated* vs Entry's expense*) and Idea
+// deliberately has no payment status/note.
+const estimatedExpenseAmountField = z
+  .number()
+  .nonnegative('Estimated expense amount cannot be negative')
+  .max(9999999999.99, 'Estimated expense amount is too large')
+  .optional()
+  .nullable();
+
+const estimatedExpenseCurrencyField = z
+  .string()
+  .trim()
+  .length(3, 'Currency must be a 3-letter code (e.g. USD)')
+  .transform((value) => value.toUpperCase())
+  .optional()
+  .nullable();
+
+export function hasEstimatedExpensePair(data: {
+  estimatedExpenseAmount?: number | null;
+  estimatedExpenseCurrency?: string | null;
+}): boolean {
+  const hasAmount = data.estimatedExpenseAmount !== undefined && data.estimatedExpenseAmount !== null;
+  const hasCurrency =
+    data.estimatedExpenseCurrency !== undefined && data.estimatedExpenseCurrency !== null;
+  return hasAmount === hasCurrency;
+}
+
+const ideaFieldsShape = {
+  title: z.string().trim().min(1, 'Title is required').max(200),
+  category: z.string().trim().max(200).optional().nullable(),
+  priority: z.enum(IDEA_PRIORITIES, {
+    message: `priority must be one of: ${IDEA_PRIORITIES.join(', ')}`,
+  }),
+  weatherSuitability: z.enum(WEATHER_SUITABILITIES, {
+    message: `weatherSuitability must be one of: ${WEATHER_SUITABILITIES.join(', ')}`,
+  }),
+  // No `.default([])` here deliberately -- same reasoning as
+  // lib/entry-types/stay.schema.ts's `typeDetails` comment: `ideaUpdateSchema`
+  // below is this same shape run through `.partial()`, and a PATCH that
+  // omits `weatherTags` must leave the stored array untouched, not overwrite
+  // it with `[]`. Defaulting to `[]` on create happens in the Route Handler
+  // instead (app/api/v1/ideas/route.ts).
+  weatherTags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
+  // AD-11: Idea is one of AD-11's Location-owning rows -- same shape/
+  // validation as TimelineEntry's Location fields, reused directly rather
+  // than redefined (unlike the expense fields above, which differ in name).
+  ...locationFields,
+  estimatedExpenseAmount: estimatedExpenseAmountField,
+  estimatedExpenseCurrency: estimatedExpenseCurrencyField,
+};
+
+export const ideaFieldsSchema = z.object(ideaFieldsShape).strict();
+
+export const ideaCreateSchema = z
+  .object({ tripId: z.string().uuid('tripId must be a valid UUID'), ...ideaFieldsShape })
+  .strict()
+  .refine(hasEstimatedExpensePair, {
+    message: 'Estimated expense requires both an amount and a currency',
+    path: ['estimatedExpenseCurrency'],
+  });
+
+export const ideaUpdateSchema = ideaFieldsSchema.partial();

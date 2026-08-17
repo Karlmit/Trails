@@ -9,6 +9,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
   const tabs = [
     { href: `/trips/${tripId}/timeline`, label: 'Timeline' },
     { href: `/trips/${tripId}/sections`, label: 'Sections' },
+    { href: `/trips/${tripId}/ideas`, label: 'Ideas' },
     { href: `/trips/${tripId}/overview`, label: 'Overview' },
   ];
 

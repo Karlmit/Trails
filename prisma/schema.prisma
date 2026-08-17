@@ -85,6 +85,7 @@ model Trip {
 
   sections       Section[]
   timelineEntries TimelineEntry[]
+  ideas          Idea[]
 
   @@map("trips")
 }
@@ -105,6 +106,71 @@ model Section {
 
   @@index([tripId])
   @@map("sections")
+}
+
+// FR-16/FR-17, spec-ideas: an unconfirmed candidate, not shown on the
+// Timeline. Scoped to spec-ideas.md's literal field list (title, category,
+// priority, weather suitability + free-form tags, estimated expense) plus
+// AD-11's Location fields (Idea is explicitly one of AD-11's Location-owning
+// rows -- an Idea is "a candidate place or activity," per the PRD Glossary;
+// omitting it from the initial pass was a spec gap, not a deliberate
+// exclusion, unlike Tags/Links/Photos below). No Tags/Links/Photos
+// (AD-4's polymorphic tables are still deferred, same exclusion already
+// applied to TimelineEntry).
+enum IdeaPriority {
+  MUST_DO
+  WOULD_LIKE
+  MAYBE
+
+  @@map("idea_priority")
+}
+
+enum WeatherSuitability {
+  INDOOR
+  OUTDOOR
+  EITHER
+
+  @@map("weather_suitability")
+}
+
+model Idea {
+  id     String @id @default(uuid()) @db.Uuid
+  tripId String @map("trip_id") @db.Uuid
+
+  title              String
+  category           String?
+  priority           IdeaPriority
+  weatherSuitability WeatherSuitability @map("weather_suitability")
+  // Free-form tags (e.g. "Rainy day"), distinct from AD-4's still-deferred
+  // polymorphic Tag table -- a plain array column owned entirely by Idea.
+  weatherTags        String[]           @default([]) @map("weather_tags")
+
+  // AD-11: Location is always embedded plain columns, never a shared
+  // entity -- same shape as TimelineEntry's Location fields (lib/entry-
+  // types/shared-fields.schema.ts's locationFields), carried over verbatim
+  // on conversion (FR-17).
+  locationName    String?  @map("location_name")
+  locationAddress String?  @map("location_address")
+  locationLat     Decimal? @map("location_lat") @db.Decimal(9, 6)
+  locationLng     Decimal? @map("location_lng") @db.Decimal(9, 6)
+  locationMapLink String?  @map("location_map_link")
+
+  // Estimated expense (FR-16): amount+currency travel together or not at
+  // all, same "both or neither" rule as TimelineEntry's Expense (FR-22),
+  // enforced in lib/validation.ts, not a DB constraint. Converting an Idea
+  // (FR-17) maps this pair onto the new TimelineEntry's own Expense fields.
+  estimatedExpenseAmount   Decimal? @map("estimated_expense_amount") @db.Decimal(12, 2)
+  estimatedExpenseCurrency String?  @map("estimated_expense_currency")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Converting an Idea deletes it (FR-17) -- no stored link survives to a
+  // TimelineEntry it became; Cascade here only covers Trip deletion.
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("ideas")
 }
 
 // AD-1: TimelineEntry is one table discriminated by `entry_type`

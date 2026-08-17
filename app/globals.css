@@ -379,6 +379,25 @@ p {
   color: var(--color-text-soft);
 }
 
+/* Idea Priority -- distinct from Trip Status badges above (semantically
+   unrelated; reusing those classes collapsed Would-like/Maybe into one
+   style). Three tiers of visual commitment, brand palette only -- gold
+   stays reserved for the Active-trip ceremony. */
+.badge-priority-must-do {
+  background: var(--color-brand-accent);
+  color: #fff;
+}
+
+.badge-priority-would-like {
+  background: var(--color-brand-mint);
+  color: var(--color-brand-deep);
+}
+
+.badge-priority-maybe {
+  background: var(--color-surface-cool);
+  color: var(--color-text-soft);
+}
+
 /* Main content shell */
 .page {
   max-width: 960px;
@@ -649,6 +668,18 @@ p {
   height: 12px;
   border-radius: 3px;
   background: var(--swatch-color, var(--color-brand-mint));
+}
+
+/* Idea weather-tag chip (FR-16) -- full-pill radius, same universal shape
+   as buttons/badges, on a quiet neutral surface (not a CTA, not a status). */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.8rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-cool);
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
 }
 
 .stack {
