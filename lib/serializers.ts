@@ -1,4 +1,13 @@
-import type { Attachment, Checklist, ChecklistItem, Idea, Section, TimelineEntry, Trip } from '@prisma/client';
+import type {
+  Attachment,
+  Checklist,
+  ChecklistItem,
+  Idea,
+  ImportantInfo,
+  Section,
+  TimelineEntry,
+  Trip,
+} from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
 export function serializeTrip(trip: Trip) {
@@ -113,6 +122,28 @@ export function serializeChecklistItem(item: ChecklistItem) {
     text: item.text,
     checked: item.checked,
     note: item.note,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+// FR-26, spec-important-info: same shape/conventions as serializeSection
+// above.
+export function serializeImportantInfo(item: ImportantInfo) {
+  return {
+    id: item.id,
+    tripId: item.tripId,
+    title: item.title,
+    content: item.content,
+    locationName: item.locationName,
+    locationAddress: item.locationAddress,
+    locationLat: decimalToNumber(item.locationLat),
+    locationLng: decimalToNumber(item.locationLng),
+    locationMapLink: item.locationMapLink,
+    contactName: item.contactName,
+    contactPhone: item.contactPhone,
+    contactEmail: item.contactEmail,
+    isPrivate: item.isPrivate,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };

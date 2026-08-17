@@ -51,6 +51,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const entry = await prisma.timelineEntry.findUnique({ where: { id: existing.ownerId } });
     if (entry) revalidatePath(entryDetailHref(existing.tripId, entry.entryType, entry.id));
   }
+  if (existing.ownerType === 'IMPORTANT_INFO') {
+    revalidatePath(`/trips/${existing.tripId}/important-info`);
+  }
 
   return new NextResponse(null, { status: 204 });
 }

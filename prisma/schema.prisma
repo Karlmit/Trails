@@ -90,6 +90,7 @@ model Trip {
   ideas          Idea[]
   checklists     Checklist[]
   attachments    Attachment[]
+  importantInfo  ImportantInfo[]
 
   @@map("trips")
 }
@@ -346,14 +347,58 @@ model ChecklistItem {
   @@map("checklist_items")
 }
 
+// FR-26, spec-important-info: trip-wide reference content that isn't tied to
+// any one Entry -- insurance, passport copies, visa info, emergency
+// contacts, embassy details, SIM/eSIM, addresses, emergency instructions.
+// Same "Trip has many, no Section association" shape as Checklist (spec's
+// frozen Intent) -- no date of its own to derive Section membership from.
+// Location/Contact fields are AD-11/FR-15's shared shape, reused verbatim
+// from lib/entry-types/shared-fields.schema.ts's locationFields/contactFields
+// (same columns as TimelineEntry/Idea).
+model ImportantInfo {
+  id     String @id @default(uuid()) @db.Uuid
+  tripId String @map("trip_id") @db.Uuid
+
+  title   String
+  content String?
+
+  locationName    String?  @map("location_name")
+  locationAddress String?  @map("location_address")
+  locationLat     Decimal? @map("location_lat") @db.Decimal(9, 6)
+  locationLng     Decimal? @map("location_lng") @db.Decimal(9, 6)
+  locationMapLink String?  @map("location_map_link")
+
+  contactName  String? @map("contact_name")
+  contactPhone String? @map("contact_phone")
+  contactEmail String? @map("contact_email")
+
+  // FR-26's `isPrivate` toggle is stored and PATCH-toggleable but has no
+  // read-time enforcement effect in this pass -- AD-10 is explicit that
+  // Important Info sits entirely behind requireAuth already (no Guest
+  // surface exists yet for this flag to exclude an item from). See
+  // spec-important-info.md's disclosed "isPrivate" note.
+  isPrivate Boolean @default(false) @map("is_private")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // No Section field anywhere (spec's "Never" boundary) -- Trip is the only
+  // relation, same as Checklist.
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("important_info")
+}
+
 // FR-24/FR-25, spec-documents: a file uploaded to some owning row. AD-4's
 // Rule enumerates owner_type as "one of TimelineEntry | Idea | ImportantInfo"
-// -- only TIMELINE_ENTRY exists as a member today (ImportantInfo has no
-// table yet; Idea deliberately never gets Attachment support per FR-16).
-// Extending this enum later (e.g. adding IMPORTANT_INFO) is additive and
-// touches no existing row.
+// -- TIMELINE_ENTRY and IMPORTANT_INFO are real members (Idea deliberately
+// never gets Attachment support per FR-16). IMPORTANT_INFO was added by
+// spec-important-info.md's migration (prisma/migrations/<timestamp>_important_info)
+// via `ALTER TYPE ... ADD VALUE`, additive and touching no existing row.
 enum AttachmentOwnerType {
   TIMELINE_ENTRY
+  IMPORTANT_INFO
 
   @@map("attachment_owner_type")
 }

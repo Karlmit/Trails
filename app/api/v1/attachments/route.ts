@@ -7,26 +7,27 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, buildUploadPath, isAllowedMimeType } from '@/lib/attachments';
+import { serializeAttachment } from '@/lib/serializers';
+import { isForeignKeyViolationError } from '@/lib/db-errors';
+import { isUuid } from '@/lib/uuid';
+import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 
 // A generous cap on the *stored, unsanitized* original filename -- well
 // above any real filename, just enough to keep it out of Content-Disposition
 // header-size territory (see the check at the point of use below).
 const MAX_ORIGINAL_FILENAME_LENGTH = 255;
-import { serializeAttachment } from '@/lib/serializers';
-import { isForeignKeyViolationError } from '@/lib/db-errors';
-import { isUuid } from '@/lib/uuid';
-import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 
 // FR-24/FR-25, spec-documents: Attachment upload (multipart) + list, mirroring
 // app/api/v1/checklists' Route Handler conventions (auth check, isUuid,
 // Errors helper, revalidatePath) as closely as a file-upload endpoint can.
 //
 // AD-4: `ownerType` is `TimelineEntry | Idea | ImportantInfo` in the
-// architecture, but only `TIMELINE_ENTRY` is a real enum member yet (Idea
-// never gets Attachments per FR-16; ImportantInfo has no table). This route
-// is written generically against the enum so a later ImportantInfo spec can
-// add a case here without restructuring anything.
-const ATTACHMENT_OWNER_TYPES = ['TIMELINE_ENTRY'] as const;
+// architecture -- `TIMELINE_ENTRY` and `IMPORTANT_INFO` are both real enum
+// members (Idea never gets Attachments per FR-16). spec-important-info added
+// the `IMPORTANT_INFO` branch below exactly as spec-documents' Intent
+// predicted: a new enum member + one new branch in resolveOwnerTripId, no
+// other Attachment code changes.
+const ATTACHMENT_OWNER_TYPES = ['TIMELINE_ENTRY', 'IMPORTANT_INFO'] as const;
 
 function isAttachmentOwnerType(value: string): value is AttachmentOwnerType {
   return (ATTACHMENT_OWNER_TYPES as readonly string[]).includes(value);
@@ -34,17 +35,25 @@ function isAttachmentOwnerType(value: string): value is AttachmentOwnerType {
 
 /**
  * Resolves `tripId` from the owner row per AD-5 ("the upload handler
- * resolves trip_id via the owner lookup before writing"). Only
- * TIMELINE_ENTRY exists today; a future ownerType adds a branch here.
+ * resolves trip_id via the owner lookup before writing"). `entryType` is
+ * only meaningful for a TIMELINE_ENTRY owner (used by revalidateForOwner
+ * below to pick the right Entry detail path) -- ImportantInfo has no
+ * entryType concept at all, so that field is simply omitted for it rather
+ * than the function growing an owner-type-specific return shape.
  */
 async function resolveOwnerTripId(
   ownerType: AttachmentOwnerType,
   ownerId: string,
-): Promise<{ tripId: string; entryType: string } | null> {
+): Promise<{ tripId: string; entryType?: string } | null> {
   if (ownerType === 'TIMELINE_ENTRY') {
     const entry = await prisma.timelineEntry.findUnique({ where: { id: ownerId } });
     if (!entry) return null;
     return { tripId: entry.tripId, entryType: entry.entryType };
+  }
+  if (ownerType === 'IMPORTANT_INFO') {
+    const item = await prisma.importantInfo.findUnique({ where: { id: ownerId } });
+    if (!item) return null;
+    return { tripId: item.tripId };
   }
   return null;
 }
@@ -53,6 +62,9 @@ function revalidateForOwner(tripId: string, ownerType: AttachmentOwnerType, owne
   revalidatePath(`/trips/${tripId}/documents`);
   if (ownerType === 'TIMELINE_ENTRY' && entryType) {
     revalidatePath(entryDetailHref(tripId, entryType, ownerId));
+  }
+  if (ownerType === 'IMPORTANT_INFO') {
+    revalidatePath(`/trips/${tripId}/important-info`);
   }
 }
 
