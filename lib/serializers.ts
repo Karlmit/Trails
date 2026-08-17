@@ -1,4 +1,4 @@
-import type { Idea, Section, TimelineEntry, Trip } from '@prisma/client';
+import type { Checklist, ChecklistItem, Idea, Section, TimelineEntry, Trip } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
 export function serializeTrip(trip: Trip) {
@@ -91,5 +91,29 @@ export function serializeIdea(idea: Idea) {
     estimatedExpenseCurrency: idea.estimatedExpenseCurrency,
     createdAt: idea.createdAt.toISOString(),
     updatedAt: idea.updatedAt.toISOString(),
+  };
+}
+
+// FR-21, spec-checklists: same shape/conventions as serializeSection above.
+export function serializeChecklist(checklist: Checklist) {
+  return {
+    id: checklist.id,
+    tripId: checklist.tripId,
+    title: checklist.title,
+    description: checklist.description,
+    createdAt: checklist.createdAt.toISOString(),
+    updatedAt: checklist.updatedAt.toISOString(),
+  };
+}
+
+export function serializeChecklistItem(item: ChecklistItem) {
+  return {
+    id: item.id,
+    checklistId: item.checklistId,
+    text: item.text,
+    checked: item.checked,
+    note: item.note,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
   };
 }

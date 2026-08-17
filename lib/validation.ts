@@ -193,3 +193,43 @@ export const ideaCreateSchema = z
   });
 
 export const ideaUpdateSchema = ideaFieldsSchema.partial();
+
+// FR-21, spec-checklists: Checklist/ChecklistItem CRUD, mirroring the
+// Section/Idea schema shape above. Both schemas are `.strict()` so an
+// unlisted field (spec's "Ask First" boundary -- nothing beyond
+// title/description on Checklist, text/checked/note on ChecklistItem) is
+// rejected as a 400 rather than silently ignored.
+
+export const checklistCreateSchema = z
+  .object({
+    tripId: z.string().uuid('tripId must be a valid UUID'),
+    title: z.string().trim().min(1, 'Title is required').max(200),
+    description: z.string().trim().max(5000).optional().nullable(),
+  })
+  .strict();
+
+export const checklistUpdateSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Title is required').max(200).optional(),
+    description: z.string().trim().max(5000).optional().nullable(),
+  })
+  .strict();
+
+export const checklistItemCreateSchema = z
+  .object({
+    checklistId: z.string().uuid('checklistId must be a valid UUID'),
+    text: z.string().trim().min(1, 'Text is required').max(500),
+    note: z.string().trim().max(2000).optional().nullable(),
+  })
+  .strict();
+
+// Toggling checked state (FR-21's single-tap action) is just a PATCH whose
+// body is `{ checked }` -- no separate endpoint from general item edits, so
+// this one schema covers both.
+export const checklistItemUpdateSchema = z
+  .object({
+    text: z.string().trim().min(1, 'Text is required').max(500).optional(),
+    checked: z.boolean().optional(),
+    note: z.string().trim().max(2000).optional().nullable(),
+  })
+  .strict();

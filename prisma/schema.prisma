@@ -86,6 +86,7 @@ model Trip {
   sections       Section[]
   timelineEntries TimelineEntry[]
   ideas          Idea[]
+  checklists     Checklist[]
 
   @@map("trips")
 }
@@ -296,4 +297,48 @@ model TimelineEntry {
   // index the Timeline's ~1s performance NFR depends on."
   @@index([tripId, startAt])
   @@map("timeline_entries")
+}
+
+// FR-21, spec-checklists: a Trip may have multiple Checklists (packing
+// lists, pre-departure tasks, ...). Deliberately no Section association of
+// any kind -- Checklists have no date of their own to derive Section
+// membership from, and no manual tag either (spec's frozen Intent).
+model Checklist {
+  id     String @id @default(uuid()) @db.Uuid
+  tripId String @map("trip_id") @db.Uuid
+
+  title       String
+  description String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // No Section field anywhere on Checklist or ChecklistItem (spec's
+  // "Never" boundary) -- Trip is the only relation.
+  trip  Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([tripId])
+  @@map("checklists")
+}
+
+// A Checklist Item's `checked` toggle is a single-request, no-confirmation
+// action (spec's "Always" boundary, PRD FR-21's "single-tap action").
+model ChecklistItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  checklistId String  @map("checklist_id") @db.Uuid
+
+  text    String
+  checked Boolean @default(false)
+  note    String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Cascade from Checklist to its Items (spec's Code Map) -- deleting a
+  // Checklist deletes its Items, never orphaning rows.
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+  @@map("checklist_items")
 }

@@ -735,3 +735,63 @@ p {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-4);
 }
+
+/* Checklist (FR-21) -- an Item row is a single-tap checkbox toggle (no
+   confirmation dialog per the spec's "Always" boundary), so it stays a
+   plain native checkbox rather than a button that opens anything. */
+.checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.checklist-item-checkbox {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  accent-color: var(--color-brand-accent);
+  cursor: pointer;
+}
+
+.checklist-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.checklist-item-text {
+  word-break: break-word;
+}
+
+.checklist-item.is-checked .checklist-item-text {
+  text-decoration: line-through;
+  color: var(--color-text-soft);
+}
+
+.checklist-item-note {
+  font-size: 0.85rem;
+  color: var(--color-text-soft);
+}
+
+.checklist-item-remove {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: var(--space-1);
+}
+
+.checklist-item-remove:hover {
+  color: var(--color-danger);
+}
