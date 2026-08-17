@@ -34,6 +34,29 @@ export function isDateOrderValid(startDate: Date, endDate: Date): boolean {
   return endDate.getTime() >= startDate.getTime();
 }
 
+/**
+ * TimelineEntry's `start_at`/`end_at` (AD-1) are full timestamps, not
+ * calendar dates -- unlike `dateOnly` above, this preserves time-of-day and
+ * accepts any ISO 8601 datetime string.
+ */
+export const dateTimeField = z
+  .string()
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Must be a valid date/time' })
+  .transform((value) => new Date(value));
+
+/**
+ * Shared start/end ordering check for TimelineEntry types (FR-11/FR-12
+ * require a strictly later end; FR-13 allows an Activity's end to equal its
+ * start). Same merge-after-partial-PATCH usage pattern as isDateOrderValid.
+ */
+export function isDateTimeOrderValid(
+  startAt: Date,
+  endAt: Date,
+  { allowEqual = false }: { allowEqual?: boolean } = {},
+): boolean {
+  return allowEqual ? endAt.getTime() >= startAt.getTime() : endAt.getTime() > startAt.getTime();
+}
+
 export const timezoneField = z
   .string()
   .trim()

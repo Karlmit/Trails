@@ -1,5 +1,6 @@
-// Trails — foundation schema (User, Session, Trip, Section only).
-// TimelineEntry and everything else in AD-1/AD-4 lands in a later spec.
+// Trails — foundation schema (User, Session, Trip, Section, TimelineEntry).
+// AD-4's polymorphic Tags/Links/Photos/Attachments tables are still a later
+// spec (spec-timeline-entries explicitly excludes file upload UI).
 //
 // AD-2's Section EXCLUDE USING gist constraint (btree_gist) is not
 // representable in the Prisma schema language. It is added as raw SQL in
@@ -82,7 +83,8 @@ model Trip {
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sections Section[]
+  sections       Section[]
+  timelineEntries TimelineEntry[]
 
   @@map("trips")
 }
@@ -103,4 +105,129 @@ model Section {
 
   @@index([tripId])
   @@map("sections")
+}
+
+// AD-1: TimelineEntry is one table discriminated by `entry_type`
+// (spec-timeline-entries implements Stay/Transport/Activity/Note now;
+// BlogPost is a valid discriminator value per AD-1's literal rule so a
+// later Blog spec is an additive change, not a migration -- but no
+// create/edit path in this spec ever writes entryType=BLOG_POST).
+enum EntryType {
+  STAY
+  TRANSPORT
+  ACTIVITY
+  NOTE
+  BLOG_POST
+
+  @@map("entry_type")
+}
+
+// Entry Subtype (FR-11/FR-12/FR-13): one enum spanning every type's
+// allowed values, each prefixed distinctly per type (STAY_OTHER vs
+// TRANSPORT_OTHER vs ACTIVITY_OTHER) so the *database* column itself can
+// never hold a value from the wrong type's subtype set -- defense in depth
+// on top of the per-entry_type Zod schema (lib/entry-types/*.schema.ts)
+// that is the actual enforcement point per AD-1/FR-15.
+enum EntrySubtype {
+  // Stay (FR-11)
+  HOTEL
+  HOSTEL
+  RESORT
+  APARTMENT
+  VILLA
+  GUESTHOUSE
+  STAY_OTHER
+  // Transport (FR-12)
+  FLIGHT
+  TRAIN
+  FERRY
+  BUS
+  CAR
+  TAXI
+  TRANSFER
+  TRANSPORT_OTHER
+  // Activity (FR-13)
+  TOUR
+  RESTAURANT
+  ATTRACTION
+  EVENT
+  BEACH
+  HIKE
+  MUSEUM
+  SHOPPING
+  NIGHTLIFE
+  ACTIVITY_OTHER
+
+  @@map("entry_subtype")
+}
+
+model TimelineEntry {
+  id        String    @id @default(uuid()) @db.Uuid
+  tripId    String    @map("trip_id") @db.Uuid
+  entryType EntryType @map("entry_type")
+  subtype   EntrySubtype?
+
+  title       String
+  description String?
+
+  // AD-1: one shared temporal pair for every type, both UTC (AD-8). `endAt`
+  // is NULL for a Note (date-only) and may be NULL for a point-in-time
+  // Activity; Stay/Transport always populate it (checked in the per-type
+  // Zod schema, not a DB constraint, so the error stays a clean 400 per
+  // AD-1's "validated ... against exactly one Zod schema per entry_type").
+  startAt DateTime  @map("start_at") @db.Timestamptz(6)
+  endAt   DateTime? @map("end_at") @db.Timestamptz(6)
+
+  // AD-11: Location is embedded plain columns, never a shared entity --
+  // one Location per row, used by Stay/Transport/Activity, left NULL for
+  // Note (FR-14: "no Location ... fields ... shown for this type").
+  locationName    String?  @map("location_name")
+  locationAddress String?  @map("location_address")
+  locationLat     Decimal? @map("location_lat") @db.Decimal(9, 6)
+  locationLng     Decimal? @map("location_lng") @db.Decimal(9, 6)
+  locationMapLink String?  @map("location_map_link")
+
+  // Shared per FR-15, but withheld for Note (FR-14).
+  bookingReference String? @map("booking_reference")
+
+  // Expense (FR-22 is out of scope for aggregation, but recording one on an
+  // Entry here is explicitly in scope per this spec's "Ask First" note).
+  expenseAmount        Decimal? @map("expense_amount") @db.Decimal(12, 2)
+  expenseCurrency      String?  @map("expense_currency")
+  expensePaymentStatus String?  @map("expense_payment_status")
+  expensePaymentNote   String?  @map("expense_payment_note")
+
+  // Contact Information (FR-15) -- shared across every type, Note included.
+  contactName  String? @map("contact_name")
+  contactPhone String? @map("contact_phone")
+  contactEmail String? @map("contact_email")
+
+  // Distinct from Post-Trip Notes (FR-15): planning-time notes vs. notes
+  // added and retained after the Trip is Completed.
+  notes         String?
+  postTripNotes String? @map("post_trip_notes")
+
+  // AD-1: genuinely type-only fields (Stay's room info; Transport's
+  // terminal/gate/platform/service number/seat/baggage), validated per
+  // entry_type by exactly one Zod schema each (lib/entry-types/*.schema.ts).
+  // Never defined or inferred independently anywhere else.
+  typeDetails Json @default("{}") @map("type_details")
+
+  // AD-1: real shared column, not JSONB. NULL = Draft, set = Published
+  // (FR-19). Unused by this spec's create/edit paths (always NULL here) --
+  // reserved for the Blog spec, which is why it must already exist as a
+  // real column rather than a later migration.
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // No stored Section reference (AD-2) -- Section membership is always
+  // derived from `startAt` at render time, never a foreign key here.
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  // AD-1: "Index (trip_id, start_at) on timeline_entries; this is the
+  // index the Timeline's ~1s performance NFR depends on."
+  @@index([tripId, startAt])
+  @@map("timeline_entries")
 }

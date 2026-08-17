@@ -1,4 +1,4 @@
-import { dateKeyOfDateColumn } from '@/lib/trip-status';
+import { dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
 
 export interface TimelineDay {
   dateKey: string; // YYYY-MM-DD
@@ -93,4 +93,143 @@ export function buildTimelineDays(
       ),
     };
   });
+}
+
+// spec-timeline-entries: TimelineEntry rendering on the graph spine. A
+// single-day entry (its start/end fall on the same calendar day, in the
+// Trip's own timezone per AD-8) is a dot on that day's node/content. A
+// multi-day entry spans a colored pill down an offset lane, kept distinct
+// from the Section rail/band column so it never visually collides with it
+// (FR-11..FR-15 I/O matrix: "multi-day entries render as spanning pills on
+// an offset lane, not overlapping the Section rail").
+
+export interface EntryForLayout {
+  id: string;
+  entryType: string;
+  subtype: string | null;
+  title: string;
+  startAt: Date;
+  endAt: Date | null;
+}
+
+export interface TimelineEntryDot {
+  id: string;
+  entryType: string;
+  subtype: string | null;
+  title: string;
+}
+
+export interface TimelineLaneSegment {
+  entryId: string;
+  entryType: string;
+  subtype: string | null;
+  title: string;
+  // True on the first/last rendered day of this entry's span -- used to
+  // draw the pill's rounded caps only at its actual ends, flush in between,
+  // so several stacked day-rows read as one continuous pill.
+  isStart: boolean;
+  isEnd: boolean;
+}
+
+export interface TimelineDayWithEntries extends TimelineDay {
+  dots: TimelineEntryDot[];
+  // Index = lane number; `null` where no pill occupies that lane this day.
+  laneSegments: Array<TimelineLaneSegment | null>;
+}
+
+export interface TimelineLayout {
+  days: TimelineDayWithEntries[];
+  laneCount: number;
+}
+
+/**
+ * Merges TimelineEntries onto an already-built `days` array (from
+ * buildTimelineDays). Kept as a separate function -- rather than folding
+ * into buildTimelineDays -- so Section-band logic and Entry-layout logic
+ * stay independently testable, per this spec's "unit-tested" task.
+ */
+export function layoutTimelineEntries(
+  days: TimelineDay[],
+  entries: EntryForLayout[],
+  timezone: string,
+): TimelineLayout {
+  const dotsByIndex = new Map<number, TimelineEntryDot[]>();
+  const segmentsByIndex = new Map<number, Map<number, TimelineLaneSegment>>();
+  // Lane index -> dateKey of the last day that lane is occupied through.
+  const laneEnds: string[] = [];
+
+  const sorted = [...entries].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  for (const entry of sorted) {
+    const startKey = dateKeyInTimezone(entry.startAt, timezone);
+    const endKey = entry.endAt ? dateKeyInTimezone(entry.endAt, timezone) : startKey;
+
+    if (startKey === endKey) {
+      const index = days.findIndex((day) => day.dateKey === startKey);
+      // Defensive: an entry dated outside the Trip's own range is dropped
+      // from rendering rather than crashing -- validation should prevent
+      // this in practice, but the layout function must stay total.
+      if (index === -1) continue;
+      const list = dotsByIndex.get(index) ?? [];
+      list.push({ id: entry.id, entryType: entry.entryType, subtype: entry.subtype, title: entry.title });
+      dotsByIndex.set(index, list);
+      continue;
+    }
+
+    const firstIndex = days.findIndex((day) => day.dateKey >= startKey);
+    if (firstIndex === -1) continue; // entirely after the Trip's range
+
+    let lastIndex = -1;
+    for (let i = days.length - 1; i >= 0; i -= 1) {
+      if (days[i].dateKey <= endKey) {
+        lastIndex = i;
+        break;
+      }
+    }
+    if (lastIndex === -1 || firstIndex > lastIndex) continue; // entirely before/outside range
+
+    // Greedy interval coloring: the first lane whose most recent occupant
+    // ends on or before this entry's start (dateKeys are YYYY-MM-DD, so
+    // plain string comparison sorts correctly) -- same "touching endpoints
+    // are not an overlap" convention as Section bands (buildTimelineDays
+    // above), so a Stay ending the day a following Stay begins reuses the
+    // lane instead of wasting a second one on two ranges that never
+    // actually overlap. On their shared boundary day, the later entry's
+    // segment simply takes that day's cell in the lane (entries are
+    // processed in start-date order, so it's written last) -- an
+    // arbitrary-but-consistent pick, same as which Section a shared
+    // boundary day's band renders under.
+    let lane = laneEnds.findIndex((lastEnd) => lastEnd <= startKey);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(endKey);
+    } else {
+      laneEnds[lane] = endKey;
+    }
+
+    for (let i = firstIndex; i <= lastIndex; i += 1) {
+      const dayLanes = segmentsByIndex.get(i) ?? new Map<number, TimelineLaneSegment>();
+      dayLanes.set(lane, {
+        entryId: entry.id,
+        entryType: entry.entryType,
+        subtype: entry.subtype,
+        title: entry.title,
+        isStart: i === firstIndex,
+        isEnd: i === lastIndex,
+      });
+      segmentsByIndex.set(i, dayLanes);
+    }
+  }
+
+  const laneCount = laneEnds.length;
+  const resultDays: TimelineDayWithEntries[] = days.map((day, index) => {
+    const laneMap = segmentsByIndex.get(index);
+    const laneSegments: Array<TimelineLaneSegment | null> = Array.from(
+      { length: laneCount },
+      (_unused, lane) => laneMap?.get(lane) ?? null,
+    );
+    return { ...day, dots: dotsByIndex.get(index) ?? [], laneSegments };
+  });
+
+  return { days: resultDays, laneCount };
 }

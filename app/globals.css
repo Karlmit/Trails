@@ -128,6 +128,14 @@ p {
   color: var(--color-text-soft);
 }
 
+/* Entered line breaks (description/notes/postTripNotes, all `<textarea>`
+   inputs) must survive on display -- these display elements have no
+   `white-space` override otherwise, so multi-line text collapses to one
+   line. */
+.text-multiline {
+  white-space: pre-wrap;
+}
+
 /* Buttons -- full-pill, universal scale(0.95) active press */
 .btn {
   display: inline-flex;
@@ -409,6 +417,11 @@ p {
   font-size: 1.8rem;
   cursor: pointer;
   transition: transform 0.2s ease;
+  text-decoration: none;
+}
+
+.fab:hover {
+  text-decoration: none;
 }
 
 .fab:active {
@@ -545,6 +558,75 @@ p {
   height: 10px;
   border-radius: 50%;
   background: var(--color-gold);
+}
+
+/* TimelineEntry rendering (spec-timeline-entries, FR-11..FR-15): a
+   single-day entry is a colored-dot "chip" in the day's content column
+   (below); a multi-day entry is a colored pill running down its own offset
+   lane, placed between the graph column and the Section band so it never
+   visually collides with the Section rail. */
+.timeline-lanes {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: stretch;
+  /* A Trip with many simultaneous multi-day entries must scroll within its
+     own region instead of blowing out the page's horizontal layout -- the
+     inline width (laneCount * 12px, set per-row in the Timeline page) is
+     capped here rather than left unbounded. */
+  max-width: 160px;
+  overflow-x: auto;
+}
+
+.timeline-lane-segment,
+.timeline-lane-empty {
+  width: 8px;
+  flex-shrink: 0;
+}
+
+.timeline-lane-segment {
+  display: block;
+  background: var(--segment-color, var(--color-brand-accent));
+}
+
+.timeline-lane-segment.is-start {
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  margin-top: 6px;
+}
+
+.timeline-lane-segment.is-end {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.entry-dot-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.entry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  width: fit-content;
+}
+
+.entry-chip:hover {
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.entry-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--color-brand-accent));
+  flex-shrink: 0;
 }
 
 .section-legend {

@@ -1,4 +1,4 @@
-import type { Section, Trip } from '@prisma/client';
+import type { Section, TimelineEntry, Trip } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
 export function serializeTrip(trip: Trip) {
@@ -28,5 +28,46 @@ export function serializeSection(section: Section) {
     endDate: section.endDate.toISOString().slice(0, 10),
     createdAt: section.createdAt.toISOString(),
     updatedAt: section.updatedAt.toISOString(),
+  };
+}
+
+// AD-1: TimelineEntry's Decimal columns (location coordinates, Expense
+// amount) come back from Prisma as Decimal.js instances -- converted to
+// plain numbers over the wire (Consistency Conventions: no envelope, plain
+// JSON values).
+function decimalToNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return Number(value);
+}
+
+export function serializeTimelineEntry(entry: TimelineEntry) {
+  return {
+    id: entry.id,
+    tripId: entry.tripId,
+    entryType: entry.entryType,
+    subtype: entry.subtype,
+    title: entry.title,
+    description: entry.description,
+    startAt: entry.startAt.toISOString(),
+    endAt: entry.endAt ? entry.endAt.toISOString() : null,
+    locationName: entry.locationName,
+    locationAddress: entry.locationAddress,
+    locationLat: decimalToNumber(entry.locationLat),
+    locationLng: decimalToNumber(entry.locationLng),
+    locationMapLink: entry.locationMapLink,
+    bookingReference: entry.bookingReference,
+    expenseAmount: decimalToNumber(entry.expenseAmount),
+    expenseCurrency: entry.expenseCurrency,
+    expensePaymentStatus: entry.expensePaymentStatus,
+    expensePaymentNote: entry.expensePaymentNote,
+    contactName: entry.contactName,
+    contactPhone: entry.contactPhone,
+    contactEmail: entry.contactEmail,
+    notes: entry.notes,
+    postTripNotes: entry.postTripNotes,
+    typeDetails: entry.typeDetails,
+    publishedAt: entry.publishedAt ? entry.publishedAt.toISOString() : null,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
   };
 }

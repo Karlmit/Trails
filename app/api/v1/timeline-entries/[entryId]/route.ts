@@ -1,0 +1,170 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { revalidatePath } from 'next/cache';
+import { ZodError } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { getUserFromApiRequest } from '@/lib/auth';
+import { Errors } from '@/lib/api-errors';
+import { serializeTimelineEntry } from '@/lib/serializers';
+import { isRecordNotFoundError } from '@/lib/db-errors';
+import { isUuid } from '@/lib/uuid';
+import { clearOrphanedExpenseDependents, hasExpensePair } from '@/lib/entry-types/shared-fields.schema';
+import {
+  UPDATE_SCHEMAS,
+  entryOutsideTripRangeError,
+  isCreatableEntryType,
+  mergedDateOrderError,
+  toEntryUpdateData,
+  type ParsedEntryFields,
+} from '@/lib/entry-types';
+
+interface RouteParams {
+  params: Promise<{ entryId: string }>;
+}
+
+function revalidateEntry(tripId: string, entryId: string) {
+  // AD-12: revalidate every Server Component route this mutation affects.
+  revalidatePath(`/trips/${tripId}/timeline`);
+  revalidatePath(`/trips/${tripId}/entries/${entryId}`);
+}
+
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  const user = await getUserFromApiRequest(request);
+  if (!user) return Errors.unauthorized();
+
+  const { entryId } = await params;
+  if (!isUuid(entryId)) return Errors.notFound('Entry not found');
+
+  const entry = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
+  // Blog Post rows aren't readable through this spec's endpoint yet (no
+  // create path ever produces one) -- same guard as PATCH below, applied
+  // consistently across every read/write path so a future BLOG_POST row is
+  // never returned through this API before its own spec (FR-18-20) exists.
+  if (!entry || !isCreatableEntryType(entry.entryType)) {
+    return Errors.notFound('Entry not found');
+  }
+
+  return NextResponse.json(serializeTimelineEntry(entry));
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const user = await getUserFromApiRequest(request);
+  if (!user) return Errors.unauthorized();
+
+  const { entryId } = await params;
+  if (!isUuid(entryId)) return Errors.notFound('Entry not found');
+
+  const existing = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
+  // Blog Post rows aren't manageable through this spec's endpoint yet (no
+  // create path ever produces one) -- treat as not-found rather than
+  // guessing at a Draft/Publish edit contract that isn't specified here.
+  if (!existing || !isCreatableEntryType(existing.entryType)) {
+    return Errors.notFound('Entry not found');
+  }
+  const entryType = existing.entryType;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Errors.validation('Request body must be valid JSON');
+  }
+  if (typeof body !== 'object' || body === null) {
+    return Errors.validation('Request body must be a JSON object');
+  }
+
+  // Entry Type is fixed at creation (AD-1's discriminator, not an editable
+  // field) -- tripId is likewise never reassigned via PATCH.
+  const { entryType: _ignoredEntryType, tripId: _ignoredTripId, ...rest } = body as Record<
+    string,
+    unknown
+  >;
+
+  let parsed: ParsedEntryFields;
+  try {
+    parsed = UPDATE_SCHEMAS[entryType].parse(rest) as ParsedEntryFields;
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return Errors.validation(err.issues[0]?.message ?? 'Invalid request body');
+    }
+    throw err;
+  }
+
+  // Merge-before-checking-order, same pattern as Section/Trip PATCH so a
+  // one-field PATCH can never invert the pair.
+  const mergedStartAt = parsed.startAt ?? existing.startAt;
+  const mergedEndAt = parsed.endAt !== undefined ? parsed.endAt : existing.endAt;
+  const orderError = mergedDateOrderError(entryType, mergedStartAt, mergedEndAt);
+  if (orderError) return Errors.validation(orderError);
+
+  // The merged start/end must still fall within the parent Trip's own date
+  // range -- otherwise it 200s but then never renders anywhere on the
+  // Timeline (layoutTimelineEntries defensively drops it).
+  const trip = await prisma.trip.findUnique({ where: { id: existing.tripId } });
+  if (!trip) return Errors.notFound('Trip not found');
+  const rangeError = entryOutsideTripRangeError(trip, mergedStartAt, mergedEndAt);
+  if (rangeError) return Errors.validation(rangeError);
+
+  // Same merge for the Expense pair (FR-22): amount and currency must
+  // still travel together after the merge, not just within this PATCH body.
+  const mergedAmount =
+    parsed.expenseAmount !== undefined
+      ? parsed.expenseAmount
+      : existing.expenseAmount !== null
+        ? Number(existing.expenseAmount)
+        : null;
+  const mergedCurrency =
+    parsed.expenseCurrency !== undefined ? parsed.expenseCurrency : existing.expenseCurrency;
+  if (!hasExpensePair({ expenseAmount: mergedAmount, expenseCurrency: mergedCurrency })) {
+    return Errors.validation('Expense requires both an amount and a currency');
+  }
+  // Clearing the Expense pair (merged amount+currency both null) must also
+  // clear its dependent payment status/note, not leave them orphaned
+  // pointing at an Expense that no longer exists.
+  clearOrphanedExpenseDependents(parsed, { expenseAmount: mergedAmount, expenseCurrency: mergedCurrency });
+
+  try {
+    const entry = await prisma.timelineEntry.update({
+      where: { id: entryId },
+      data: toEntryUpdateData(parsed),
+    });
+
+    revalidateEntry(existing.tripId, entryId);
+
+    return NextResponse.json(serializeTimelineEntry(entry));
+  } catch (err) {
+    if (isRecordNotFoundError(err)) {
+      return Errors.notFound('Entry not found');
+    }
+    throw err;
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  const user = await getUserFromApiRequest(request);
+  if (!user) return Errors.unauthorized();
+
+  const { entryId } = await params;
+  if (!isUuid(entryId)) return Errors.notFound('Entry not found');
+
+  const existing = await prisma.timelineEntry.findUnique({ where: { id: entryId } });
+  // Blog Post rows aren't deletable through this spec's endpoint yet -- same
+  // guard as GET/PATCH above, applied consistently across every read/write
+  // path.
+  if (!existing || !isCreatableEntryType(existing.entryType)) {
+    return Errors.notFound('Entry not found');
+  }
+
+  try {
+    await prisma.timelineEntry.delete({ where: { id: entryId } });
+  } catch (err) {
+    if (isRecordNotFoundError(err)) {
+      revalidateEntry(existing.tripId, entryId);
+      return new NextResponse(null, { status: 204 });
+    }
+    throw err;
+  }
+
+  revalidateEntry(existing.tripId, entryId);
+
+  return new NextResponse(null, { status: 204 });
+}

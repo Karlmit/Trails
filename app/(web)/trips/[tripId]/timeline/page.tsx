@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { computeTripStatus, dateKeyInTimezone, timeOfDayInTimezone } from '@/lib/trip-status';
-import { buildTimelineDays } from '@/lib/timeline';
+import { buildTimelineDays, layoutTimelineEntries, type EntryForLayout } from '@/lib/timeline';
 import { sectionColor, sectionColorSolid } from '@/lib/section-colors';
+import { entryTypeColor } from '@/lib/entry-types/colors';
+import { subtypeLabel } from '@/lib/entry-types/labels';
+import { CREATABLE_ENTRY_TYPES } from '@/lib/entry-types';
 import { isUuid } from '@/lib/uuid';
 import Link from 'next/link';
 import { TimelineAutoScroll } from '@/components/TimelineAutoScroll';
@@ -24,18 +27,33 @@ function formatDayLabel(dateKey: string): string {
 // FR-6, FR-8, FR-9, FR-10: the Timeline -- a git-graph-style spine (left
 // graph column: rail + node per day) plus read-only Section color bands,
 // gap days kept visible, auto-scroll + current-position marker for an
-// Active Trip. Section add/remove has moved to /trips/[tripId]/sections
-// (spec-timeline-ux-and-timezone) -- this page renders, it never mutates.
-// No TimelineEntry rows exist yet (deferred); the graph's rail/lane system
-// is built generally enough for entry dots/lines to slot in later without
-// a rework, but none render here yet.
+// Active Trip. Section add/remove lives on /trips/[tripId]/sections; this
+// page renders, it never mutates Sections directly.
+//
+// spec-timeline-entries: TimelineEntries now render on the same spine
+// (lib/timeline.ts's layoutTimelineEntries -- FR-11..FR-15): a single-day
+// entry as a dot/chip in the day's content, a multi-day entry as a colored
+// pill running down an offset lane between the graph column and the
+// Section band, so it never collides with the Section rail. The FAB (the
+// one exception to "Timeline is view-only" per DESIGN.md/PRD) launches the
+// separate /entries/new create page rather than editing inline here.
 export default async function TimelinePage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    include: { sections: { orderBy: { startDate: 'asc' } } },
+    include: {
+      sections: { orderBy: { startDate: 'asc' } },
+      // Blog Post rows (AD-1) aren't manageable through this spec yet --
+      // same exclusion as the API routes' `isCreatableEntryType` guard, so
+      // one is never rendered on the Timeline before its own spec
+      // (FR-18-20) gives it a real Draft/Publish contract.
+      timelineEntries: {
+        where: { entryType: { in: [...CREATABLE_ENTRY_TYPES] } },
+        orderBy: { startAt: 'asc' },
+      },
+    },
   });
   if (!trip) notFound();
 
@@ -45,6 +63,15 @@ export default async function TimelinePage({ params }: PageProps) {
   const { hour, minute } = timeOfDayInTimezone(now, trip.timezone);
 
   const days = buildTimelineDays(trip, trip.sections, todayKey);
+  const entriesForLayout: EntryForLayout[] = trip.timelineEntries.map((entry) => ({
+    id: entry.id,
+    entryType: entry.entryType,
+    subtype: entry.subtype,
+    title: entry.title,
+    startAt: entry.startAt,
+    endAt: entry.endAt,
+  }));
+  const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout, trip.timezone);
 
   return (
     <main className="page">
@@ -58,7 +85,7 @@ export default async function TimelinePage({ params }: PageProps) {
       )}
 
       <div className="stack" style={{ gap: 0 }}>
-        {days.map((day) => {
+        {laidOutDays.map((day) => {
           const bandColor = day.sectionIndex !== null ? sectionColor(day.sectionIndex) : undefined;
           const railColor = day.sectionIndex !== null ? sectionColorSolid(day.sectionIndex) : undefined;
 
@@ -83,6 +110,27 @@ export default async function TimelinePage({ params }: PageProps) {
                 />
               </div>
 
+              {laneCount > 0 && (
+                <div className="timeline-lanes" style={{ width: laneCount * 12 }}>
+                  {day.laneSegments.map((segment, laneIndex) =>
+                    segment ? (
+                      <Link
+                        key={laneIndex}
+                        href={`/trips/${tripId}/entries/${segment.entryId}`}
+                        className={`timeline-lane-segment${segment.isStart ? ' is-start' : ''}${
+                          segment.isEnd ? ' is-end' : ''
+                        }`}
+                        style={{ ['--segment-color' as string]: entryTypeColor(segment.entryType) }}
+                        title={segment.title}
+                        aria-label={segment.title}
+                      />
+                    ) : (
+                      <span key={laneIndex} className="timeline-lane-empty" />
+                    ),
+                  )}
+                </div>
+              )}
+
               <div
                 className="timeline-content timeline-section-band"
                 style={bandColor ? { ['--band-color' as string]: bandColor } : undefined}
@@ -95,13 +143,32 @@ export default async function TimelinePage({ params }: PageProps) {
                       {trip.timezone})
                     </div>
                   )}
-                  <div className="timeline-day-empty">No entries yet</div>
+                  {day.dots.length > 0 ? (
+                    <div className="entry-dot-list">
+                      {day.dots.map((dot) => (
+                        <Link key={dot.id} href={`/trips/${tripId}/entries/${dot.id}`} className="entry-chip">
+                          <span
+                            className="entry-chip-dot"
+                            style={{ ['--dot-color' as string]: entryTypeColor(dot.entryType) }}
+                          />
+                          <span>{dot.title}</span>
+                          {dot.subtype && <span className="text-soft">· {subtypeLabel(dot.subtype)}</span>}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="timeline-day-empty">No entries yet</div>
+                  )}
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      <Link href={`/trips/${tripId}/entries/new`} className="fab" aria-label="Add Entry">
+        +
+      </Link>
     </main>
   );
 }

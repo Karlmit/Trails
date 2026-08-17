@@ -1,0 +1,682 @@
+import { NextRequest } from 'next/server';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { hasTestDatabase, resetDb, testPrisma } from '../helpers/db';
+import { GET as listEntries, POST as createEntry } from '@/app/api/v1/timeline-entries/route';
+import {
+  DELETE as deleteEntry,
+  GET as getEntry,
+  PATCH as patchEntry,
+} from '@/app/api/v1/timeline-entries/[entryId]/route';
+import { issueSession } from '@/lib/session';
+
+function jsonRequest(url: string, method: string, body: unknown | undefined, token?: string) {
+  return new NextRequest(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+function entryParams(entryId: string) {
+  return { params: Promise.resolve({ entryId }) };
+}
+
+const UNKNOWN_ID = '11111111-1111-4111-8111-111111111111';
+
+// FR-11-FR-15, AD-1: TimelineEntry CRUD -- covers the spec's I/O matrix.
+// Requires a live Postgres via DATABASE_URL.
+describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
+  let token: string;
+  let tripId: string;
+
+  beforeEach(async () => {
+    await resetDb();
+    const user = await testPrisma().user.create({
+      data: { username: 'sara', passwordHash: 'irrelevant', role: 'ADMIN' },
+    });
+    token = (await issueSession(user.id)).token;
+
+    const trip = await testPrisma().trip.create({
+      data: {
+        name: 'Thailand',
+        startDate: new Date('2026-08-01T00:00:00.000Z'),
+        endDate: new Date('2026-08-20T00:00:00.000Z'),
+        timezone: 'Asia/Bangkok',
+      },
+    });
+    tripId = trip.id;
+  });
+
+  afterAll(async () => {
+    await testPrisma().$disconnect();
+  });
+
+  it('creates a Stay entry spanning multiple nights (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.entryType).toBe('STAY');
+    expect(body.subtype).toBe('RESORT');
+    expect(body.startAt).toBe('2026-08-03T14:00:00.000Z');
+  });
+
+  it('rejects a Stay whose check-out is not later than check-in (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-03T14:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('creates a Transport entry (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'TRANSPORT',
+          title: 'Flight to Phuket',
+          subtype: 'FLIGHT',
+          startAt: '2026-08-03T08:00:00.000Z',
+          endAt: '2026-08-03T10:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it('rejects a Transport whose arrival is not later than departure (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'TRANSPORT',
+          title: 'Flight to Phuket',
+          subtype: 'FLIGHT',
+          startAt: '2026-08-03T08:00:00.000Z',
+          endAt: '2026-08-03T07:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('creates a single-day Activity with no end datetime (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Boat tour',
+          subtype: 'TOUR',
+          startAt: '2026-08-05T09:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.endAt).toBeNull();
+  });
+
+  it('accepts an Activity whose end equals its start (point-in-time, 201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Sunset viewpoint',
+          subtype: 'ATTRACTION',
+          startAt: '2026-08-05T18:00:00.000Z',
+          endAt: '2026-08-05T18:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it('creates a Note with only a title and date, and no booking/expense fields shown (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'NOTE',
+          title: 'Bring reef-safe sunscreen',
+          startAt: '2026-08-04T00:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.bookingReference).toBeNull();
+    expect(body.expenseAmount).toBeNull();
+    expect(body.locationName).toBeNull();
+  });
+
+  it('rejects a Note that supplies a booking reference (400, FR-14)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'NOTE',
+          title: 'Bring reef-safe sunscreen',
+          startAt: '2026-08-04T00:00:00.000Z',
+          bookingReference: 'ABC123',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a Stay given a Transport subtype value, naming the allowed set (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'FLIGHT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message).toMatch(/subtype must be one of/i);
+    expect(body.error.message).toContain('HOTEL');
+  });
+
+  it('rejects an Expense with an amount but no currency (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Museum visit',
+          subtype: 'MUSEUM',
+          startAt: '2026-08-05T09:00:00.000Z',
+          expenseAmount: 20,
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a negative Expense amount (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Museum visit',
+          subtype: 'MUSEUM',
+          startAt: '2026-08-05T09:00:00.000Z',
+          expenseAmount: -5,
+          expenseCurrency: 'usd',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects entryType=BLOG_POST as unsupported (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        { tripId, entryType: 'BLOG_POST', title: 'A journal entry', startAt: '2026-08-05T00:00:00.000Z' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // Item 6: an Entry outside its parent Trip's own date range (2026-08-01 to
+  // 2026-08-20 here) must 400 at create -- accepting it would leave
+  // silently-invisible data (layoutTimelineEntries defensively drops it).
+  it('rejects a create whose startAt falls before the Trip start date (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'NOTE',
+          title: 'Too early',
+          startAt: '2026-07-31T00:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a create whose endAt falls after the Trip end date (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Too late',
+          subtype: 'TOUR',
+          startAt: '2026-08-19T09:00:00.000Z',
+          endAt: '2026-08-25T09:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // Item 3: locationMapLink must reject a non-http(s) scheme end to end,
+  // not just at the schema-unit level.
+  it('rejects a javascript: URI as the map link (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          title: 'Museum visit',
+          subtype: 'MUSEUM',
+          startAt: '2026-08-05T09:00:00.000Z',
+          locationMapLink: 'javascript:alert(1)',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // Item 5: FR-15's Contact Information capability applies to every type,
+  // Note included -- must actually be stored, not dropped.
+  it('creates a Note carrying Contact fields (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'NOTE',
+          title: 'Bring reef-safe sunscreen',
+          startAt: '2026-08-04T00:00:00.000Z',
+          contactName: 'Dive shop',
+          contactPhone: '+66-76-000-000',
+          contactEmail: 'dive@example.com',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.contactName).toBe('Dive shop');
+    expect(body.contactEmail).toBe('dive@example.com');
+  });
+
+  it('404s when the parent Trip does not exist', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId: UNKNOWN_ID,
+          entryType: 'NOTE',
+          title: 'Orphan note',
+          startAt: '2026-08-05T00:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an unauthenticated create (401)', async () => {
+    const res = await createEntry(
+      jsonRequest('http://localhost/api/v1/timeline-entries', 'POST', {
+        tripId,
+        entryType: 'NOTE',
+        title: 'Orphan note',
+        startAt: '2026-08-05T00:00:00.000Z',
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  // Item 2: BLOG_POST rows aren't manageable through this spec's endpoints
+  // yet -- excluded consistently across every read/write path, not just
+  // creation (no create path in this API ever produces one, so the row is
+  // seeded directly via Prisma here).
+  describe('BLOG_POST exclusion (item 2)', () => {
+    let blogPostId: string;
+
+    beforeEach(async () => {
+      const row = await testPrisma().timelineEntry.create({
+        data: {
+          tripId,
+          entryType: 'BLOG_POST',
+          title: 'A journal entry',
+          startAt: new Date('2026-08-05T00:00:00.000Z'),
+        },
+      });
+      blogPostId = row.id;
+    });
+
+    it('excludes it from the list endpoint', async () => {
+      const res = await listEntries(
+        jsonRequest(`http://localhost/api/v1/timeline-entries?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.find((e: { id: string }) => e.id === blogPostId)).toBeUndefined();
+    });
+
+    it('404s a direct GET for it', async () => {
+      const res = await getEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${blogPostId}`, 'GET', undefined, token),
+        entryParams(blogPostId),
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('404s a DELETE for it (never deletable through this API)', async () => {
+      const res = await deleteEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${blogPostId}`, 'DELETE', undefined, token),
+        entryParams(blogPostId),
+      );
+      expect(res.status).toBe(404);
+
+      const stillThere = await testPrisma().timelineEntry.findUnique({ where: { id: blogPostId } });
+      expect(stillThere).not.toBeNull();
+    });
+  });
+
+  it('lists entries for a Trip in start-date order', async () => {
+    await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        { tripId, entryType: 'NOTE', title: 'Later note', startAt: '2026-08-10T00:00:00.000Z' },
+        token,
+      ),
+    );
+    await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        { tripId, entryType: 'NOTE', title: 'Earlier note', startAt: '2026-08-02T00:00:00.000Z' },
+        token,
+      ),
+    );
+
+    const res = await listEntries(
+      jsonRequest(`http://localhost/api/v1/timeline-entries?tripId=${tripId}`, 'GET', undefined, token),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.map((e: { title: string }) => e.title)).toEqual(['Earlier note', 'Later note']);
+  });
+
+  describe('detail: GET/PATCH/DELETE', () => {
+    let entryId: string;
+
+    beforeEach(async () => {
+      const res = await createEntry(
+        jsonRequest(
+          'http://localhost/api/v1/timeline-entries',
+          'POST',
+          {
+            tripId,
+            entryType: 'STAY',
+            title: 'Beach Resort',
+            subtype: 'RESORT',
+            startAt: '2026-08-03T14:00:00.000Z',
+            endAt: '2026-08-06T11:00:00.000Z',
+          },
+          token,
+        ),
+      );
+      entryId = (await res.json()).id;
+    });
+
+    it('gets a single Entry', async () => {
+      const res = await getEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'GET', undefined, token),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(200);
+    });
+
+    it('updates a field via PATCH', async () => {
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { title: 'Beach Resort (renamed)' },
+          token,
+        ),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.title).toBe('Beach Resort (renamed)');
+    });
+
+    it('rejects a startAt-only PATCH that would invert the stored endAt (400)', async () => {
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { startAt: '2026-08-09T00:00:00.000Z' },
+          token,
+        ),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    // Item 6: the *merged* start/end must still fall within the parent
+    // Trip's own date range (2026-08-01 to 2026-08-20 here) after a PATCH.
+    it('rejects a PATCH whose merged startAt/endAt falls outside the Trip range (400)', async () => {
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { startAt: '2026-08-25T00:00:00.000Z', endAt: '2026-08-26T00:00:00.000Z' },
+          token,
+        ),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    // Item 4: clearing an Entry's End field on edit must actually clear it
+    // server-side (explicit `endAt: null`), mirroring the Expense pair's
+    // already-correct null-clearing.
+    it('clears a stored endAt when PATCHed with endAt: null (Activity)', async () => {
+      const created = await createEntry(
+        jsonRequest(
+          'http://localhost/api/v1/timeline-entries',
+          'POST',
+          {
+            tripId,
+            entryType: 'ACTIVITY',
+            title: 'Boat tour',
+            subtype: 'TOUR',
+            startAt: '2026-08-05T09:00:00.000Z',
+            endAt: '2026-08-05T12:00:00.000Z',
+          },
+          token,
+        ),
+      );
+      const activityId = (await created.json()).id;
+
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${activityId}`,
+          'PATCH',
+          { endAt: null },
+          token,
+        ),
+        entryParams(activityId),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.endAt).toBeNull();
+    });
+
+    // Item 7: clearing the Expense pair (amount+currency both null) must
+    // also clear its dependent payment status/note, not leave them orphaned.
+    it('clears expensePaymentStatus/expensePaymentNote when the Expense pair is cleared', async () => {
+      const created = await createEntry(
+        jsonRequest(
+          'http://localhost/api/v1/timeline-entries',
+          'POST',
+          {
+            tripId,
+            entryType: 'ACTIVITY',
+            title: 'Museum visit',
+            subtype: 'MUSEUM',
+            startAt: '2026-08-05T09:00:00.000Z',
+            expenseAmount: 20,
+            expenseCurrency: 'USD',
+            expensePaymentStatus: 'Paid',
+            expensePaymentNote: 'Paid in cash',
+          },
+          token,
+        ),
+      );
+      const activityId = (await created.json()).id;
+
+      // Clears only the pair -- payment status/note are deliberately *not*
+      // included in this PATCH body, to prove the server clears them too
+      // rather than relying on the client to also send them null.
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${activityId}`,
+          'PATCH',
+          { expenseAmount: null, expenseCurrency: null },
+          token,
+        ),
+        entryParams(activityId),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.expenseAmount).toBeNull();
+      expect(body.expenseCurrency).toBeNull();
+      expect(body.expensePaymentStatus).toBeNull();
+      expect(body.expensePaymentNote).toBeNull();
+    });
+
+    it('does not overwrite typeDetails when a PATCH omits it', async () => {
+      await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { typeDetails: { roomInfo: 'Ocean view king' } },
+          token,
+        ),
+        entryParams(entryId),
+      );
+
+      const res = await patchEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'PATCH', { title: 'Renamed' }, token),
+        entryParams(entryId),
+      );
+      const body = await res.json();
+      expect(body.typeDetails).toEqual({ roomInfo: 'Ocean view king' });
+    });
+
+    it('deletes an Entry (204)', async () => {
+      const res = await deleteEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'DELETE', undefined, token),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(204);
+
+      const remaining = await testPrisma().timelineEntry.count();
+      expect(remaining).toBe(0);
+    });
+
+    it('returns 404 for an unknown/malformed id', async () => {
+      const res = await deleteEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/not-a-uuid`, 'DELETE', undefined, token),
+        entryParams('not-a-uuid'),
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects an unauthenticated PATCH/DELETE', async () => {
+      const patchRes = await patchEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'PATCH', { title: 'Nope' }),
+        entryParams(entryId),
+      );
+      expect(patchRes.status).toBe(401);
+
+      const deleteRes = await deleteEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'DELETE', undefined),
+        entryParams(entryId),
+      );
+      expect(deleteRes.status).toBe(401);
+    });
+  });
+});
