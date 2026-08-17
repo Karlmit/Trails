@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { EntryForm, type EntryDTO } from '@/components/EntryForm';
+import { AttachmentList } from '@/components/AttachmentList';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
 
@@ -174,6 +175,8 @@ export function EntryDetailPanel({ tripId, entry: initialEntry }: { tripId: stri
             <dd className="text-multiline" style={{ margin: 0 }}>{entry.postTripNotes}</dd>
           </div>
         )}
+
+        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
       </div>
     </div>
   );

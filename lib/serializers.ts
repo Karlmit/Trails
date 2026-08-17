@@ -1,4 +1,4 @@
-import type { Checklist, ChecklistItem, Idea, Section, TimelineEntry, Trip } from '@prisma/client';
+import type { Attachment, Checklist, ChecklistItem, Idea, Section, TimelineEntry, Trip } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
 export function serializeTrip(trip: Trip) {
@@ -115,5 +115,22 @@ export function serializeChecklistItem(item: ChecklistItem) {
     note: item.note,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
+  };
+}
+
+// FR-24/FR-25, spec-documents: same shape/conventions as serializeSection
+// above. `filePath` (an on-disk path under AD-5's uploads volume) is
+// deliberately never exposed here -- the client only ever needs the
+// attachment id, to build the `/api/v1/attachments/[id]/file` download URL.
+export function serializeAttachment(attachment: Attachment) {
+  return {
+    id: attachment.id,
+    tripId: attachment.tripId,
+    ownerType: attachment.ownerType,
+    ownerId: attachment.ownerId,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    originalFilename: attachment.originalFilename,
+    createdAt: attachment.createdAt.toISOString(),
   };
 }

@@ -38,11 +38,8 @@ services:
       retries: 10
       start_period: 20s
     volumes:
-      # AD-5's mandatory upload path shape (/data/uploads/{trip_id}/...) --
-      # not written to yet in this spec (no Attachment feature exists
-      # until TimelineEntry lands), but declared now per the architecture's
-      # structural seed so the volume already exists and is never
-      # accidentally recreated non-persistent later.
+      # AD-5's mandatory upload path shape (/data/uploads/{trip_id}/...),
+      # written to by app/api/v1/attachments/route.ts (spec-documents).
       - uploads:/data/uploads
 
 volumes:

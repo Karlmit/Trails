@@ -1,6 +1,8 @@
 // Trails — foundation schema (User, Session, Trip, Section, TimelineEntry).
-// AD-4's polymorphic Tags/Links/Photos/Attachments tables are still a later
-// spec (spec-timeline-entries explicitly excludes file upload UI).
+// AD-4's polymorphic Tags/Links tables are still a later spec
+// (spec-timeline-entries explicitly excludes file upload UI). Photos remain
+// deferred too; Attachments landed in spec-documents.md (FR-24/FR-25) --
+// see the Attachment model below.
 //
 // AD-2's Section EXCLUDE USING gist constraint (btree_gist) is not
 // representable in the Prisma schema language. It is added as raw SQL in
@@ -87,6 +89,7 @@ model Trip {
   timelineEntries TimelineEntry[]
   ideas          Idea[]
   checklists     Checklist[]
+  attachments    Attachment[]
 
   @@map("trips")
 }
@@ -341,4 +344,56 @@ model ChecklistItem {
 
   @@index([checklistId])
   @@map("checklist_items")
+}
+
+// FR-24/FR-25, spec-documents: a file uploaded to some owning row. AD-4's
+// Rule enumerates owner_type as "one of TimelineEntry | Idea | ImportantInfo"
+// -- only TIMELINE_ENTRY exists as a member today (ImportantInfo has no
+// table yet; Idea deliberately never gets Attachment support per FR-16).
+// Extending this enum later (e.g. adding IMPORTANT_INFO) is additive and
+// touches no existing row.
+enum AttachmentOwnerType {
+  TIMELINE_ENTRY
+
+  @@map("attachment_owner_type")
+}
+
+model Attachment {
+  id     String @id @default(uuid()) @db.Uuid
+  // AD-5: "the upload handler resolves trip_id via the owner lookup before
+  // writing" -- a denormalized column, not derived at read time, so the
+  // Documents page (FR-25) is a single flat query keyed on this column
+  // rather than a per-owner-type union.
+  tripId String @map("trip_id") @db.Uuid
+
+  // Polymorphic owner reference (AD-4) -- ownerId is NOT a declarable Prisma
+  // relation since the table it points into varies with ownerType. Deleting
+  // the owning TimelineEntry deletes these rows via an explicit
+  // delete-attachments-first step in that route's DELETE handler
+  // (app/api/v1/timeline-entries/[entryId]/route.ts), documented inline
+  // there since Prisma can't express this FK's cascade declaratively.
+  ownerType AttachmentOwnerType @map("owner_type")
+  ownerId   String              @db.Uuid @map("owner_id")
+
+  // AD-5: only path + metadata is ever stored here -- file bytes always live
+  // on the `uploads` volume at exactly this path, never in Postgres.
+  filePath         String @map("file_path")
+  mimeType         String @map("mime_type")
+  sizeBytes        Int    @map("size_bytes")
+  originalFilename String @map("original_filename")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // tripId IS a real, declarable FK (unlike ownerId above) -- this gives a
+  // genuine DB-level cascade so a direct Trip delete (which cascades its
+  // TimelineEntries at the DB layer, bypassing the TimelineEntry DELETE
+  // route's own explicit Attachment cleanup step) can never leave orphaned
+  // Attachment rows behind, even though the files themselves stay on disk
+  // (spec's Boundaries: "no v1 requirement for a Trip-deletion disk-purge
+  // script; noted as deferred, not silently ignored").
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([ownerType, ownerId])
+  @@map("attachments")
 }

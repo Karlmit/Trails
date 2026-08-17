@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
+import { AttachmentList } from '@/components/AttachmentList';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -124,6 +125,8 @@ export function BlogPostDetailPanel({ tripId, post: initialPost }: { tripId: str
             Published {new Date(post.publishedAt as string).toLocaleString()} · visible on the Timeline
           </p>
         )}
+
+        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} />
       </div>
     </div>
   );

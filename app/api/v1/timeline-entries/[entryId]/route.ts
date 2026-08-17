@@ -165,7 +165,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    await prisma.timelineEntry.delete({ where: { id: entryId } });
+    // spec-documents (FR-24/FR-25), frozen I/O matrix: "Entry delete
+    // cascades -- Attachment rows gone too (rows only; files remain on
+    // disk, logged as deferred cleanup)." Attachment.ownerId isn't a
+    // declarable Prisma relation (AD-4's owner_type is polymorphic), so this
+    // explicit deleteMany + the Entry delete are the cascade, done
+    // atomically in one transaction. The orphaned files this leaves behind
+    // are a disclosed, deliberate deferral -- see deferred-work.md -- not an
+    // oversight; deleting them too would go beyond what the frozen matrix
+    // calls for.
+    await prisma.$transaction([
+      prisma.attachment.deleteMany({ where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId } }),
+      prisma.timelineEntry.delete({ where: { id: entryId } }),
+    ]);
   } catch (err) {
     if (isRecordNotFoundError(err)) {
       revalidateEntry(existing.tripId, entryId, existing.entryType);
@@ -175,6 +187,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
 
   revalidateEntry(existing.tripId, entryId, existing.entryType);
+  revalidatePath(`/trips/${existing.tripId}/documents`);
 
   return new NextResponse(null, { status: 204 });
 }
