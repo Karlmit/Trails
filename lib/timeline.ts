@@ -4,6 +4,15 @@ export interface TimelineDay {
   dateKey: string; // YYYY-MM-DD
   sectionIndex: number | null;
   isToday: boolean;
+  // Graph-column rail connectivity (git-graph-spine redesign): true when
+  // this day shares the same non-null Section as its immediate neighbor,
+  // so the rail segment between the two nodes renders continuous and in
+  // that Section's color. A gap day, or a day at a Section boundary
+  // (different Section on each side), never connects -- the rail renders
+  // muted/discontinuous instead. Computed purely from neighboring
+  // `sectionIndex` values, never stored.
+  connectsAbove: boolean;
+  connectsBelow: boolean;
 }
 
 interface SectionRange {
@@ -35,7 +44,7 @@ export function buildTimelineDays(
   sections: SectionRange[],
   todayKey: string | null = null,
 ): TimelineDay[] {
-  const days: TimelineDay[] = [];
+  const rawDays: Array<Pick<TimelineDay, 'dateKey' | 'sectionIndex' | 'isToday'>> = [];
   const cursor = new Date(
     Date.UTC(trip.startDate.getUTCFullYear(), trip.startDate.getUTCMonth(), trip.startDate.getUTCDate()),
   );
@@ -63,7 +72,7 @@ export function buildTimelineDays(
         dateKeyOfDateColumn(section.startDate) <= dateKey &&
         dateKey <= dateKeyOfDateColumn(section.endDate),
     );
-    days.push({
+    rawDays.push({
       dateKey,
       sectionIndex: sectionIndex === -1 ? null : sectionIndex,
       isToday: dateKey === todayKey,
@@ -71,5 +80,17 @@ export function buildTimelineDays(
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
-  return days;
+  return rawDays.map((day, index) => {
+    const prev = rawDays[index - 1];
+    const next = rawDays[index + 1];
+    return {
+      ...day,
+      connectsAbove: Boolean(
+        prev && day.sectionIndex !== null && prev.sectionIndex === day.sectionIndex,
+      ),
+      connectsBelow: Boolean(
+        next && day.sectionIndex !== null && next.sectionIndex === day.sectionIndex,
+      ),
+    };
+  });
 }

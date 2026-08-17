@@ -2,17 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-
-const COMMON_TIMEZONES = [
-  'UTC',
-  'Europe/Stockholm',
-  'Europe/London',
-  'America/New_York',
-  'America/Los_Angeles',
-  'Asia/Bangkok',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
+import { TimezoneSelect } from '@/components/TimezoneSelect';
 
 export function NewTripForm() {
   const router = useRouter();
@@ -29,6 +19,15 @@ export function NewTripForm() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    // I/O matrix ("Timezone selection"): TimezoneSelect only ever reports a
+    // real, list-backed IANA string or '' -- '' means the user typed
+    // something but never picked a zone, which must block submission.
+    if (!timezone) {
+      setError('Please pick a timezone from the list.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -102,18 +101,7 @@ export function NewTripForm() {
       </div>
       <div className="field">
         <label htmlFor="trip-timezone">Timezone</label>
-        <input
-          id="trip-timezone"
-          list="timezone-options"
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          required
-        />
-        <datalist id="timezone-options">
-          {COMMON_TIMEZONES.map((tz) => (
-            <option key={tz} value={tz} />
-          ))}
-        </datalist>
+        <TimezoneSelect id="trip-timezone" initialValue={timezone} onChange={setTimezone} required />
       </div>
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>

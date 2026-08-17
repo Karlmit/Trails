@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { TimezoneSelect } from '@/components/TimezoneSelect';
 
 interface EditTripFormProps {
   trip: {
@@ -31,6 +32,15 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    // I/O matrix ("Timezone selection"): '' means the user typed something
+    // but never picked a zone from the list -- block submission rather
+    // than saving an unvalidated string.
+    if (!timezone) {
+      setError('Please pick a timezone from the list.');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -103,12 +113,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
       </div>
       <div className="field">
         <label htmlFor="edit-timezone">Timezone</label>
-        <input
-          id="edit-timezone"
-          value={timezone}
-          onChange={(e) => setTimezone(e.target.value)}
-          required
-        />
+        <TimezoneSelect id="edit-timezone" initialValue={timezone} onChange={setTimezone} required />
       </div>
       <div className="field">
         <label htmlFor="edit-description">Description</label>

@@ -22,6 +22,7 @@ function revalidateTrip(tripId: string) {
   revalidatePath('/trips');
   revalidatePath(`/trips/${tripId}/overview`);
   revalidatePath(`/trips/${tripId}/timeline`);
+  revalidatePath(`/trips/${tripId}/sections`);
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {

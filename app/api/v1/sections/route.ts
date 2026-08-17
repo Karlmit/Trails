@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     });
 
     revalidatePath(`/trips/${parsed.tripId}/timeline`);
+    revalidatePath(`/trips/${parsed.tripId}/sections`);
 
     return NextResponse.json(serializeSection(section), { status: 201 });
   } catch (err) {

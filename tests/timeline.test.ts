@@ -66,4 +66,65 @@ describe('buildTimelineDays (FR-8)', () => {
     const trip = { startDate: dateOnly('2026-08-10'), endDate: dateOnly('2026-08-01') };
     expect(() => buildTimelineDays(trip, [])).toThrow(/endDate.*precedes.*startDate/i);
   });
+
+  // spec-timeline-ux-and-timezone: graph-column rail connectivity is
+  // derived purely from neighboring days' sectionIndex -- continuous only
+  // when both sides share the same non-null Section.
+  describe('rail connectivity (connectsAbove/connectsBelow)', () => {
+    it('connects two adjacent days that share the same Section', () => {
+      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') };
+      const sections = [{ startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') }];
+      const days = buildTimelineDays(trip, sections);
+
+      const first = days.find((d) => d.dateKey === '2026-08-01')!;
+      const middle = days.find((d) => d.dateKey === '2026-08-02')!;
+      const last = days.find((d) => d.dateKey === '2026-08-03')!;
+
+      expect(first.connectsAbove).toBe(false); // no day before the range
+      expect(first.connectsBelow).toBe(true);
+      expect(middle.connectsAbove).toBe(true);
+      expect(middle.connectsBelow).toBe(true);
+      expect(last.connectsAbove).toBe(true);
+      expect(last.connectsBelow).toBe(false); // no day after the range
+    });
+
+    it('does not connect across a gap day (no Section on one or both sides)', () => {
+      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') };
+      const sections = [{ startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-01') }];
+      const days = buildTimelineDays(trip, sections);
+
+      const sectionDay = days.find((d) => d.dateKey === '2026-08-01')!;
+      const gapDay = days.find((d) => d.dateKey === '2026-08-02')!;
+      const anotherGapDay = days.find((d) => d.dateKey === '2026-08-03')!;
+
+      expect(sectionDay.connectsBelow).toBe(false);
+      expect(gapDay.connectsAbove).toBe(false);
+      expect(gapDay.connectsBelow).toBe(false);
+      expect(anotherGapDay.connectsAbove).toBe(false);
+    });
+
+    it('does not connect across a Section boundary (two different Sections, touching endpoints)', () => {
+      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+      const sections = [
+        { startDate: dateOnly('2026-08-03'), endDate: dateOnly('2026-08-07') },
+        { startDate: dateOnly('2026-08-07'), endDate: dateOnly('2026-08-10') },
+      ];
+      const days = buildTimelineDays(trip, sections);
+
+      const withinFirst = days.find((d) => d.dateKey === '2026-08-05')!;
+      const boundaryDay = days.find((d) => d.dateKey === '2026-08-07')!; // belongs to section 0 (FR-5)
+      const afterBoundary = days.find((d) => d.dateKey === '2026-08-08')!; // belongs to section 1
+
+      expect(withinFirst.connectsAbove).toBe(true);
+      expect(withinFirst.connectsBelow).toBe(true);
+      // The boundary day is attributed to section 0, but its neighbor
+      // (2026-08-08) belongs to section 1 -- different sectionIndex, so no
+      // connection renders across the boundary.
+      expect(boundaryDay.sectionIndex).toBe(0);
+      expect(boundaryDay.connectsAbove).toBe(true);
+      expect(boundaryDay.connectsBelow).toBe(false);
+      expect(afterBoundary.sectionIndex).toBe(1);
+      expect(afterBoundary.connectsAbove).toBe(false);
+    });
+  });
 });

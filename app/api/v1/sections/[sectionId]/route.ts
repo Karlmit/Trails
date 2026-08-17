@@ -60,6 +60,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     });
 
     revalidatePath(`/trips/${existing.tripId}/timeline`);
+    revalidatePath(`/trips/${existing.tripId}/sections`);
 
     return NextResponse.json(serializeSection(section));
   } catch (err) {
@@ -92,12 +93,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   } catch (err) {
     if (isRecordNotFoundError(err)) {
       revalidatePath(`/trips/${existing.tripId}/timeline`);
+      revalidatePath(`/trips/${existing.tripId}/sections`);
       return new NextResponse(null, { status: 204 });
     }
     throw err;
   }
 
   revalidatePath(`/trips/${existing.tripId}/timeline`);
+  revalidatePath(`/trips/${existing.tripId}/sections`);
 
   return new NextResponse(null, { status: 204 });
 }
