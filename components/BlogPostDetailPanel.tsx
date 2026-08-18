@@ -7,9 +7,19 @@ import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
-import { formatEntryDateTime } from '@/lib/trip-status';
+import { entryClockTime, formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-status';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
+
+// User-reported: "Check-in/out time should not be mandatory" now applies to
+// a Blog Post's own date too (BlogPostForm's `timeRequired={false}`) --
+// same literal-midnight sentinel every other Entry Type already uses (see
+// EntryDetailPanel's identical helper) to avoid showing a fabricated
+// "00:00" the User never actually entered.
+function hasNoSpecificTime(date: string): boolean {
+  const { hour, minute } = entryClockTime(new Date(date));
+  return hour === 0 && minute === 0;
+}
 
 // FR-18/FR-19: view/edit/publish/unpublish/delete a single Blog Post. Same
 // view<->edit toggle + inline-delete shape as EntryDetailPanel
@@ -128,7 +138,11 @@ export function BlogPostDetailPanel({
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
             Date
           </dt>
-          <dd style={{ margin: 0 }}>{formatEntryDateTime(post.startAt)}</dd>
+          <dd style={{ margin: 0 }}>
+            {hasNoSpecificTime(post.startAt)
+              ? formatEntryEndpointDateOnly(new Date(post.startAt), null)
+              : formatEntryDateTime(post.startAt)}
+          </dd>
         </dl>
 
         {post.description && (
@@ -144,7 +158,13 @@ export function BlogPostDetailPanel({
 
         {isPublished && (
           <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>
-            Published {new Date(post.publishedAt as string).toLocaleString()} · visible on the Timeline
+            {/* User-reported: not using 24-hour clock -- `toLocaleString()`
+                formats AM/PM-vs-24h from the browser's OS locale (and, since
+                this is a Client Component still server-rendered once before
+                hydration, could disagree with the server's own locale/
+                timezone entirely). formatEntryDateTime is hydration-safe and
+                always 24-hour, same as every other timestamp in the app. */}
+            Published {formatEntryDateTime(post.publishedAt as string)} · visible on the Timeline
           </p>
         )}
 

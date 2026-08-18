@@ -300,16 +300,30 @@ export default async function TimelinePage({ params }: PageProps) {
                   <div className="entry-dot-list">
                     {day.lines.map((line) => {
                       const { text, showSubtype } = dayLineLabel(line, trip.timezone);
+                      const isBlogPost = line.entryType === 'BLOG_POST';
                       return (
                         <Link
                           key={line.entryId}
                           href={entryDetailHref(tripId, line.entryType, line.entryId)}
-                          className="entry-chip"
+                          className={`entry-chip${isBlogPost ? ' entry-chip-blog' : ''}`}
                         >
+                          {/* User-reported: "it should be a fancy link to the
+                              blog post" -- a Blog Post has no subtype badge
+                              of its own (labels.ts), so on the Timeline it
+                              rendered as a plain, undistinguished text link,
+                              identical to a Note. A book icon + brand-color
+                              text + "Read post" affordance sets it apart at
+                              a glance. */}
+                          {isBlogPost && (
+                            <span className="entry-chip-blog-icon" aria-hidden="true">
+                              📖
+                            </span>
+                          )}
                           <span>{text}</span>
                           {showSubtype && line.subtype && (
                             <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
                           )}
+                          {isBlogPost && <span className="entry-chip-blog-cta"> Read post →</span>}
                         </Link>
                       );
                     })}

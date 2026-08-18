@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { DateTimeInput } from '@/components/DateTimeInput';
 
 export interface BlogPostDTO {
   id: string;
@@ -22,6 +23,11 @@ interface BlogPostFormProps {
   tripId: string;
   mode: 'create' | 'edit';
   post?: BlogPostDTO;
+  // User-reported: "the check-in defaulted to the trips start date" for
+  // other Entry Types (EntryForm.tsx) but Blog Posts were never given the
+  // same default -- a create-mode form with no seed opens its date picker
+  // on the Trip's own first day, same as everywhere else.
+  tripStartDate?: string;
   onSaved?: (post: BlogPostDTO) => void;
   onCancel?: () => void;
 }
@@ -45,11 +51,13 @@ function toDateTimeLocal(iso: string | null): string {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
-export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPostFormProps) {
+export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCancel }: BlogPostFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(post?.title ?? '');
   const [description, setDescription] = useState(post?.description ?? '');
-  const [startAt, setStartAt] = useState(toDateTimeLocal(post?.startAt ?? null));
+  const [startAt, setStartAt] = useState(
+    post?.startAt ? toDateTimeLocal(post.startAt) : mode === 'create' ? (tripStartDate ?? '') : '',
+  );
   // spec-guest-access (FR-28): defaults to `false`, same as the DB column.
   const [isPrivate, setIsPrivate] = useState(post?.isPrivate ?? false);
   const [error, setError] = useState<string | null>(null);
@@ -124,13 +132,14 @@ export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPost
 
       <div className="field">
         <label htmlFor="blog-date">Date</label>
-        <input
-          id="blog-date"
-          type="datetime-local"
-          value={startAt}
-          onChange={(e) => setStartAt(e.target.value)}
-          required
-        />
+        {/* User-reported: not using 24-hour clock, and not matching the
+            same date-picker settings as the rest of the app -- swapped
+            from a native `datetime-local` (which formats AM/PM-vs-24h from
+            the browser's OS locale, with no reliable override) to the same
+            DateTimeInput every other Entry Type uses. `timeRequired={false}`
+            matches "Check-in/out time should not be mandatory": a bare
+            date is a complete, valid value here too. */}
+        <DateTimeInput id="blog-date" value={startAt} onChange={setStartAt} required timeRequired={false} />
       </div>
 
       <div className="field">

@@ -715,6 +715,24 @@ p {
   opacity: 0.75;
 }
 
+/* User-reported: "it should be a fancy link to the blog post" -- a Blog
+   Post has no subtype badge (unlike every other Entry Type), so without
+   this it was a plain text link indistinguishable from a Note. */
+.entry-chip-blog {
+  color: var(--color-brand-deep);
+  font-weight: 600;
+}
+
+.entry-chip-blog-icon {
+  margin-right: 2px;
+}
+
+.entry-chip-blog-cta {
+  font-weight: 500;
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+
 .section-legend {
   display: flex;
   flex-wrap: wrap;

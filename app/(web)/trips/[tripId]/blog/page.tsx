@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
 import { BlogPostCard } from '@/components/BlogPostCard';
 
@@ -87,7 +88,7 @@ export default async function BlogPage({ params }: PageProps) {
 
       {viewer.type === 'user' && (
         <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
-          <BlogPostForm tripId={tripId} mode="create" />
+          <BlogPostForm tripId={tripId} mode="create" tripStartDate={dateKeyOfDateColumn(trip.startDate)} />
         </div>
       )}
 
