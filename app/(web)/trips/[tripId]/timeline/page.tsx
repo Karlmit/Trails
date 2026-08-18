@@ -308,7 +308,7 @@ export default async function TimelinePage({ params }: PageProps) {
                         >
                           <span>{text}</span>
                           {showSubtype && line.subtype && (
-                            <span className="text-soft">· {subtypeLabel(line.subtype)}</span>
+                            <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
                           )}
                         </Link>
                       );

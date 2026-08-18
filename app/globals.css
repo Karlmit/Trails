@@ -694,14 +694,20 @@ p {
   gap: var(--space-1);
 }
 
+/* User-reported ("text overlaps its boxes" -- a long title wrapping onto
+   two lines while its subtype badge stayed put beside the wrapped second
+   line instead of following the text). `inline-flex` was the cause: two
+   flex items sit side by side as fixed boxes, so when the first one's own
+   text wraps internally, the second stays vertically centered against the
+   *whole* now-taller flex container rather than flowing after the
+   wrapped text. Plain inline display lets both spans wrap together as one
+   normal run of text, exactly like a sentence -- the fix that actually
+   matters on a narrow phone width, where titles wrap far more often. */
 .entry-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline;
   font-size: 0.9rem;
   line-height: 1.4rem;
   color: var(--color-text);
-  width: fit-content;
 }
 
 .entry-chip:hover {
@@ -971,4 +977,32 @@ p {
   object-fit: cover;
   float: right;
   margin-left: var(--space-3);
+}
+
+/* User-reported, mobile: "the white space around the content is too
+   much" -- .page/.page-wide's padding is a fixed desktop-sized value with
+   no narrower-viewport adjustment anywhere in this file (this is the
+   app's first media query). Cut side padding roughly in half and ease
+   off the top/bottom too, so a phone-width screen spends its space on
+   content instead of margin. */
+@media (max-width: 640px) {
+  .page,
+  .page-wide {
+    padding: var(--space-3) var(--space-2) var(--space-6);
+  }
+
+  /* User-reported: "the section label currently overlaps the
+     information" -- on a narrow content column there simply isn't room
+     for an absolutely-positioned pill in the corner without it landing on
+     top of that day's own text. Stack it as a normal block above the
+     content instead ("we should easily be able to solve this by
+     stacking") -- it already renders first in the content cell's own DOM
+     order, so removing the absolute positioning alone is enough to put it
+     there in normal document flow. */
+  .timeline-section-label {
+    position: static;
+    display: inline-flex;
+    max-width: 100%;
+    margin-bottom: var(--space-2);
+  }
 }
