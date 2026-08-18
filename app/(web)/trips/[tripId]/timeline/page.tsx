@@ -44,14 +44,18 @@ const LANE_UNIT = 16;
 const TRUNK_X = LANE_UNIT / 2;
 const laneX = (laneIndex: number) => LANE_UNIT * (laneIndex + 1) + LANE_UNIT / 2;
 
-function formatDayLabel(dateKey: string): string {
+// User-reported: a single-line "Tue, Dec 1"-style label wrapped onto two
+// lines for some dates but not others (whichever combination of weekday/
+// month name happened to exceed the date column's fixed width) -- an
+// inconsistent, ragged row height depending on which words happened to be
+// long that day. Always split into exactly two lines instead -- "Dec 1"
+// then "Tuesday" -- so every row's date cell is the same shape regardless
+// of which day it is.
+function formatDayLabel(dateKey: string): { monthDay: string; weekday: string } {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(date);
+  const monthDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(date);
+  return { monthDay, weekday };
 }
 
 // An entry's own recorded startAt/endAt is its literal wall-clock digits
@@ -74,7 +78,11 @@ function formatHHMM(date: Date, zone: string | null, tripTimezone: string): stri
 // strictly between a branch's own start/end is just the title, since the
 // branch line itself already communicates "still ongoing." Activity/Note
 // never show a time at all -- the caller falls back to showing `subtype`
-// instead.
+// instead. User-reported: "Check-in/out time should not be mandatory" --
+// Stay/Transport can now also have no specific time (DateTimeInput's
+// `timeRequired={false}`, EntryForm.tsx), stored as literal midnight; the
+// word (Check-in/Departure/etc.) still shows, just without a fabricated
+// "00:00" the traveler never actually entered.
 function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: string; showSubtype: boolean } {
   const isTimedType = line.entryType === 'TRANSPORT' || line.entryType === 'STAY';
   if (!isTimedType) {
@@ -82,11 +90,21 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: stri
   }
   if (line.isStart) {
     const word = line.entryType === 'TRANSPORT' ? 'Departure' : 'Check-in';
-    return { text: `${line.title} · ${word} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`, showSubtype: false };
+    const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
+    const hasTime = hour !== 0 || minute !== 0;
+    const text = hasTime
+      ? `${line.title} · ${word} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
+      : `${line.title} · ${word}`;
+    return { text, showSubtype: false };
   }
   if (line.isEnd && line.endAt) {
     const word = line.entryType === 'TRANSPORT' ? 'Arrival' : 'Check-out';
-    return { text: `${line.title} · ${word} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`, showSubtype: false };
+    const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
+    const hasTime = hour !== 0 || minute !== 0;
+    const text = hasTime
+      ? `${line.title} · ${word} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
+      : `${line.title} · ${word}`;
+    return { text, showSubtype: false };
   }
   return { text: line.title, showSubtype: false };
 }
@@ -202,6 +220,7 @@ export default async function TimelinePage({ params }: PageProps) {
           const previousSectionIndex = index > 0 ? laidOutDays[index - 1].sectionIndex : null;
           const showSectionLabel = section !== null && day.sectionIndex !== previousSectionIndex;
           const rowLine = index + 1;
+          const dayLabel = formatDayLabel(day.dateKey);
 
           return (
             <div key={day.dateKey} className="timeline-grid-row">
@@ -256,7 +275,8 @@ export default async function TimelinePage({ params }: PageProps) {
                 className={`timeline-date-cell${day.isToday ? ' is-today' : ''}`}
                 style={{ gridRow: rowLine, gridColumn: 2 }}
               >
-                {formatDayLabel(day.dateKey)}
+                <div className="timeline-date-primary">{dayLabel.monthDay}</div>
+                <div className="timeline-date-weekday">{dayLabel.weekday}</div>
               </div>
 
               <div className="timeline-content-cell" style={{ gridRow: rowLine, gridColumn: 3 }}>

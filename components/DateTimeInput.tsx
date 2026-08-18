@@ -110,7 +110,18 @@ export function DateTimeInput({ id, value, onChange, required, timeRequired = tr
         id={`${baseId}-hour`}
         aria-label="Hour"
         value={hour}
-        onChange={(e) => update(date, e.target.value, minute)}
+        onChange={(e) => {
+          const nextHour = e.target.value;
+          // User-reported: picking Hour from this list, then having to
+          // separately pick Minute from an equally long 00-59 list, is
+          // annoying for the overwhelmingly common on-the-hour case --
+          // default Minute to "00" the moment Hour is picked, if Minute
+          // hasn't been touched yet. Never overrides a Minute the User
+          // already chose, and never fires when clearing Hour back to its
+          // placeholder (nextHour is falsy).
+          const nextMinute = nextHour && !minute ? '00' : minute;
+          update(date, nextHour, nextMinute);
+        }}
         required={required && timeRequired}
       >
         <option value="">HH</option>

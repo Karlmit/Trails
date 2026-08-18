@@ -429,10 +429,10 @@ export function EntryForm({
           <DateTimeInput
             id="entry-start"
             value={startAt}
-            // User-reported: "we may plan to visit Big Buddha a certain
-            // day, but we should not have to enter a specific time for
-            // it" -- Activity alone can save with just a date, no time.
-            timeRequired={entryType !== 'ACTIVITY'}
+            // User-reported: "Check-in/out time should not be mandatory"
+            // -- every type can save with just a date, no specific time
+            // (not just Activity, per the original "Big Buddha" ask).
+            timeRequired={false}
             onChange={(value) => {
               setStartAt(value);
               // spec-entry-fields-datepickers: End auto-follows Start until
@@ -486,13 +486,18 @@ export function EntryForm({
                   if (date === splitDateTime(startAt).date) {
                     const nextDay = new Date(`${date}T00:00:00.000Z`);
                     nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-                    setEndAt(combineDateTime(nextDay.toISOString().slice(0, 10), hour, minute));
+                    // timeRequired: false, matching the DateTimeInput below
+                    // -- a date-only End (no specific time picked) must
+                    // still roll forward as a bare date, not collapse to
+                    // '' for lacking an hour/minute it was never given.
+                    setEndAt(combineDateTime(nextDay.toISOString().slice(0, 10), hour, minute, false));
                     return;
                   }
                 }
                 setEndAt(value);
               }}
               required={endRequired}
+              timeRequired={false}
             />
           </div>
         )}

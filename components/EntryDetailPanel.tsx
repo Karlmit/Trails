@@ -18,15 +18,17 @@ import {
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
-// User-reported: an Activity saved with no specific time (DateTimeInput's
-// `timeRequired={false}`, EntryForm.tsx) still needs *some* stored clock
-// time (TimelineEntry.startAt/endAt are never nullable) -- midnight is the
-// sentinel. Showing "12:00 AM"/"00:00" back to the User who deliberately
-// left it blank would look like a fabricated, wrong time, so it's hidden
-// here specifically (Activity + exactly midnight); every other type/time
-// always displays its real clock time in full.
-function hasNoSpecificTime(entryType: string, date: string, zone: string | null): boolean {
-  if (entryType !== 'ACTIVITY') return false;
+// User-reported: "Check-in/out time should not be mandatory" -- every
+// type's Start/End can now be saved with no specific time (DateTimeInput's
+// `timeRequired={false}`, EntryForm.tsx), but still needs *some* stored
+// clock time (TimelineEntry.startAt/endAt are never nullable) -- midnight
+// is the sentinel. Showing "12:00 AM"/"00:00" back to the User who
+// deliberately left it blank would look like a fabricated, wrong time, so
+// it's hidden here whenever the stored time is exactly midnight,
+// regardless of Entry Type (a genuine literal-midnight time is
+// indistinguishable from "none given" -- the same accepted tradeoff this
+// app already makes everywhere else it reads an Entry's own time).
+function hasNoSpecificTime(date: string, zone: string | null): boolean {
   const { hour, minute } = entryEndpointClockTime(new Date(date), zone);
   return hour === 0 && minute === 0;
 }
@@ -144,7 +146,7 @@ export function EntryDetailPanel({
               {entry.entryType === 'TRANSPORT' ? 'Departure' : entry.entryType === 'STAY' ? 'Check-in' : 'Start'}
             </dt>
             <dd style={{ margin: 0 }}>
-              {hasNoSpecificTime(entry.entryType, entry.startAt, entry.startTimezone) ? (
+              {hasNoSpecificTime(entry.startAt, entry.startTimezone) ? (
                 formatEntryEndpointDateOnly(new Date(entry.startAt), entry.startTimezone)
               ) : (
                 <>
@@ -160,7 +162,7 @@ export function EntryDetailPanel({
                 {entry.entryType === 'TRANSPORT' ? 'Arrival' : entry.entryType === 'STAY' ? 'Check-out' : 'End'}
               </dt>
               <dd style={{ margin: 0 }}>
-                {hasNoSpecificTime(entry.entryType, entry.endAt, entry.endTimezone) ? (
+                {hasNoSpecificTime(entry.endAt, entry.endTimezone) ? (
                   formatEntryEndpointDateOnly(new Date(entry.endAt), entry.endTimezone)
                 ) : (
                   <>

@@ -603,12 +603,25 @@ p {
 
 .timeline-date-cell {
   padding: var(--space-3) 0;
-  font-weight: 600;
   color: var(--color-text-soft);
 }
 
 .timeline-date-cell.is-today {
   color: var(--color-gold);
+}
+
+/* User-reported: a single-line "Tue, Dec 1"-style label wrapped onto two
+   lines for some dates but not others, depending on which weekday/month
+   name happened to be long that day -- an inconsistent, ragged row
+   height. Two always-present, explicitly separate lines fix that: every
+   day's date cell is the same shape regardless of which day it is. */
+.timeline-date-primary {
+  font-weight: 600;
+}
+
+.timeline-date-weekday {
+  font-size: 0.8rem;
+  opacity: 0.8;
 }
 
 
