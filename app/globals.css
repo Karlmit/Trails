@@ -1066,7 +1066,9 @@ p {
   background: none;
   border: 1px solid #d6dbde;
   border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
+  padding: 0 var(--space-3);
+  min-height: 44px;
+  font-size: 0.95rem;
   cursor: pointer;
 }
 
@@ -1099,9 +1101,35 @@ p {
   margin: 0 0 var(--space-2) var(--space-4);
 }
 
+/* User-reported: "it will mostly be used from a phone" -- a floated image
+   at 45% max-width leaves a genuinely unreadable, ~150px-wide wrapped text
+   column on a phone screen. Fold Left/Right back to the same full-width
+   stacked layout as Center below this width -- the side-by-side option
+   only makes sense once there's enough width for both halves to actually
+   be legible (Notion-style editors face the same tradeoff, which is
+   exactly why none of them offer floated text wrap in the first place).
+   The Left/Right/Center toggle buttons themselves stay untouched -- a
+   chosen "float" layout just renders as Center's own stacked look below
+   this width, and reverts to floating again above it with no data loss
+   (the choice is still stored). Deliberately placed *after* the
+   unconditional rules above, not inside the app's earlier shared
+   `@media (max-width: 640px)` block further up this file -- two rules of
+   equal specificity resolve by source order regardless of which one sits
+   inside a matching media query, so a copy living earlier in the file
+   would keep losing to these unconditional ones (caught live: the image
+   kept floating at 390px width until this was moved down here). */
+@media (max-width: 640px) {
+  .rte-layout-image-float-left,
+  .rte-layout-image-float-right {
+    float: none;
+    max-width: 100%;
+    margin: 0 0 var(--space-2) 0;
+  }
+}
+
 .rte-layout-image-toolbar {
   display: flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
   margin-bottom: var(--space-1);
 }
 
@@ -1109,8 +1137,9 @@ p {
   background: var(--color-surface);
   border: 1px solid #d6dbde;
   border-radius: 999px;
-  padding: 2px var(--space-2);
-  font-size: 0.78rem;
+  padding: 0 var(--space-2);
+  min-height: 36px;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 

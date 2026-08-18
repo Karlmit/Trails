@@ -14,13 +14,19 @@ import { BlockNoteView } from '@blocknote/mantine';
 
 // User-reported: "look online for an easy way to integrate a ready made
 // WYSIWYG editor for blog posts ... a way to even choose if text is next to
-// an image or if the image is just above/below the text." BlockNote's own
-// built-in `image` block (registered below, unmodified) already covers
-// "add images" end to end (upload/drag-drop/paste/resize) -- this file adds
-// exactly one custom block, `layoutImage`, on top of it, solely for the
-// side-by-side option: a real CSS float, which is not something a Notion-
-// style block editor (including real Notion) does for its own built-in
-// image block at all.
+// an image or if the image is just above/below the text," and later "ensure
+// that the blog editor allows for uploading images."
+//
+// This is the ONE AND ONLY image block registered below -- BlockNote's own
+// built-in `image` block is deliberately NOT included in the schema
+// (verified live: it has an upstream bug where the block's own persistent
+// "Loading..." placeholder never clears if `uploadFile` rejects -- e.g.
+// every time a User tries to add an image before the post's first save --
+// even though the upload dialog's own transient UI correctly resets after
+// 3s. Rather than special-case around a third-party bug, this custom block
+// is the app's single image block: it upload/resizes and, uniquely, offers
+// the layout choice, all with its own correctly-scoped local loading/error
+// state instead of BlockNote's buggy global upload tracker.
 const layoutImageBlock = createReactBlockSpec(
   {
     type: 'layoutImage',
@@ -36,6 +42,7 @@ const layoutImageBlock = createReactBlockSpec(
   {
     render: ({ block, editor }) => {
       const [uploading, setUploading] = useState(false);
+      const [uploadError, setUploadError] = useState<string | null>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
       // Threaded down from RichTextEditor's own closure via module state is
       // not safe across multiple editors on one page -- read straight off
@@ -47,18 +54,16 @@ const layoutImageBlock = createReactBlockSpec(
       async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (!file || !postId) return;
+        if (!file || !editor.uploadFile) return;
         setUploading(true);
+        setUploadError(null);
         try {
-          const formData = new FormData();
-          formData.append('ownerType', 'TIMELINE_ENTRY');
-          formData.append('ownerId', postId);
-          formData.append('file', file);
-          const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
-          const photo = await response.json().catch(() => null);
-          if (response.ok && photo?.id) {
-            editor.updateBlock(block, { props: { ...block.props, url: `/api/v1/photos/${photo.id}/file` } });
+          const url = await editor.uploadFile(file);
+          if (typeof url === 'string') {
+            editor.updateBlock(block, { props: { ...block.props, url } });
           }
+        } catch {
+          setUploadError('Could not upload this image. Please try again.');
         } finally {
           setUploading(false);
         }
@@ -80,10 +85,16 @@ const layoutImageBlock = createReactBlockSpec(
           <div className="rte-layout-image-placeholder" contentEditable={false}>
             {postId ? (
               <>
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                  {uploading ? 'Uploading…' : '🖼️ Add image with text wrap'}
+                <button
+                  type="button"
+                  className="rte-layout-image-upload-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading…' : '🖼️ Add image'}
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+                {uploadError && <div className="field-error">{uploadError}</div>}
               </>
             ) : (
               <span className="text-soft">Save this post first, then edit it to add images.</span>
@@ -122,9 +133,12 @@ const layoutImageBlock = createReactBlockSpec(
   },
 );
 
+// `image` is deliberately omitted -- see layoutImageBlock's own comment
+// above for why this app never registers BlockNote's built-in one.
+const { image: _unusedDefaultImageBlock, ...blockSpecsWithoutDefaultImage } = defaultBlockSpecs;
 export const blogPostSchema = BlockNoteSchema.create({
   blockSpecs: {
-    ...defaultBlockSpecs,
+    ...blockSpecsWithoutDefaultImage,
     layoutImage: layoutImageBlock(),
   },
 });
@@ -151,14 +165,44 @@ export function parseBlogContent(raw: string | null | undefined): PartialBlock[]
   return [{ type: 'paragraph', content: raw }];
 }
 
+// User-reported: "ensure that the blog editor allows for uploading images"
+// -- this was the actual gap: `uploadFile` was never wired onto the editor
+// itself, so BlockNote's own built-in `image` block (the discoverable
+// "Image" slash-menu item, plus drag-drop and clipboard paste, none of
+// which go through layoutImageBlock's own bespoke upload button above) had
+// no working upload path at all -- only the custom block did. Shared by
+// both: `layoutImageBlock`'s render calls `editor.uploadFile` directly
+// instead of duplicating this fetch.
+async function uploadBlogImage(file: File, postId: string | null): Promise<string> {
+  if (!postId) {
+    // Mirrors layoutImageBlock's own "Save this post first" message --
+    // BlockNote's built-in File Panel renders whatever this throws via its
+    // own `.bn-error-text` (UploadTab.tsx), so this string is User-facing.
+    throw new Error('Save this post first, then edit it to add images.');
+  }
+  const formData = new FormData();
+  formData.append('ownerType', 'TIMELINE_ENTRY');
+  formData.append('ownerId', postId);
+  formData.append('file', file);
+  const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
+  const photo = await response.json().catch(() => null);
+  if (!response.ok || !photo?.id) {
+    throw new Error(photo?.error?.message ?? 'Could not upload this image.');
+  }
+  return `/api/v1/photos/${photo.id}/file`;
+}
+
 function useBlogEditor(initialContent: string | null | undefined, postId: string | null) {
-  // BlockNote's own `initialContent` is read once at creation time -- fine
-  // here since both Forms that use this only ever mount once per Blog Post
-  // (create page vs. edit page are separate mounts, never the same instance
-  // switching content underneath itself).
+  // BlockNote's own `initialContent`/`uploadFile` are read once at creation
+  // time -- fine here since both Forms that use this only ever mount once
+  // per Blog Post (create page vs. edit page are separate mounts, and
+  // `postId` is invariant for a given mount's whole lifetime -- create mode
+  // never flips to having one without a full page navigation to the detail
+  // page first).
   const editor = useCreateBlockNote({
     schema: blogPostSchema,
     initialContent: useMemo(() => parseBlogContent(initialContent), [initialContent]),
+    uploadFile: (file) => uploadBlogImage(file, postId),
   });
   // Stashed for layoutImageBlock's render function above -- see its comment.
   (editor as unknown as { _blogPostId: string | null })._blogPostId = postId;
@@ -207,9 +251,9 @@ export function RichTextEditor({
               [
                 ...getDefaultReactSlashMenuItems(editor),
                 {
-                  title: 'Image with text wrap',
-                  subtext: 'An image that text can flow beside, left or right',
-                  aliases: ['image', 'photo', 'picture', 'float'],
+                  title: 'Image',
+                  subtext: 'Upload a photo -- can flow beside text, or sit above/below it',
+                  aliases: ['image', 'photo', 'picture', 'upload', 'float'],
                   group: 'Media',
                   icon: <span aria-hidden="true">🖼️</span>,
                   onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' }),
