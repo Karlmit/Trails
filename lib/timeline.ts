@@ -51,15 +51,6 @@ export function sectionIndexForDateKey(dateKey: string, sections: SectionRange[]
  * timezone, or `null` for a non-Active Trip -- see computeTripStatus/
  * dateKeyInTimezone in lib/trip-status.ts) flags the single day, if any,
  * that the current-position marker and auto-scroll target key off of.
- *
- * spec-timeline-visual-redesign: no longer computes rail-connectivity
- * flags (`connectsAbove`/`connectsBelow`) -- the graph-column dot rail
- * they drove has been removed entirely (see the Timeline page's own
- * comment for why). A Section's contiguous run is now identified purely
- * by comparing a day's own `sectionIndex` to its immediate neighbor's,
- * done once, inline, by the one caller that needs it (the Timeline page,
- * deciding where to render the Section name pill) -- not worth carrying
- * as two booleans on every single day going forward.
  */
 export function buildTimelineDays(
   trip: { startDate: Date; endDate: Date },
@@ -117,17 +108,14 @@ export interface EntryForLayout {
 }
 
 /**
- * spec-timeline-visual-redesign: one line per (Entry, day it touches) --
- * the single unified shape for both a one-day Entry (isStart and isEnd
- * both true) and every day a multi-day Entry spans. Replaces the old
- * `TimelineEntryDot`/`TimelineLaneSegment` split, whose two *separate*
- * per-day data structures were exactly why a shared boundary day could
- * lose one entry's information to another's: a Stay's own check-out day
- * and the next Stay's check-in day, or a Transport's own arrival day and
- * whatever else happened to land there, each fought over one lane-indexed
- * "cell" that could hold only one occupant. A day's `lines` is a plain
- * array -- every Entry that touches that day always gets an entry in it,
- * independent of how many others do too.
+ * spec-timeline-git-graph: one line per (Entry, day it touches) -- the
+ * single unified shape for both a one-day Entry (isStart and isEnd both
+ * true, rendered as a dot on the trunk) and every day a multi-day Entry
+ * spans (rendered as a branch). A day's `lines` is a plain array -- every
+ * Entry that touches that day always gets an entry in it, so two Entries
+ * touching the same day (a Stay's own check-out and the next Stay's
+ * check-in; a Transport's arrival and whatever else is happening that day)
+ * can never clobber each other's information.
  */
 export interface TimelineDayLine {
   entryId: string;
@@ -143,66 +131,45 @@ export interface TimelineDayLine {
 }
 
 /**
- * spec-timeline-visual-redesign: a Stay's own continuous "ribbon" -- the
- * one Entry Type that represents *being somewhere* for a span of days, so
- * it's the one type that gets a genuine multi-row visual object (rendered
- * by the Timeline page as a single CSS Grid item spanning
- * `startDayIndex`..`endDayIndex` rows, not stacked per-day segments trying
- * to fake continuity -- the previous design's "lines end abruptly"
- * complaint). Transport/Activity are transitions, not places -- they never
- * get a ribbon, only their own `TimelineDayLine`s (Departure/Arrival text),
- * so they can never compete with a Stay's ribbon for lane space (the
- * previous design's "travel lines share the same space as stay lines"
- * complaint: both types drew from one shared lane pool).
+ * spec-timeline-git-graph: user-directed redesign, modeled directly on
+ * GitKraken's own branch/merge graph -- "we use a main line the same color
+ * as the section; if a stay or travel is planned this branches out of the
+ * main line and then back in whenever the end date is." Any Entry that
+ * spans more than one day (Stay *or* Transport, whichever type -- the
+ * previous design's mistake was treating them differently, one with a
+ * dedicated ribbon and the other with none at all, so they visually
+ * competed for the same lanes) gets one `TimelineBranchSegment` per day it
+ * touches:
+ *   - `'start'` on its first day -- the trunk peels off into this lane.
+ *   - `'through'` on every day strictly between -- runs parallel to the
+ *     trunk, full row height.
+ *   - `'end'` on its last day -- this lane merges back into the trunk.
+ * Two Entries meeting on the same day in the same lane (one's `'end'`, the
+ * next's `'start'`) simply both appear in that day's `branches` array --
+ * rendered as a merge-curve immediately followed by a branch-curve, the
+ * same shape a real git graph draws when one branch merges and another
+ * forks at nearly the same commit. No special-casing needed: the day-level
+ * `lines`/`branches` arrays are always plain, never-clobbered lists.
  */
-export interface StayRibbonSpan {
+export interface TimelineBranchSegment {
   entryId: string;
-  title: string;
-  // Alternates by chronological order among Stays only, 0/1 -- two
-  // adjacent Stays are always visually distinguishable, including at a
-  // same-day handoff (see StayHandoff below).
-  colorIndex: 0 | 1;
-  startDayIndex: number; // inclusive index into the `days` array
-  endDayIndex: number; // inclusive
-  laneIndex: number; // 0 unless two Stays genuinely overlap (rare)
-  // True when this ribbon's own last day was shortened by one, to make
-  // room for a StayHandoff marker on what would otherwise be a shared,
-  // ambiguous day -- the Timeline page uses this to decide whether the
-  // ribbon's bottom end draws a rounded "true end" cap (false) or a flat
-  // edge that visually continues into the handoff marker (true).
-  truncatedForHandoff: boolean;
-}
-
-/**
- * spec-timeline-visual-redesign: the day two Stays meet -- one's check-out,
- * the next's check-in, both real and both worth seeing at a glance. Rather
- * than force one ribbon to visually "win" that day (the previous design's
- * silent-data-loss bug), it gets its own small two-tone marker instead,
- * and both TimelineDayLines (Check-out text, Check-in text) still render
- * normally underneath, exactly like any other day.
- */
-export interface StayHandoff {
-  dayIndex: number;
+  entryType: string;
   laneIndex: number;
-  outgoingEntryId: string;
-  outgoingColorIndex: 0 | 1;
-  incomingEntryId: string;
-  incomingColorIndex: 0 | 1;
+  position: 'start' | 'through' | 'end';
 }
 
 export interface TimelineDayWithEntries extends TimelineDay {
   lines: TimelineDayLine[];
+  branches: TimelineBranchSegment[];
 }
 
 export interface TimelineLayout {
   days: TimelineDayWithEntries[];
-  stayRibbons: StayRibbonSpan[];
-  stayHandoffs: StayHandoff[];
-  // How many ribbon columns the Timeline page needs to reserve -- 1 in the
-  // overwhelming common case, >1 only when two Stays genuinely overlap
-  // (not just touch) rather than a data-entry mistake to guard, not a
-  // layout this app's booking model expects.
-  stayLaneCount: number;
+  // The most concurrent multi-day Entries active at once -- how many
+  // branch lanes the Timeline page needs to reserve room for. 1 in the
+  // overwhelming common case; >1 only when two multi-day Entries
+  // genuinely overlap (not just touch).
+  laneCount: number;
 }
 
 /**
@@ -212,18 +179,15 @@ export interface TimelineLayout {
  * stay independently testable, per this spec's "unit-tested" task.
  */
 export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayout[]): TimelineLayout {
-  const resultDays: TimelineDayWithEntries[] = days.map((day) => ({ ...day, lines: [] }));
+  const resultDays: TimelineDayWithEntries[] = days.map((day) => ({ ...day, lines: [], branches: [] }));
 
   const sorted = [...entries].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   interface LaneOccupant {
     entryId: string;
     endDayIndex: number;
-    colorIndex: 0 | 1;
   }
   const laneOccupants: Array<LaneOccupant | null> = [];
-  const stayRibbons: StayRibbonSpan[] = [];
-  const stayHandoffs: StayHandoff[] = [];
 
   for (const entry of sorted) {
     const startKey = entryEndpointDateKey(entry.startAt, entry.startTimezone);
@@ -245,10 +209,7 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
     if (lastIndex === -1 || firstIndex > lastIndex) continue; // entirely before/outside range
 
     // Every Entry that touches a day gets its own line there -- no shared
-    // per-day "cell" of any kind, so two Entries touching the same day
-    // (a Stay's check-out and the next Stay's check-in; a Transport's
-    // arrival and whatever else is happening that day) can never clobber
-    // each other.
+    // per-day "cell" of any kind, so nothing can clobber anything else.
     for (let i = firstIndex; i <= lastIndex; i += 1) {
       resultDays[i].lines.push({
         entryId: entry.id,
@@ -264,59 +225,26 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
       });
     }
 
-    if (entry.entryType !== 'STAY') continue; // only a Stay gets a ribbon
+    if (lastIndex === firstIndex) continue; // single-day -- a dot on the trunk, no branch/lane at all
 
     // Greedy interval coloring, same "touching endpoints reuse the lane"
-    // convention as the Section band's own containment rule -- but now
-    // scoped to Stay entries only, and a touching reuse produces a
-    // StayHandoff marker instead of letting the two ribbons fight over
-    // the shared day.
+    // convention as the Section band's own containment rule -- across
+    // *every* multi-day Entry Type together (Stay and Transport share the
+    // same lane pool; a lane represents "a branch is active," not "a Stay
+    // is active"), so a Transport's own branch never needs special-casing
+    // relative to a Stay's.
     let lane = laneOccupants.findIndex((occupant) => occupant === null || occupant.endDayIndex <= firstIndex);
     if (lane === -1) {
       lane = laneOccupants.length;
       laneOccupants.push(null);
     }
+    laneOccupants[lane] = { entryId: entry.id, endDayIndex: lastIndex };
 
-    const previousOccupant = laneOccupants[lane];
-    // Alternates against *this lane's own* previous occupant, not a global
-    // running count -- an unrelated Stay briefly claiming a different lane
-    // (a genuine overlap) must never shift which color a real touching
-    // handoff's two ribbons end up with. Two Stays sharing a handoff are
-    // always adjacent occupants of the *same* lane by construction, so
-    // this alone guarantees they always differ.
-    const colorIndex: 0 | 1 = previousOccupant ? (previousOccupant.colorIndex === 0 ? 1 : 0) : 0;
-
-    if (previousOccupant && previousOccupant.endDayIndex === firstIndex) {
-      const outgoingRibbon = stayRibbons.find((ribbon) => ribbon.entryId === previousOccupant.entryId);
-      // A same-day (check-in === check-out) Stay immediately followed by
-      // another can't be shortened below its own single day -- the ribbon
-      // and the handoff marker both occupy that one day, a rare, harmless
-      // degenerate case rather than one worth more machinery for.
-      if (outgoingRibbon && outgoingRibbon.endDayIndex > outgoingRibbon.startDayIndex) {
-        outgoingRibbon.endDayIndex -= 1;
-        outgoingRibbon.truncatedForHandoff = true;
-      }
-      stayHandoffs.push({
-        dayIndex: firstIndex,
-        laneIndex: lane,
-        outgoingEntryId: previousOccupant.entryId,
-        outgoingColorIndex: previousOccupant.colorIndex,
-        incomingEntryId: entry.id,
-        incomingColorIndex: colorIndex,
-      });
+    for (let i = firstIndex; i <= lastIndex; i += 1) {
+      const position = i === firstIndex ? 'start' : i === lastIndex ? 'end' : 'through';
+      resultDays[i].branches.push({ entryId: entry.id, entryType: entry.entryType, laneIndex: lane, position });
     }
-
-    laneOccupants[lane] = { entryId: entry.id, endDayIndex: lastIndex, colorIndex };
-    stayRibbons.push({
-      entryId: entry.id,
-      title: entry.title,
-      colorIndex,
-      startDayIndex: firstIndex,
-      endDayIndex: lastIndex,
-      laneIndex: lane,
-      truncatedForHandoff: false,
-    });
   }
 
-  return { days: resultDays, stayRibbons, stayHandoffs, stayLaneCount: laneOccupants.length };
+  return { days: resultDays, laneCount: laneOccupants.length };
 }

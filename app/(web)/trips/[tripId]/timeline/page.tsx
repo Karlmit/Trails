@@ -11,7 +11,7 @@ import {
   buildTimelineDays,
   layoutTimelineEntries,
   type EntryForLayout,
-  type StayHandoff,
+  type TimelineBranchSegment,
   type TimelineDayLine,
 } from '@/lib/timeline';
 import {
@@ -32,8 +32,17 @@ interface PageProps {
   params: Promise<{ tripId: string }>;
 }
 
-const DATE_COLUMN_WIDTH = 84;
-const RIBBON_COLUMN_WIDTH = 10;
+// spec-timeline-git-graph: one lane = LANE_UNIT px, and the SVG viewBox
+// width is set to the exact same pixel count (not scaled) -- so an x
+// coordinate in the path data always means the same real pixel column,
+// letting a plain absolutely-positioned HTML dot (drawn separately, see
+// the dots column below) line up with the trunk's own path with no extra
+// math. Only the vertical axis stretches (`preserveAspectRatio="none"`,
+// viewBox height fixed at 100 "units") to fill whatever height a day's own
+// content happens to need.
+const LANE_UNIT = 16;
+const TRUNK_X = LANE_UNIT / 2;
+const laneX = (laneIndex: number) => LANE_UNIT * (laneIndex + 1) + LANE_UNIT / 2;
 
 function formatDayLabel(dateKey: string): string {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
@@ -59,17 +68,13 @@ function formatHHMM(date: Date, zone: string | null, tripTimezone: string): stri
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}${timezoneDisclosure(zone, tripTimezone)}`;
 }
 
-// spec-timeline-visual-redesign: every day an Entry touches gets exactly
-// one line, always -- a single-day Entry (isStart and isEnd both true), or
-// any day a multi-day Entry spans. Stay/Transport show a real Check-in/
-// Check-out or Departure/Arrival time on their first/last day (a domestic
-// flight or a day-use hotel booking is "first and last" on the same single
-// day, and still gets its time); any day strictly between is just the
-// title, since the Stay's own ribbon (drawn separately, see
-// app/globals.css) already communicates "still ongoing" for Stay, and a
-// multi-day Activity/Note has no such device so its own middle days stay
-// plain too, matching the pre-redesign behavior. Activity/Note never show
-// a time at all -- the caller falls back to showing `subtype` instead.
+// spec-timeline-git-graph: a single-day Entry (isStart and isEnd both true)
+// is a dot on the trunk and still gets a real Check-in/Departure time, just
+// like the first/last day of a multi-day Entry's branch does; any day
+// strictly between a branch's own start/end is just the title, since the
+// branch line itself already communicates "still ongoing." Activity/Note
+// never show a time at all -- the caller falls back to showing `subtype`
+// instead.
 function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: string; showSubtype: boolean } {
   const isTimedType = line.entryType === 'TRANSPORT' || line.entryType === 'STAY';
   if (!isTimedType) {
@@ -86,32 +91,44 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: stri
   return { text: line.title, showSubtype: false };
 }
 
-// spec-timeline-visual-redesign: replaces the git-graph-style dot rail +
-// offset "lane" pill system entirely. User-reported ("the timeline looks
-// very messy... lines end abruptly... travel lines share the same space as
-// stay lines"): the previous design ran Sections, Stays, and Transport all
-// through one generic colored-band/lane abstraction, so touching entries
-// (a Stay's own check-out day and the next Stay's check-in day; a
-// Transport's arrival day and whatever else landed there) fought over one
-// shared per-day "cell" -- whichever was processed last silently won,
-// erasing the other's text entirely (the reported "OZO Phuket checkout"
-// and "flight arrival" bugs). Now:
-//   - A Section is a plain background tint across the whole row (unchanged)
-//     plus its name pill on the first day of its run.
-//   - A Stay is the one Entry Type that represents *being somewhere* for a
-//     span of days, so it alone gets a continuous "ribbon": one real CSS
-//     Grid item spanning `startDayIndex`..`endDayIndex` grid rows (so it's
-//     genuinely one continuous shape, not stacked per-day segments faking
-//     continuity -- variable row heights are handled natively by the grid,
-//     no client JS measurement needed). Two Stays meeting on the same day
-//     (one's check-out, the next's check-in) get a small two-tone handoff
-//     marker on that shared day instead of forcing one ribbon to "win" it.
-//   - Transport/Activity are transitions, not places -- they never get a
-//     ribbon or a lane at all, only their own text line(s), so they can
-//     never compete with a Stay's ribbon for space.
-//   - Every Entry that touches a day gets its own line in that day's
-//     `lines` array (lib/timeline.ts) -- a plain list, not a lane-indexed
-//     slot, so nothing can be silently overwritten.
+// spec-timeline-git-graph: the path data for one branch segment, in
+// viewBox units -- 0..100 vertically regardless of the row's actual
+// rendered height (preserveAspectRatio="none" stretches it to fit).
+// 'start'/'end' are smooth S-curves between the trunk and this lane
+// (a real git graph's own branch/merge shape); 'through' is a plain
+// straight line down the lane, parallel to the trunk.
+function branchPath(branch: TimelineBranchSegment): string {
+  const x = laneX(branch.laneIndex);
+  if (branch.position === 'start') return `M ${TRUNK_X} 0 C ${TRUNK_X} 50, ${x} 50, ${x} 100`;
+  if (branch.position === 'end') return `M ${x} 0 C ${x} 50, ${TRUNK_X} 50, ${TRUNK_X} 100`;
+  return `M ${x} 0 L ${x} 100`;
+}
+
+// spec-timeline-git-graph: user-directed redesign, modeled directly on
+// GitKraken's own branch/merge graph. User-reported regressions this
+// corrects, from the previous (non-git-graph) redesign:
+//   - "the decision to remove the lines for travel was a really bad call"
+//     / "a bad call to remove lines for stays" -- both Stay and Transport
+//     now share one branch mechanism (lib/timeline.ts's
+//     TimelineBranchSegment), colored by their own Entry Type
+//     (entryTypeColor), never by an ad hoc Stay-only ribbon scheme.
+//   - "lines added in between the dates and the info" -- the graph column
+//     is leftmost again, before the date column, matching GitKraken's own
+//     layout and this app's pre-existing convention.
+//   - "lines are still ending abruptly with a flat end" -- a branch's own
+//     start/end is a smooth curve peeling off of / merging into the trunk
+//     (SVG cubic beziers), not a rectangular bar with rounded corners.
+//   - "we use a main line the same color as the section" -- the trunk
+//     (lane -1, always drawn) is colored per its own day's Section,
+//     dashed/neutral on a gap day; "if a stay or travel is planned this
+//     branches out of the main line and then back in" -- exactly what
+//     TimelineBranchSegment's 'start'/'through'/'end' positions draw see
+//     branchPath above); "one-day activities... different colored dots on
+//     the main line" -- a single-day Entry is a dot at the trunk's own x
+//     position; "several activities... make that section taller" -- the
+//     dots column mirrors the content column's own line-by-line rhythm
+//     (same gap, one dot-or-blank slot per line), so a day with N lines
+//     naturally needs the same height on both sides, no special-casing.
 export default async function TimelinePage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
@@ -157,15 +174,10 @@ export default async function TimelinePage({ params }: PageProps) {
     startTimezone: entry.startTimezone,
     endTimezone: entry.endTimezone,
   }));
-  const { days: laidOutDays, stayRibbons, stayHandoffs, stayLaneCount } = layoutTimelineEntries(days, entriesForLayout);
+  const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
 
-  const ribbonLaneCount = Math.max(stayLaneCount, 1);
-  const gridTemplateColumns = `${DATE_COLUMN_WIDTH}px repeat(${ribbonLaneCount}, ${RIBBON_COLUMN_WIDTH}px) 1fr`;
-
-  const handoffsByDayIndex = new Map<number, StayHandoff>();
-  for (const handoff of stayHandoffs) handoffsByDayIndex.set(handoff.dayIndex, handoff);
-
-  const ribbonColorVar = (colorIndex: 0 | 1) => `var(--stay-ribbon-${colorIndex === 0 ? 'a' : 'b'})`;
+  const graphWidth = LANE_UNIT * (laneCount + 1);
+  const gridTemplateColumns = `${graphWidth}px 84px 1fr`;
 
   return (
     <main className="page">
@@ -184,13 +196,12 @@ export default async function TimelinePage({ params }: PageProps) {
           const bandColor = section
             ? (section.color && sectionCustomColorBand(section.color)) ?? sectionColor(day.sectionIndex!)
             : undefined;
-          const railColor = section
+          const trunkColor = section
             ? (section.color && sectionCustomColorSolid(section.color)) ?? sectionColorSolid(day.sectionIndex!)
             : undefined;
           const previousSectionIndex = index > 0 ? laidOutDays[index - 1].sectionIndex : null;
           const showSectionLabel = section !== null && day.sectionIndex !== previousSectionIndex;
           const rowLine = index + 1;
-          const handoff = handoffsByDayIndex.get(index);
 
           return (
             <div key={day.dateKey} className="timeline-grid-row">
@@ -199,32 +210,56 @@ export default async function TimelinePage({ params }: PageProps) {
                 className={`timeline-row-bg${day.isToday ? ' is-today' : ''}`}
                 style={{
                   gridRow: rowLine,
-                  ...(bandColor ? { ['--band-color' as string]: bandColor, ['--rail-accent-color' as string]: railColor } : undefined),
+                  ...(bandColor ? { ['--band-color' as string]: bandColor } : undefined),
                 }}
               />
 
-              <div className="timeline-date-cell" style={{ gridRow: rowLine, gridColumn: 1 }}>
+              <div className="timeline-graph-cell" style={{ gridRow: rowLine, gridColumn: 1, width: graphWidth }}>
+                <svg
+                  className="timeline-graph-svg"
+                  viewBox={`0 0 ${graphWidth} 100`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d={`M ${TRUNK_X} 0 L ${TRUNK_X} 100`}
+                    className={`timeline-trunk-path${trunkColor ? '' : ' is-gap'}`}
+                    style={trunkColor ? { stroke: trunkColor } : undefined}
+                  />
+                  {day.branches.map((branch) => (
+                    <path
+                      key={branch.entryId}
+                      d={branchPath(branch)}
+                      className="timeline-branch-path"
+                      style={{ stroke: entryTypeColor(branch.entryType) }}
+                    />
+                  ))}
+                </svg>
+                <div className="timeline-dots-column">
+                  {day.lines.map((line) => {
+                    const isSingleDay = line.isStart && line.isEnd;
+                    return (
+                      <div key={line.entryId} className="timeline-dot-slot">
+                        {isSingleDay && (
+                          <span
+                            className="timeline-dot"
+                            style={{ ['--dot-color' as string]: entryTypeColor(line.entryType) }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div
+                className={`timeline-date-cell${day.isToday ? ' is-today' : ''}`}
+                style={{ gridRow: rowLine, gridColumn: 2 }}
+              >
                 {formatDayLabel(day.dateKey)}
               </div>
 
-              {handoff && (
-                <div
-                  className="timeline-handoff"
-                  style={{
-                    gridRow: rowLine,
-                    gridColumn: 2 + handoff.laneIndex,
-                    ['--handoff-color-a' as string]: ribbonColorVar(handoff.outgoingColorIndex),
-                    ['--handoff-color-b' as string]: ribbonColorVar(handoff.incomingColorIndex),
-                  }}
-                  title="Check-out / Check-in the same day"
-                  aria-hidden="true"
-                />
-              )}
-
-              <div
-                className="timeline-content-cell"
-                style={{ gridRow: rowLine, gridColumn: 2 + ribbonLaneCount }}
-              >
+              <div className="timeline-content-cell" style={{ gridRow: rowLine, gridColumn: 3 }}>
                 {showSectionLabel && section && (
                   <div className="timeline-section-label">
                     {section.emoji && (
@@ -251,10 +286,6 @@ export default async function TimelinePage({ params }: PageProps) {
                           href={entryDetailHref(tripId, line.entryType, line.entryId)}
                           className="entry-chip"
                         >
-                          <span
-                            className="entry-chip-dot"
-                            style={{ ['--dot-color' as string]: entryTypeColor(line.entryType) }}
-                          />
                           <span>{text}</span>
                           {showSubtype && line.subtype && (
                             <span className="text-soft">· {subtypeLabel(line.subtype)}</span>
@@ -270,20 +301,6 @@ export default async function TimelinePage({ params }: PageProps) {
             </div>
           );
         })}
-
-        {stayRibbons.map((ribbon) => (
-          <div
-            key={ribbon.entryId}
-            className={`timeline-ribbon${ribbon.truncatedForHandoff ? ' is-truncated' : ''}`}
-            style={{
-              gridRow: `${ribbon.startDayIndex + 1} / ${ribbon.endDayIndex + 2}`,
-              gridColumn: 2 + ribbon.laneIndex,
-              ['--ribbon-color' as string]: ribbonColorVar(ribbon.colorIndex),
-            }}
-            title={ribbon.title}
-            aria-hidden="true"
-          />
-        ))}
       </div>
 
       {viewer.type === 'user' && (

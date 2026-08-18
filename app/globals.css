@@ -27,15 +27,6 @@
   --color-gold-light: #dfc49d;
   --color-gold-lightest: #faf6ee;
 
-  /* spec-timeline-visual-redesign: the Stay ribbon's two alternating tones
-     -- deliberately neutral (not drawn from the Section palette's coded
-     hues below) so the ribbon reads as a structural device, "you are
-     physically here," rather than another piece of color-coded metadata.
-     Two adjacent Stays are always visually distinguishable, including at a
-     same-day handoff. */
-  --stay-ribbon-a: #333d3a;
-  --stay-ribbon-b: #a1793f;
-
   /* Text */
   --color-text: rgba(0, 0, 0, 0.87);
   --color-text-soft: rgba(0, 0, 0, 0.58);
@@ -487,6 +478,19 @@ p {
    element per day in the `.map()`, but the grid itself must see that day's
    background/date/content cells as direct children, not nested one level
    inside a wrapper that would otherwise become a single grid item itself. */
+/* spec-timeline-git-graph: modeled directly on GitKraken's own branch/
+   merge graph, per the user's explicit direction. The graph column sits
+   leftmost (before the date column, matching GitKraken's own layout and
+   this app's earlier convention) and is a CSS Grid, not stacked flex rows
+   -- `.timeline-grid-row` is `display: contents` (React needs one
+   wrapping element per day in the `.map()`, but the grid itself must see
+   that day's background/graph/date/content cells as direct children, not
+   nested one level inside a wrapper that would otherwise become a single
+   grid item itself). Each row's height is whatever its tallest cell
+   needs -- CSS Grid's implicit row sizing handles this with no client-side
+   measurement, so a day with several single-day dots (and therefore
+   several content lines) simply grows to fit both columns' matching
+   rhythm, with no special-casing. */
 .timeline-grid {
   display: grid;
   column-gap: var(--space-3);
@@ -517,74 +521,101 @@ p {
   box-shadow: inset 3px 0 0 var(--color-gold);
 }
 
+/* spec-timeline-git-graph: the trunk (always drawn, every day) plus 0+
+   branch curves for whatever multi-day Entries are active that day --
+   layered as an absolutely-positioned SVG behind a parallel column of
+   dots for single-day Entries. The SVG's viewBox width equals its actual
+   CSS pixel width 1:1 (only the vertical axis stretches via
+   `preserveAspectRatio="none"`), so `.timeline-dot`'s plain HTML
+   positioning lines up with the trunk's own path with no extra math. */
+.timeline-graph-cell {
+  position: relative;
+  padding: var(--space-3) 0;
+}
+
+.timeline-graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.timeline-trunk-path,
+.timeline-branch-path {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.timeline-trunk-path {
+  stroke: rgba(0, 0, 0, 0.22);
+}
+
+/* A gap day (no Section) -- dashed and muted, same "no defined context
+   here" convention the original graph rail used, rather than a solid line
+   implying a leg that doesn't actually exist. */
+.timeline-trunk-path.is-gap {
+  stroke: rgba(0, 0, 0, 0.16);
+  stroke-dasharray: 3 4;
+}
+
+/* spec-timeline-git-graph: one line per branch position -- 'start'/'end'
+   are the smooth S-curves peeling off of / merging into the trunk (a real
+   git graph's own shape, replacing the previous redesign's flat-ended
+   rectangular bar); 'through' is a plain straight line down the lane,
+   parallel to the trunk. Colored by the Entry's own Type
+   (entryTypeColor), not a Stay-specific scheme -- Transport and Stay share
+   this exact same mechanism now, never competing for lanes since each
+   Entry simply claims whichever lane is free. */
+.timeline-branch-path {
+  stroke-width: 3;
+}
+
+.timeline-dots-column {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  height: 100%;
+}
+
+/* Mirrors .entry-dot-list's own per-line rhythm exactly (same gap above,
+   same line-height here) so a dot lines up with its own text line in the
+   content column -- a day with a multi-day Entry's own line (no dot, just
+   an empty slot the same height) still keeps every *other* line's dot
+   aligned correctly. */
+.timeline-dot-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.4rem;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--color-brand-accent));
+  border: 2px solid var(--color-canvas);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
 .timeline-date-cell {
   padding: var(--space-3) 0;
   font-weight: 600;
   color: var(--color-text-soft);
 }
 
-.timeline-row-bg.is-today + .timeline-date-cell {
+.timeline-date-cell.is-today {
   color: var(--color-gold);
 }
+
 
 .timeline-content-cell {
   position: relative;
   padding: var(--space-3) 0;
   min-width: 0;
-}
-
-/* spec-timeline-visual-redesign: a Stay's own continuous "ribbon" -- the
-   one Entry Type that represents *being somewhere* for a span of days, so
-   it's the one type that gets a genuine multi-row visual object (grid-row
-   spans multiple day-rows as a single element, see the .timeline-grid
-   comment above). Rounded caps at both real ends (its own check-in/
-   check-out) give it a deliberately physical, luggage-tag-ribbon quality;
-   `.is-truncated` (its bottom end was shortened by one day to make room
-   for a handoff marker, see .timeline-handoff below) drops the bottom
-   rounding so the ribbon visually runs straight into the marker rather
-   than looking like it stopped early for no reason. */
-.timeline-ribbon {
-  grid-column: 2;
-  z-index: 1;
-  width: 100%;
-  margin: var(--space-3) 0;
-  background: var(--ribbon-color);
-  border-radius: 5px;
-}
-
-.timeline-ribbon.is-truncated {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  margin-bottom: 0;
-}
-
-/* spec-timeline-visual-redesign: the day two Stays meet -- one's
-   check-out, the next's check-in, both real (both TimelineDayLines still
-   render normally in the content column). Rather than force one ribbon to
-   visually "win" that day (the previous design's silent-data-loss bug),
-   it gets this small two-tone marker instead: a half-and-half circle,
-   outgoing Stay's color on top, incoming Stay's color on bottom -- read at
-   a glance as a hand-off, not a collision. */
-/* `align-self: start` + a top margin matching .timeline-ribbon's own --
-   a day's row is as tall as its (possibly multi-line) content, so
-   centering vertically would float this marker away from the one place it
-   actually needs to sit: exactly where the outgoing ribbon's shortened
-   bottom edge meets the incoming ribbon's top edge, both of which align to
-   this same row's top (that's what .timeline-ribbon's own margin does). */
-.timeline-handoff {
-  align-self: start;
-  justify-self: center;
-  /* Above .timeline-ribbon (z-index: 1) -- both the outgoing and incoming
-     ribbon occupy this exact grid cell too (the shared day), and DOM order
-     alone would let whichever renders later paint over this marker. */
-  z-index: 2;
-  margin-top: var(--space-3);
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: linear-gradient(to bottom, var(--handoff-color-a) 50%, var(--handoff-color-b) 50%);
-  border: 2px solid var(--color-canvas);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
 }
 
 .timeline-section-label {
@@ -655,6 +686,7 @@ p {
   align-items: center;
   gap: 6px;
   font-size: 0.9rem;
+  line-height: 1.4rem;
   color: var(--color-text);
   width: fit-content;
 }
@@ -663,15 +695,6 @@ p {
   text-decoration: none;
   opacity: 0.75;
 }
-
-.entry-chip-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dot-color, var(--color-brand-accent));
-  flex-shrink: 0;
-}
-
 
 .section-legend {
   display: flex;
