@@ -230,7 +230,9 @@ export function EntryDetailPanel({
           initialPhotos={photos}
         />
 
-        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly={readOnly} />
+        {!readOnly && (
+          <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly={readOnly} />
+        )}
       </div>
     </div>
   );

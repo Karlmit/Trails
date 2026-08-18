@@ -243,6 +243,67 @@ export function mergedDateOrderError(
  * layoutTimelineEntries) -- called with the *merged* start/end on PATCH, same
  * "merge before checking" pattern as `mergedDateOrderError` above.
  */
+/**
+ * spec-guest-field-scope: a Guest viewing a Stay/Transport/Activity/Note
+ * detail page only ever sees Title, Check-in/Check-out (or
+ * Departure/Arrival/Start/End), Location, and Photos -- exactly what the
+ * Timeline's own at-a-glance rendering already shows, plus Photos (already
+ * Guest-visible per FR-28/spec-tags-links-photos). Every other field is
+ * stripped to `null` here, on the server, before the entry object is ever
+ * handed to the Client Component that renders it -- a Client Component prop
+ * is always serialized into the RSC payload sent to the browser regardless
+ * of what the component chooses to render, so hiding these fields with a
+ * `readOnly` conditional inside the component would still ship the real
+ * values to the browser. `null` is indistinguishable from "this Entry
+ * genuinely has no Contact Info", so this is a real, not merely cosmetic,
+ * scope reduction (Intent). Pure: returns a new object, never mutates
+ * `entry`. Blog Post content is explicitly NOT field-scoped (Intent #2) --
+ * callers must never apply this to a BLOG_POST entry.
+ */
+export function stripEntryFieldsForGuest<
+  T extends {
+    description: unknown;
+    bookingReference: unknown;
+    website: unknown;
+    bookedVia: unknown;
+    expenseAmount: unknown;
+    expenseCurrency: unknown;
+    expensePaymentStatus: unknown;
+    expensePaymentNote: unknown;
+    contactName: unknown;
+    contactPhone: unknown;
+    contactEmail: unknown;
+    notes: unknown;
+    postTripNotes: unknown;
+    typeDetails: unknown;
+  },
+>(entry: T): T {
+  return {
+    ...entry,
+    description: null,
+    bookingReference: null,
+    website: null,
+    bookedVia: null,
+    expenseAmount: null,
+    expenseCurrency: null,
+    expensePaymentStatus: null,
+    expensePaymentNote: null,
+    contactName: null,
+    contactPhone: null,
+    contactEmail: null,
+    notes: null,
+    postTripNotes: null,
+    // A Stay's roomInfo or a Transport's seat/gate/terminal/serviceNumber/
+    // baggageInfo are type-specific fields carried in this bag -- not one
+    // of the 13 named fields above, but just as out-of-scope for a Guest
+    // (Intent: only Title/dates/Location/Photos are Guest-visible). Reset
+    // to `{}` rather than `null` so it stays indistinguishable from an
+    // Activity's own always-empty typeDetails, matching the "null reveals
+    // nothing about whether a real value exists" rule for every other field.
+    typeDetails: {},
+  };
+}
+
 export function entryOutsideTripRangeError(
   trip: { startDate: Date; endDate: Date; timezone: string },
   startAt: Date,

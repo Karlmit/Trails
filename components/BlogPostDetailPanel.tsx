@@ -157,7 +157,9 @@ export function BlogPostDetailPanel({
           initialPhotos={photos}
         />
 
-        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} readOnly={readOnly} />
+        {!readOnly && (
+          <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} readOnly={readOnly} />
+        )}
       </div>
     </div>
   );
