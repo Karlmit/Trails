@@ -338,6 +338,20 @@ describe('lib/entry-types/*.schema.ts', () => {
       expect(result.success).toBe(false);
     });
 
+    // User-reported: "we may plan to visit Big Buddha a certain day, but
+    // we should not have to enter a specific time for it" -- a bare
+    // `YYYY-MM-DD` startAt (DateTimeInput's timeRequired={false} mode)
+    // must parse cleanly, deterministically as UTC midnight (an ECMA-262
+    // date-only string is always UTC, unlike a datetime-without-zone
+    // string -- see dateTimeField's own comment).
+    it('accepts a date-only startAt (no specific time)', () => {
+      const result = activityCreateSchema.safeParse({ ...base, startAt: '2026-08-05' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.startAt.toISOString()).toBe('2026-08-05T00:00:00.000Z');
+      }
+    });
+
     it('rejects a negative Expense amount', () => {
       const result = activityCreateSchema.safeParse({ ...base, expenseAmount: -5, expenseCurrency: 'USD' });
       expect(result.success).toBe(false);

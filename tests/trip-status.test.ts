@@ -6,7 +6,9 @@ import {
   entryEndpointClockTime,
   entryEndpointDateKey,
   formatEntryDateTime,
+  formatEntryEndpointDateOnly,
   formatEntryEndpointDateTime,
+  timezoneDisclosure,
   tripDurationDays,
   tripLocalNow,
   zonedWallClockToUtc,
@@ -176,5 +178,32 @@ describe('entryEndpointClockTime / entryEndpointDateKey / formatEntryEndpointDat
     const date = new Date('2026-08-05T22:00:00.000Z');
     expect(entryEndpointDateKey(date, null)).toBe('2026-08-05');
     expect(entryEndpointDateKey(date, 'Asia/Bangkok')).toBe('2026-08-06');
+  });
+});
+
+// User-reported: a leg's declared timezone is otherwise invisible to a
+// viewer who doesn't already know the Trip's own timezone by heart.
+describe('timezoneDisclosure', () => {
+  it('is empty when zone is null (the default, no-override case)', () => {
+    expect(timezoneDisclosure(null, 'Asia/Bangkok')).toBe('');
+  });
+
+  it('is empty when zone matches the Trip timezone exactly', () => {
+    expect(timezoneDisclosure('Asia/Bangkok', 'Asia/Bangkok')).toBe('');
+  });
+
+  it('discloses the zone in parens when it differs from the Trip timezone', () => {
+    expect(timezoneDisclosure('Asia/Tokyo', 'Asia/Bangkok')).toBe(' (Asia/Tokyo)');
+  });
+});
+
+describe('formatEntryEndpointDateOnly', () => {
+  it('formats just the date, no clock time, with zero conversion when zone is null', () => {
+    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T15:00:00.000Z'), null)).toBe('Aug 5, 2026');
+  });
+
+  it('formats through the declared zone when non-null', () => {
+    // 22:00 UTC is Aug 6 in Asia/Bangkok (+7).
+    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T22:00:00.000Z'), 'Asia/Bangkok')).toBe('Aug 6, 2026');
   });
 });

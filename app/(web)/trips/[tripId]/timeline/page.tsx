@@ -5,11 +5,13 @@ import {
   dateKeyInTimezone,
   entryEndpointClockTime,
   timeOfDayInTimezone,
+  timezoneDisclosure,
 } from '@/lib/trip-status';
 import {
   buildTimelineDays,
   layoutTimelineEntries,
   type EntryForLayout,
+  type TimelineEntryDot,
   type TimelineLaneSegment,
 } from '@/lib/timeline';
 import {
@@ -47,9 +49,22 @@ function formatDayLabel(dateKey: string): string {
 // `now`). `zone` non-null is a traveler-declared real timezone for this
 // specific leg (Transport-only, e.g. a flight's arrival airport) -- the
 // stored value is then a real UTC instant, converted through that zone.
-function formatHHMM(date: Date, zone: string | null): string {
+// User-reported: that zone is otherwise invisible, so it's disclosed in
+// parens whenever it differs from the Trip's own declared timezone.
+function formatHHMM(date: Date, zone: string | null, tripTimezone: string): string {
   const { hour, minute } = entryEndpointClockTime(date, zone);
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}${timezoneDisclosure(zone, tripTimezone)}`;
+}
+
+// User-reported: a single-day Stay/Transport (e.g. a domestic flight, or a
+// day-use hotel booking) rendered as a dot showed only its title -- no
+// Check-in/Departure time at all, unlike a multi-day entry's lane segment.
+// Mirrors laneSegmentLabel's start-day wording exactly; Activity/Note dots
+// aren't given a time label at all (`null`), so the caller falls back to
+// showing `subtype` instead, matching the existing (unaffected) behavior.
+function dotTimeLabel(dot: TimelineEntryDot, tripTimezone: string): string | null {
+  const word = dot.entryType === 'TRANSPORT' ? 'Departure' : dot.entryType === 'STAY' ? 'Check-in' : null;
+  return word ? `${word} ${formatHHMM(dot.startAt, dot.startTimezone, tripTimezone)}` : null;
 }
 
 // spec-timeline-at-a-glance: a real, visible text line for every day a
@@ -61,14 +76,14 @@ function formatHHMM(date: Date, zone: string | null): string {
 // between is just the title -- the pill itself already communicates
 // "still ongoing." Reuses the exact same per-entry-type ternary
 // EntryDetailPanel/EntryForm already use, no new vocabulary invented.
-function laneSegmentLabel(segment: TimelineLaneSegment): string {
+function laneSegmentLabel(segment: TimelineLaneSegment, tripTimezone: string): string {
   if (segment.isStart) {
     const word = segment.entryType === 'TRANSPORT' ? 'Departure' : segment.entryType === 'STAY' ? 'Check-in' : 'Start';
-    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, segment.startTimezone)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, segment.startTimezone, tripTimezone)}`;
   }
   if (segment.isEnd && segment.endAt) {
     const word = segment.entryType === 'TRANSPORT' ? 'Arrival' : segment.entryType === 'STAY' ? 'Check-out' : 'End';
-    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, segment.endTimezone)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, segment.endTimezone, tripTimezone)}`;
   }
   return segment.title;
 }
@@ -237,20 +252,27 @@ export default async function TimelinePage({ params }: PageProps) {
                   )}
                   {day.dots.length > 0 && (
                     <div className="entry-dot-list">
-                      {day.dots.map((dot) => (
-                        <Link
-                          key={dot.id}
-                          href={entryDetailHref(tripId, dot.entryType, dot.id)}
-                          className="entry-chip"
-                        >
-                          <span
-                            className="entry-chip-dot"
-                            style={{ ['--dot-color' as string]: entryTypeColor(dot.entryType) }}
-                          />
-                          <span>{dot.title}</span>
-                          {dot.subtype && <span className="text-soft">· {subtypeLabel(dot.subtype)}</span>}
-                        </Link>
-                      ))}
+                      {day.dots.map((dot) => {
+                        const timeLabel = dotTimeLabel(dot, trip.timezone);
+                        return (
+                          <Link
+                            key={dot.id}
+                            href={entryDetailHref(tripId, dot.entryType, dot.id)}
+                            className="entry-chip"
+                          >
+                            <span
+                              className="entry-chip-dot"
+                              style={{ ['--dot-color' as string]: entryTypeColor(dot.entryType) }}
+                            />
+                            <span>{dot.title}</span>
+                            {timeLabel ? (
+                              <span className="text-soft">· {timeLabel}</span>
+                            ) : (
+                              dot.subtype && <span className="text-soft">· {subtypeLabel(dot.subtype)}</span>
+                            )}
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
                   {activeLaneSegments.length > 0 && (
@@ -263,7 +285,7 @@ export default async function TimelinePage({ params }: PageProps) {
                           style={{ ['--span-color' as string]: entryTypeColor(segment.entryType) }}
                         >
                           <span className="entry-chip-span-accent" />
-                          <span>{laneSegmentLabel(segment)}</span>
+                          <span>{laneSegmentLabel(segment, trip.timezone)}</span>
                         </Link>
                       ))}
                     </div>

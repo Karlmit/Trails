@@ -143,6 +143,14 @@ export interface TimelineEntryDot {
   entryType: string;
   subtype: string | null;
   title: string;
+  // User-reported: a single-day Stay/Transport (e.g. a domestic flight, or
+  // a day-use hotel booking) showed only its title, with no Check-in/
+  // Departure time at all -- unlike a multi-day entry's lane segment,
+  // which always shows one. Carried through so the Timeline page can
+  // render the same "{title} · {word} HH:MM" wording for Stay/Transport
+  // dots too; Activity/Note dots ignore this and keep showing `subtype`.
+  startAt: Date;
+  startTimezone: string | null;
 }
 
 export interface TimelineLaneSegment {
@@ -209,7 +217,14 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
       // this in practice, but the layout function must stay total.
       if (index === -1) continue;
       const list = dotsByIndex.get(index) ?? [];
-      list.push({ id: entry.id, entryType: entry.entryType, subtype: entry.subtype, title: entry.title });
+      list.push({
+        id: entry.id,
+        entryType: entry.entryType,
+        subtype: entry.subtype,
+        title: entry.title,
+        startAt: entry.startAt,
+        startTimezone: entry.startTimezone,
+      });
       dotsByIndex.set(index, list);
       continue;
     }

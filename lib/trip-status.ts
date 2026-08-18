@@ -163,6 +163,34 @@ export function formatEntryEndpointDateTime(date: Date, zone: string | null): st
 }
 
 /**
+ * Date only, no clock time -- for an Activity the User deliberately saved
+ * with no specific time ("we may plan to visit Big Buddha a certain day,
+ * but we should not have to enter a specific time for it"). `zone` follows
+ * the same resolution rule as every other Entry-endpoint display function.
+ */
+export function formatEntryEndpointDateOnly(date: Date, zone: string | null): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: zone ?? 'UTC',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+/**
+ * User-reported: a Transport leg's declared timezone is invisible unless
+ * the viewer already knows the Trip's own declared timezone by heart --
+ * `" (Asia/Tokyo)"`, appended after a displayed time whenever this leg's
+ * own zone differs from the Trip's, `''` otherwise (including whenever
+ * `zone` is null, the default/no-override case for every type). Never
+ * shown for a zone that just happens to equal the Trip's own -- that's
+ * indistinguishable from the default and would be noise on every entry.
+ */
+export function timezoneDisclosure(zone: string | null, tripTimezone: string): string {
+  return zone && zone !== tripTimezone ? ` (${zone})` : '';
+}
+
+/**
  * Computes Trip Status (FR-2) from the Trip's start/end dates relative to
  * "today" in the Trip's own timezone. Never manually overridable.
  */

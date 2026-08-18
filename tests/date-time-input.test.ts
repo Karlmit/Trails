@@ -29,6 +29,27 @@ describe('combineDateTime', () => {
   it('returns empty string when nothing is chosen', () => {
     expect(combineDateTime('', '', '')).toBe('');
   });
+
+  // User-reported: an Activity should be saveable with just a date, no
+  // specific time ("we should not have to enter a specific time for it").
+  describe('with timeRequired: false', () => {
+    it('treats a date with neither hour nor minute picked as a complete, date-only value', () => {
+      expect(combineDateTime('2026-08-03', '', '', false)).toBe('2026-08-03');
+    });
+
+    it('still returns empty string for a genuinely incomplete selection (only one of hour/minute)', () => {
+      expect(combineDateTime('2026-08-03', '14', '', false)).toBe('');
+      expect(combineDateTime('2026-08-03', '', '05', false)).toBe('');
+    });
+
+    it('still combines fully when both hour and minute are chosen', () => {
+      expect(combineDateTime('2026-08-03', '14', '05', false)).toBe('2026-08-03T14:05');
+    });
+
+    it('still returns empty string with no date at all', () => {
+      expect(combineDateTime('', '', '', false)).toBe('');
+    });
+  });
 });
 
 describe('splitDateTime', () => {

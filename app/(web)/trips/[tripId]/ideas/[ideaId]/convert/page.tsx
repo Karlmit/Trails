@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeIdea } from '@/lib/serializers';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { isUuid } from '@/lib/uuid';
 import { EntryForm } from '@/components/EntryForm';
 
@@ -43,6 +44,7 @@ export default async function ConvertIdeaPage({ params }: PageProps) {
         tripId={tripId}
         mode="create"
         tripTimezone={trip.timezone}
+        tripStartDate={dateKeyOfDateColumn(trip.startDate)}
         initialValues={{
           title: dto.title,
           locationName: dto.locationName,

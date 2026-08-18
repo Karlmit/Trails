@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { isUuid } from '@/lib/uuid';
 import { EntryForm } from '@/components/EntryForm';
 
@@ -26,7 +27,12 @@ export default async function NewEntryPage({ params }: PageProps) {
         </Link>
       </div>
       <p className="text-soft">Stay, Transport, Activity, or Note -- pick a type below.</p>
-      <EntryForm tripId={tripId} mode="create" tripTimezone={trip.timezone} />
+      <EntryForm
+        tripId={tripId}
+        mode="create"
+        tripTimezone={trip.timezone}
+        tripStartDate={dateKeyOfDateColumn(trip.startDate)}
+      />
     </main>
   );
 }

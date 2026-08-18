@@ -7,6 +7,14 @@ interface DateTimeInputProps {
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  // User-reported: "we may plan to visit Big Buddha a certain day, but we
+  // should not have to enter a specific time for it" -- when false, a date
+  // alone (hour and minute both left at their placeholder) is a complete,
+  // valid value; picking only one of hour/minute is still treated as an
+  // incomplete, abandoned selection (`''`), same as always. Defaults to
+  // true, unchanged for every existing call site (Stay/Transport
+  // check-in/out, and Activity's own End).
+  timeRequired?: boolean;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
@@ -17,10 +25,14 @@ const MINUTES = Array.from({ length: 60 }, (_, m) => String(m).padStart(2, '0'))
  * Produces the exact `YYYY-MM-DDTHH:mm` shape EntryForm already works with
  * internally, or `''` the moment any one of the three parts is missing --
  * an incomplete selection (date picked but hour/minute not yet chosen, or
- * vice versa) must never submit as a malformed partial value.
+ * vice versa) must never submit as a malformed partial value. When
+ * `timeRequired` is false, a date with *neither* hour nor minute picked
+ * is itself a complete value (just the date, no time) rather than `''`.
  */
-export function combineDateTime(date: string, hour: string, minute: string): string {
-  if (!date || !hour || !minute) return '';
+export function combineDateTime(date: string, hour: string, minute: string, timeRequired = true): string {
+  if (!date) return '';
+  if (!hour && !minute) return timeRequired ? '' : date;
+  if (!hour || !minute) return '';
   return `${date}T${hour}:${minute}`;
 }
 
@@ -55,7 +67,7 @@ export function splitDateTime(value: string): { date: string; hour: string; minu
 // *external* write to `value` -- an edit-mode initial load, or End
 // following a Start change (EntryForm's useAutoEndDate wiring) -- actually
 // show up here.
-export function DateTimeInput({ id, value, onChange, required }: DateTimeInputProps) {
+export function DateTimeInput({ id, value, onChange, required, timeRequired = true }: DateTimeInputProps) {
   const autoId = useId();
   const baseId = id ?? autoId;
 
@@ -67,7 +79,7 @@ export function DateTimeInput({ id, value, onChange, required }: DateTimeInputPr
     // If `value` already matches what our own three parts combine to, this
     // change was this component's own edit echoed back down -- nothing to
     // resync. Otherwise it's an external write; adopt it.
-    if (value === combineDateTime(date, hour, minute)) return;
+    if (value === combineDateTime(date, hour, minute, timeRequired)) return;
     const next = splitDateTime(value);
     setDate(next.date);
     setHour(next.hour);
@@ -82,7 +94,7 @@ export function DateTimeInput({ id, value, onChange, required }: DateTimeInputPr
     setDate(nextDate);
     setHour(nextHour);
     setMinute(nextMinute);
-    onChange(combineDateTime(nextDate, nextHour, nextMinute));
+    onChange(combineDateTime(nextDate, nextHour, nextMinute, timeRequired));
   }
 
   return (
@@ -99,7 +111,7 @@ export function DateTimeInput({ id, value, onChange, required }: DateTimeInputPr
         aria-label="Hour"
         value={hour}
         onChange={(e) => update(date, e.target.value, minute)}
-        required={required}
+        required={required && timeRequired}
       >
         <option value="">HH</option>
         {HOURS.map((h) => (
@@ -114,7 +126,7 @@ export function DateTimeInput({ id, value, onChange, required }: DateTimeInputPr
         aria-label="Minute"
         value={minute}
         onChange={(e) => update(date, hour, e.target.value)}
-        required={required}
+        required={required && timeRequired}
       >
         <option value="">MM</option>
         {MINUTES.map((m) => (

@@ -9,9 +9,27 @@ import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
-import { formatEntryEndpointDateTime } from '@/lib/trip-status';
+import {
+  entryEndpointClockTime,
+  formatEntryEndpointDateOnly,
+  formatEntryEndpointDateTime,
+  timezoneDisclosure,
+} from '@/lib/trip-status';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
+
+// User-reported: an Activity saved with no specific time (DateTimeInput's
+// `timeRequired={false}`, EntryForm.tsx) still needs *some* stored clock
+// time (TimelineEntry.startAt/endAt are never nullable) -- midnight is the
+// sentinel. Showing "12:00 AM"/"00:00" back to the User who deliberately
+// left it blank would look like a fabricated, wrong time, so it's hidden
+// here specifically (Activity + exactly midnight); every other type/time
+// always displays its real clock time in full.
+function hasNoSpecificTime(entryType: string, date: string, zone: string | null): boolean {
+  if (entryType !== 'ACTIVITY') return false;
+  const { hour, minute } = entryEndpointClockTime(new Date(date), zone);
+  return hour === 0 && minute === 0;
+}
 
 // FR-11-FR-15: view/edit/delete a single Entry. Same view<->edit toggle
 // pattern as TripOverviewPanel/EditTripForm, plus an inline delete action
@@ -35,10 +53,10 @@ export function EntryDetailPanel({
   // required for a Guest, whose session-less browser can't self-fetch
   // GET /api/v1/photos. See PhotoGallery's own `initialPhotos` comment.
   photos?: PhotoDTO[];
-  // spec-timeline-ux-and-timezone (correction): only ever consulted by the
-  // edit form, to seed a Transport's Departure/Arrival timezone pickers --
-  // this panel's own Start/End display always uses the Entry's own
-  // startTimezone/endTimezone (entry.startTimezone/endTimezone), never this.
+  // spec-timeline-ux-and-timezone (correction): seeds the edit form's
+  // Transport Departure/Arrival timezone pickers, and is the baseline
+  // Start/End's own timezone disclosure compares against (a leg's zone is
+  // only ever shown in parens when it differs from this).
   tripTimezone: string;
 }) {
   const router = useRouter();
@@ -125,14 +143,32 @@ export function EntryDetailPanel({
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
               {entry.entryType === 'TRANSPORT' ? 'Departure' : entry.entryType === 'STAY' ? 'Check-in' : 'Start'}
             </dt>
-            <dd style={{ margin: 0 }}>{formatEntryEndpointDateTime(new Date(entry.startAt), entry.startTimezone)}</dd>
+            <dd style={{ margin: 0 }}>
+              {hasNoSpecificTime(entry.entryType, entry.startAt, entry.startTimezone) ? (
+                formatEntryEndpointDateOnly(new Date(entry.startAt), entry.startTimezone)
+              ) : (
+                <>
+                  {formatEntryEndpointDateTime(new Date(entry.startAt), entry.startTimezone)}
+                  {timezoneDisclosure(entry.startTimezone, tripTimezone)}
+                </>
+              )}
+            </dd>
           </div>
           {entry.endAt && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
                 {entry.entryType === 'TRANSPORT' ? 'Arrival' : entry.entryType === 'STAY' ? 'Check-out' : 'End'}
               </dt>
-              <dd style={{ margin: 0 }}>{formatEntryEndpointDateTime(new Date(entry.endAt), entry.endTimezone)}</dd>
+              <dd style={{ margin: 0 }}>
+                {hasNoSpecificTime(entry.entryType, entry.endAt, entry.endTimezone) ? (
+                  formatEntryEndpointDateOnly(new Date(entry.endAt), entry.endTimezone)
+                ) : (
+                  <>
+                    {formatEntryEndpointDateTime(new Date(entry.endAt), entry.endTimezone)}
+                    {timezoneDisclosure(entry.endTimezone, tripTimezone)}
+                  </>
+                )}
+              </dd>
             </div>
           )}
         </dl>

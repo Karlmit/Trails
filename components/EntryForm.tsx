@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
-import { DateTimeInput } from '@/components/DateTimeInput';
+import { DateTimeInput, combineDateTime, splitDateTime } from '@/components/DateTimeInput';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
 import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
 import { entryEndpointClockTime, entryEndpointDateKey } from '@/lib/trip-status';
@@ -49,6 +49,14 @@ interface EntryFormProps {
   // Departure/Arrival timezone pickers when neither is already set on
   // `entry` -- every other type ignores this entirely (no picker shown).
   tripTimezone: string;
+  // User-reported: defaults a brand-new Entry's Start date to the Trip's
+  // own first day, `YYYY-MM-DD` -- one fewer date-picker click for the
+  // overwhelmingly common case of planning entries in trip order. Only
+  // the date, never a time (that stays required and unset until the User
+  // actually picks one). Ignored in edit mode (optional there, since
+  // EntryDetailPanel's edit render never has a use for it) and whenever a
+  // seed already carries its own startAt.
+  tripStartDate?: string;
   entry?: EntryDTO;
   // spec-ideas (FR-17): pre-fills a *create*-mode form (e.g. from an Idea's
   // title/estimated expense) without supplying a full EntryDTO -- ignored
@@ -96,6 +104,7 @@ export function EntryForm({
   tripId,
   mode,
   tripTimezone,
+  tripStartDate,
   entry,
   initialValues,
   apiUrl,
@@ -116,7 +125,13 @@ export function EntryForm({
   // flight's departure and arrival airports in different real zones).
   const [startTimezone, setStartTimezone] = useState(seed?.startTimezone ?? tripTimezone);
   const [endTimezone, setEndTimezone] = useState(seed?.endTimezone ?? tripTimezone);
-  const [startAt, setStartAt] = useState(toDateTimeLocal(seed?.startAt ?? null, seed?.startTimezone ?? null));
+  const [startAt, setStartAt] = useState(
+    seed?.startAt
+      ? toDateTimeLocal(seed.startAt, seed.startTimezone ?? null)
+      : mode === 'create'
+        ? (tripStartDate ?? '')
+        : '',
+  );
   const [endAt, setEndAt] = useState(toDateTimeLocal(seed?.endAt ?? null, seed?.endTimezone ?? null));
   const [locationName, setLocationName] = useState(seed?.locationName ?? '');
   const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
@@ -401,6 +416,10 @@ export function EntryForm({
           <DateTimeInput
             id="entry-start"
             value={startAt}
+            // User-reported: "we may plan to visit Big Buddha a certain
+            // day, but we should not have to enter a specific time for
+            // it" -- Activity alone can save with just a date, no time.
+            timeRequired={entryType !== 'ACTIVITY'}
             onChange={(value) => {
               setStartAt(value);
               // spec-entry-fields-datepickers: End auto-follows Start until
@@ -425,6 +444,39 @@ export function EntryForm({
                 // date yet) to '', which must not permanently disarm
                 // auto-fill.
                 if (value) autoEndDate.markTouched();
+                // User-reported: an overnight Check-out/Arrival time (e.g.
+                // a flight departing 22:00, landing 02:00) is the single
+                // most common reason End ends up <= Start -- the End date
+                // auto-filled to match Start's and the User only meant to
+                // pick a *time*, not realizing they also needed to bump the
+                // date forward. Silently roll the date forward one day
+                // whenever that exact shape occurs (End's date is still the
+                // untouched auto-filled Start date, and the time picked
+                // makes End <= Start) -- this is never wrong: a same-day
+                // End that's genuinely earlier than Start is otherwise
+                // always just a data-entry mistake, not a valid state
+                // (Stay/Transport/Activity all require End later than, or
+                // for Activity only, equal to, Start). A deliberate
+                // same-day End that's *later* than Start (a day-use booking,
+                // a same-day round-trip) never reaches this branch at all,
+                // since only value <= startAt triggers it.
+                // Activity alone allows End to equal Start (a point-in-time
+                // Activity) -- only a strictly-earlier End is ever invalid
+                // there; every other type requires strictly later.
+                const wouldBeInvalid = startAt
+                  ? entryType === 'ACTIVITY'
+                    ? value < startAt
+                    : value <= startAt
+                  : false;
+                if (value && wouldBeInvalid) {
+                  const { date, hour, minute } = splitDateTime(value);
+                  if (date === splitDateTime(startAt).date) {
+                    const nextDay = new Date(`${date}T00:00:00.000Z`);
+                    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+                    setEndAt(combineDateTime(nextDay.toISOString().slice(0, 10), hour, minute));
+                    return;
+                  }
+                }
                 setEndAt(value);
               }}
               required={endRequired}

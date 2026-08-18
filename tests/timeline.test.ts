@@ -170,6 +170,23 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
     expect(laidOut.every((d) => d.laneSegments.length === 0)).toBe(true);
   });
 
+  // User-reported: a single-day Stay/Transport dot showed only its title,
+  // with no Check-in/Departure time at all -- carries startAt/startTimezone
+  // through so the Timeline page can render one (dotTimeLabel).
+  it('carries startAt/startTimezone through onto a single-day dot', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
+    const days = buildTimelineDays(trip, []);
+    const startAt = new Date('2026-08-03T09:00:00.000Z');
+    const entries = [
+      entry({ id: 's1', entryType: 'STAY', title: 'Day-use Hotel', startAt, startTimezone: 'Asia/Bangkok' }),
+    ];
+
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
+    const dot = laidOut.find((d) => d.dateKey === '2026-08-03')!.dots[0];
+    expect(dot.startAt).toEqual(startAt);
+    expect(dot.startTimezone).toBe('Asia/Bangkok');
+  });
+
   it('renders an entry whose end equals its start as a dot (Activity point-in-time)', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
     const days = buildTimelineDays(trip, []);
