@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
+import { extractPlainText } from '@/lib/rich-text';
 
 // spec-blog: one Blog Post's list-item on /trips/[tripId]/blog -- I/O
 // matrix: "Both shown on /trips/[tripId]/blog, visually distinguished."
@@ -29,6 +30,7 @@ export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; re
     day: 'numeric',
     year: 'numeric',
   });
+  const excerpt = extractPlainText(post.description);
 
   return (
     <div className="card stack">
@@ -50,9 +52,9 @@ export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; re
         />
       )}
       <div className="text-soft">{date}</div>
-      {post.description && (
+      {excerpt && (
         <p className="text-soft text-multiline" style={{ margin: 0 }}>
-          {post.description.length > 240 ? `${post.description.slice(0, 240)}…` : post.description}
+          {excerpt.length > 240 ? `${excerpt.slice(0, 240)}…` : excerpt}
         </p>
       )}
       <div className="row">

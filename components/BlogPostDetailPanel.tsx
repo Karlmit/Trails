@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
 import { AttachmentList } from '@/components/AttachmentList';
@@ -8,6 +9,13 @@ import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 import { entryClockTime, formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-status';
+
+// See BlogPostForm.tsx's identical comment -- BlockNote can't tolerate
+// this Client Component's own server-render pass.
+const RichTextView = dynamic(() => import('@/components/RichTextEditor').then((m) => m.RichTextView), {
+  ssr: false,
+  loading: () => <div className="text-soft">Loading…</div>,
+});
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -145,16 +153,7 @@ export function BlogPostDetailPanel({
           </dd>
         </dl>
 
-        {post.description && (
-          <dl style={{ margin: 0 }}>
-            <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Content
-            </dt>
-            <dd className="text-multiline" style={{ margin: 0 }}>
-              {post.description}
-            </dd>
-          </dl>
-        )}
+        {post.description && <RichTextView content={post.description} />}
 
         {isPublished && (
           <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>

@@ -1024,3 +1024,118 @@ p {
     margin-bottom: var(--space-2);
   }
 }
+
+/* User-reported: "look online for an easy way to integrate a ready made
+   WYSIWYG editor for blog posts" -- BlockNote (components/RichTextEditor.tsx).
+   Its own theme CSS (imported alongside it) covers the editor chrome
+   itself; this just makes the surrounding box match this app's existing
+   `.field` inputs (card border/radius, not BlockNote's default flush
+   edge-to-edge look), and styles the one custom block this app adds on
+   top of it (`layoutImage`). */
+.rich-text-editor {
+  border: 1px solid #d6dbde;
+  border-radius: var(--radius-input);
+  overflow: hidden;
+}
+
+.rich-text-editor .bn-container {
+  padding: var(--space-2) 0;
+}
+
+.rich-text-view .bn-container {
+  padding: 0;
+}
+
+/* Read-only mode still renders BlockNote's block structure (so the
+   `layoutImage` block's own float layout renders identically to editing)
+   but the drag handles / block menus a read view has no use for are
+   hidden via BlockNote's own `editable={false}`, which already suppresses
+   them -- no extra CSS needed here beyond removing the input-like border. */
+.rich-text-view {
+  margin-top: var(--space-2);
+}
+
+.rte-layout-image-placeholder {
+  padding: var(--space-3);
+  border: 1px dashed #d6dbde;
+  border-radius: var(--radius-input);
+  text-align: center;
+}
+
+.rte-layout-image-placeholder button {
+  background: none;
+  border: 1px solid #d6dbde;
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.rte-layout-image {
+  max-width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.rte-layout-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-input);
+}
+
+/* The one deliberate exception to "block editors stack full-width rows"
+   (spec-blog-editor: "choose if text is next to an image or if the image
+   is just above/below the text") -- a real CSS float so the *next*
+   sibling block's own text genuinely wraps beside this one, which even
+   Notion's own image block can't do. */
+.rte-layout-image-float-left {
+  float: left;
+  max-width: 45%;
+  margin: 0 var(--space-4) var(--space-2) 0;
+}
+
+.rte-layout-image-float-right {
+  float: right;
+  max-width: 45%;
+  margin: 0 0 var(--space-2) var(--space-4);
+}
+
+.rte-layout-image-toolbar {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.rte-layout-image-toolbar button {
+  background: var(--color-surface);
+  border: 1px solid #d6dbde;
+  border-radius: 999px;
+  padding: 2px var(--space-2);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.rte-layout-image-toolbar button[aria-pressed='true'] {
+  background: var(--color-brand-deep);
+  color: #fff;
+  border-color: var(--color-brand-deep);
+}
+
+/* BlockNote wraps every block's own content in a `display: flex` chain
+   (`.bn-block` > `.react-renderer` > `.bn-block-content`) -- CSS ignores
+   `float` entirely on a flex item (a genuine spec rule, not a bug), so
+   `.rte-layout-image-float-left/-right`'s own float silently did nothing
+   until this chain, for this one block type specifically, is switched
+   back to normal block boxes -- verified live: without this, the image
+   floated within its own row but the next paragraph still rendered
+   full-width below it instead of wrapping beside it. Scoped tightly via
+   `data-content-type`/its mirrored `.node-layoutImage` class (both
+   BlockNote's own, reflecting this custom block's registered type name)
+   so no other block type's layout is touched. */
+.bn-block-content[data-content-type='layoutImage'],
+.react-renderer.node-layoutImage {
+  display: block;
+}
+
+.bn-block:has(> .react-renderer.node-layoutImage) {
+  display: block;
+}

@@ -1,8 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import dynamic from 'next/dynamic';
+import { useRef, useState, type FormEvent } from 'react';
 import { DateTimeInput } from '@/components/DateTimeInput';
+
+// BlockNote (RichTextEditor.tsx) touches `window` during its own render,
+// so it can't tolerate this Client Component's own server-render pass --
+// `ssr: false` defers it to mount entirely client-side, same fix every
+// other browser-only editor library (Monaco, etc.) needs in the App Router.
+const RichTextEditor = dynamic(() => import('@/components/RichTextEditor').then((m) => m.RichTextEditor), {
+  ssr: false,
+  loading: () => <div className="rich-text-editor-loading text-soft">Loading editor…</div>,
+});
 
 export interface BlogPostDTO {
   id: string;
@@ -54,7 +64,10 @@ function toDateTimeLocal(iso: string | null): string {
 export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCancel }: BlogPostFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(post?.title ?? '');
-  const [description, setDescription] = useState(post?.description ?? '');
+  // A ref, not state -- see RichTextEditor's `contentRef` prop comment for
+  // why round-tripping every keystroke through this component's own state
+  // (and back down as RichTextEditor's prop) broke the editor outright.
+  const descriptionRef = useRef(post?.description ?? '');
   const [startAt, setStartAt] = useState(
     post?.startAt ? toDateTimeLocal(post.startAt) : mode === 'create' ? (tripStartDate ?? '') : '',
   );
@@ -77,7 +90,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
 
     const body: Record<string, unknown> = {
       title,
-      description: description || null,
+      description: descriptionRef.current || null,
       // Sent as the raw `YYYY-MM-DDTHH:mm` literal -- see EntryForm.tsx's
       // matching comment for why `new Date(startAt).toISOString()` would
       // silently corrupt it via the submitting browser's own timezone.
@@ -143,12 +156,11 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
       </div>
 
       <div className="field">
-        <label htmlFor="blog-content">Content</label>
-        <textarea
-          id="blog-content"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={8}
+        <label>Content</label>
+        <RichTextEditor
+          initialContent={descriptionRef.current}
+          contentRef={descriptionRef}
+          postId={mode === 'edit' ? post!.id : null}
         />
       </div>
 

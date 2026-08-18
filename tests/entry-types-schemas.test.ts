@@ -433,6 +433,23 @@ describe('lib/entry-types/*.schema.ts', () => {
       expect(result.success).toBe(true);
     });
 
+    // components/RichTextEditor.tsx stores BlockNote's own Block[] JSON in
+    // this field -- embedded images/formatting marks make it far larger
+    // than the shared descriptionField's 5000-char cap (sized for other
+    // Entry Types' plain prose), so Blog Post gets its own, much larger one.
+    it('accepts a large BlockNote JSON document beyond the shared descriptionField cap', () => {
+      const bigDescription = JSON.stringify([
+        { type: 'paragraph', content: 'x'.repeat(6000) },
+      ]);
+      const result = blogPostCreateSchema.safeParse({ ...base, description: bigDescription });
+      expect(result.success).toBe(true);
+    });
+
+    it('still rejects a description beyond its own 200,000-char cap', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, description: 'x'.repeat(200_001) });
+      expect(result.success).toBe(false);
+    });
+
     // I/O matrix: "Missing date -> 400."
     it('rejects a missing startAt', () => {
       const result = blogPostCreateSchema.safeParse({ tripId: TRIP_ID, title: 'A journal entry' });

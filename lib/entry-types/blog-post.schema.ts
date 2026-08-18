@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { dateTimeField } from '@/lib/validation';
-import { descriptionField, isPrivateField, titleField } from './shared-fields.schema';
+import { isPrivateField, titleField } from './shared-fields.schema';
+
+// A Blog Post's own content is BlockNote's serialized Block[] JSON (see
+// components/RichTextEditor.tsx), not the plain prose the shared
+// `descriptionField` (max 5000) is sized for -- embedded images/formatting
+// marks make the JSON representation far larger than the visible text, so
+// this type gets its own, much larger cap rather than sharing that field.
+const blogPostDescriptionField = z.string().trim().max(200_000).optional().nullable();
 
 // FR-18: "A User can create a Blog Post with title, content, a required
 // associated date ... A new Blog Post starts in Draft state." Per the
@@ -20,7 +27,7 @@ import { descriptionField, isPrivateField, titleField } from './shared-fields.sc
 // normal create/edit form").
 const blogPostFieldsShape = {
   title: titleField,
-  description: descriptionField,
+  description: blogPostDescriptionField,
   startAt: dateTimeField,
   isPrivate: isPrivateField,
 };
