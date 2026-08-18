@@ -17,7 +17,68 @@ describe('lib/entry-types/*.schema.ts', () => {
       title: 'Beach Resort',
       subtype: 'RESORT',
       startAt: '2026-08-03T14:00:00.000Z',
+      locationName: 'Beach Resort',
     };
+
+    // spec-entry-fields-datepickers: Location name doubles as this Entry's
+    // Title now -- required for Stay/Transport/Activity specifically
+    // (locationFields itself, shared by Idea/ImportantInfo too, stays
+    // optional -- only these 3 type schemas override it).
+    it('rejects a missing locationName ("Location name is required")', () => {
+      const { locationName: _omit, ...withoutLocationName } = base;
+      const result = stayCreateSchema.safeParse({ ...withoutLocationName, endAt: '2026-08-06T11:00:00.000Z' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toMatch(/location name is required/i);
+      }
+    });
+
+    it('rejects an empty-string locationName', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        locationName: '',
+        endAt: '2026-08-06T11:00:00.000Z',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts and stores a Website URL', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-06T11:00:00.000Z',
+        website: 'https://example-resort.com',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.website).toBe('https://example-resort.com');
+    });
+
+    it('rejects a javascript: URI as the Website (same scheme check as locationMapLink)', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-06T11:00:00.000Z',
+        website: 'javascript:alert(1)',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts and stores a Booked via value', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-06T11:00:00.000Z',
+        bookedVia: 'StayForLong',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.bookedVia).toBe('StayForLong');
+    });
+
+    it('rejects a Booked via value over the max length', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-06T11:00:00.000Z',
+        bookedVia: 'x'.repeat(201),
+      });
+      expect(result.success).toBe(false);
+    });
 
     it('rejects check-out not later than check-in', () => {
       const result = stayCreateSchema.safeParse({ ...base, endAt: '2026-08-03T14:00:00.000Z' });
@@ -123,7 +184,36 @@ describe('lib/entry-types/*.schema.ts', () => {
       title: 'Flight to Phuket',
       subtype: 'FLIGHT',
       startAt: '2026-08-03T08:00:00.000Z',
+      locationName: 'Suvarnabhumi Airport',
     };
+
+    // spec-entry-fields-datepickers: same required-locationName override as
+    // stayCreateSchema (see its own test's comment).
+    it('rejects a missing locationName ("Location name is required")', () => {
+      const { locationName: _omit, ...withoutLocationName } = base;
+      const result = transportCreateSchema.safeParse({
+        ...withoutLocationName,
+        endAt: '2026-08-03T10:00:00.000Z',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toMatch(/location name is required/i);
+      }
+    });
+
+    it('accepts a Website and Booked via value', () => {
+      const result = transportCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-03T10:00:00.000Z',
+        website: 'https://airline.example.com',
+        bookedVia: 'Airline direct',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.website).toBe('https://airline.example.com');
+        expect(result.data.bookedVia).toBe('Airline direct');
+      }
+    });
 
     it('rejects arrival not later than departure', () => {
       const result = transportCreateSchema.safeParse({ ...base, endAt: '2026-08-03T08:00:00.000Z' });
@@ -152,7 +242,19 @@ describe('lib/entry-types/*.schema.ts', () => {
       title: 'Museum visit',
       subtype: 'MUSEUM',
       startAt: '2026-08-05T09:00:00.000Z',
+      locationName: 'National Museum',
     };
+
+    // spec-entry-fields-datepickers: same required-locationName override as
+    // stayCreateSchema (see its own test's comment).
+    it('rejects a missing locationName ("Location name is required")', () => {
+      const { locationName: _omit, ...withoutLocationName } = base;
+      const result = activityCreateSchema.safeParse(withoutLocationName);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toMatch(/location name is required/i);
+      }
+    });
 
     it('accepts an end datetime equal to the start (point-in-time)', () => {
       const result = activityCreateSchema.safeParse({ ...base, endAt: '2026-08-05T09:00:00.000Z' });

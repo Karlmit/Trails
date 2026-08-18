@@ -59,6 +59,7 @@ describe.skipIf(!hasTestDatabase)('tags route', () => {
           subtype: 'MUSEUM',
           title: 'Museum visit',
           startAt: '2026-08-03T10:00:00.000Z',
+          locationName: 'National Museum',
         },
         token,
       ),

@@ -66,6 +66,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'RESORT',
           startAt: '2026-08-03T14:00:00.000Z',
           endAt: '2026-08-06T11:00:00.000Z',
+          locationName: 'Beach Resort',
         },
         token,
       ),
@@ -89,6 +90,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'RESORT',
           startAt: '2026-08-03T14:00:00.000Z',
           endAt: '2026-08-03T14:00:00.000Z',
+          locationName: 'Beach Resort',
         },
         token,
       ),
@@ -96,6 +98,118 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  // spec-entry-fields-datepickers: Location name doubles as the Entry's
+  // Title now for Stay/Transport/Activity -- required end to end, not just
+  // at the schema-unit level (see tests/entry-types-schemas.test.ts for the
+  // schema-only coverage).
+  it('rejects a Stay create missing Location name ("Location name is required", 400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.message).toMatch(/location name is required/i);
+  });
+
+  // spec-entry-fields-datepickers: website/bookedVia, new additive fields
+  // alongside bookingReference -- stored and read back end to end.
+  it('creates a Stay with a Website and Booked via, both stored and read back (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+          locationName: 'Beach Resort',
+          website: 'https://example-resort.com',
+          bookedVia: 'StayForLong',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.website).toBe('https://example-resort.com');
+    expect(body.bookedVia).toBe('StayForLong');
+  });
+
+  it('rejects a javascript: URI as the Website (400, same scheme check as locationMapLink)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+          locationName: 'Beach Resort',
+          website: 'javascript:alert(1)',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a Booked via value over the max length (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'STAY',
+          title: 'Beach Resort',
+          subtype: 'RESORT',
+          startAt: '2026-08-03T14:00:00.000Z',
+          endAt: '2026-08-06T11:00:00.000Z',
+          locationName: 'Beach Resort',
+          bookedVia: 'x'.repeat(201),
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a Note that supplies a website field (400, Note carries none)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'NOTE',
+          title: 'Bring reef-safe sunscreen',
+          startAt: '2026-08-04T00:00:00.000Z',
+          website: 'https://example.com',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
   });
 
   it('creates a Transport entry (201)', async () => {
@@ -110,6 +224,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'FLIGHT',
           startAt: '2026-08-03T08:00:00.000Z',
           endAt: '2026-08-03T10:00:00.000Z',
+          locationName: 'Phuket Airport',
         },
         token,
       ),
@@ -129,6 +244,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'FLIGHT',
           startAt: '2026-08-03T08:00:00.000Z',
           endAt: '2026-08-03T07:00:00.000Z',
+          locationName: 'Phuket Airport',
         },
         token,
       ),
@@ -147,6 +263,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           title: 'Boat tour',
           subtype: 'TOUR',
           startAt: '2026-08-05T09:00:00.000Z',
+          locationName: 'Marina Pier',
         },
         token,
       ),
@@ -168,6 +285,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'ATTRACTION',
           startAt: '2026-08-05T18:00:00.000Z',
           endAt: '2026-08-05T18:00:00.000Z',
+          locationName: 'Sunset viewpoint',
         },
         token,
       ),
@@ -226,6 +344,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'FLIGHT',
           startAt: '2026-08-03T14:00:00.000Z',
           endAt: '2026-08-06T11:00:00.000Z',
+          locationName: 'Beach Resort',
         },
         token,
       ),
@@ -248,6 +367,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           title: 'Museum visit',
           subtype: 'MUSEUM',
           startAt: '2026-08-05T09:00:00.000Z',
+          locationName: 'National Museum',
           expenseAmount: 20,
         },
         token,
@@ -267,6 +387,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           title: 'Museum visit',
           subtype: 'MUSEUM',
           startAt: '2026-08-05T09:00:00.000Z',
+          locationName: 'National Museum',
           expenseAmount: -5,
           expenseCurrency: 'usd',
         },
@@ -362,6 +483,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           subtype: 'TOUR',
           startAt: '2026-08-19T09:00:00.000Z',
           endAt: '2026-08-25T09:00:00.000Z',
+          locationName: 'Somewhere',
         },
         token,
       ),
@@ -382,6 +504,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
           title: 'Museum visit',
           subtype: 'MUSEUM',
           startAt: '2026-08-05T09:00:00.000Z',
+          locationName: 'National Museum',
           locationMapLink: 'javascript:alert(1)',
         },
         token,
@@ -556,6 +679,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
             subtype: 'RESORT',
             startAt: '2026-08-03T14:00:00.000Z',
             endAt: '2026-08-06T11:00:00.000Z',
+            locationName: 'Beach Resort',
           },
           token,
         ),
@@ -699,6 +823,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
             subtype: 'TOUR',
             startAt: '2026-08-05T09:00:00.000Z',
             endAt: '2026-08-05T12:00:00.000Z',
+            locationName: 'Marina Pier',
           },
           token,
         ),
@@ -732,6 +857,7 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
             title: 'Museum visit',
             subtype: 'MUSEUM',
             startAt: '2026-08-05T09:00:00.000Z',
+            locationName: 'National Museum',
             expenseAmount: 20,
             expenseCurrency: 'USD',
             expensePaymentStatus: 'Paid',

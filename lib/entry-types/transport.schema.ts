@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { dateTimeField, isDateTimeOrderValid } from '@/lib/validation';
 import {
+  bookedViaField,
   bookingReferenceField,
   contactFields,
   descriptionField,
@@ -11,6 +12,7 @@ import {
   notesField,
   postTripNotesField,
   titleField,
+  websiteField,
 } from './shared-fields.schema';
 
 // FR-12: Transport's "mode" is this spec's Entry Subtype for the type.
@@ -49,7 +51,16 @@ const transportFieldsShape = {
   startAt: dateTimeField,
   endAt: dateTimeField,
   ...locationFields,
+  // spec-entry-fields-datepickers: same override as stay.schema.ts -- see
+  // its comment. locationFields itself stays untouched.
+  locationName: z
+    .string({ required_error: 'Location name is required' })
+    .trim()
+    .min(1, 'Location name is required')
+    .max(200),
   bookingReference: bookingReferenceField,
+  website: websiteField,
+  bookedVia: bookedViaField,
   ...expenseFields,
   ...contactFields,
   notes: notesField,

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
+import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
 
 export function NewTripForm() {
   const router = useRouter();
@@ -11,6 +12,9 @@ export function NewTripForm() {
   const [destination, setDestination] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // spec-entry-fields-datepickers: a brand-new Trip form never starts with
+  // an End already stored, so auto-fill starts armed.
+  const autoEndDate = useAutoEndDate(false);
   const [coverImage, setCoverImage] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PRIVATE');
@@ -59,6 +63,14 @@ export function NewTripForm() {
       // FR-1/FR-7: a newly created Trip redirects straight to its Timeline.
       router.push(`/trips/${body.id}/timeline`);
       router.refresh();
+      // review-caught: this form's `open` toggle keeps the same component
+      // instance mounted across Cancel/reopen cycles (unlike EditTripForm,
+      // which is conditionally mounted by its parent) -- without this,
+      // `autoEndDate`'s touched-state from this submission would silently
+      // persist into the next "+ New Trip" session and disarm auto-fill for
+      // the rest of the page's lifetime. Same reset SectionManager's create
+      // form already does after both submit and Cancel.
+      autoEndDate.reset(false);
     } catch {
       setError('Could not reach the server. Please try again.');
     } finally {
@@ -96,7 +108,13 @@ export function NewTripForm() {
             id="trip-start"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setStartDate(value);
+              // spec-entry-fields-datepickers: End auto-follows Start until
+              // the User explicitly picks their own End.
+              if (!autoEndDate.touched()) setEndDate(value);
+            }}
             required
           />
         </div>
@@ -106,7 +124,14 @@ export function NewTripForm() {
             id="trip-end"
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // review-caught: only a genuinely complete End value counts
+              // as a deliberate choice -- the browser's native clear button
+              // producing '' must not permanently disarm auto-fill.
+              if (value) autoEndDate.markTouched();
+              setEndDate(value);
+            }}
             required
           />
         </div>
@@ -149,7 +174,14 @@ export function NewTripForm() {
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? 'Creating…' : 'Create Trip'}
         </button>
-        <button type="button" className="btn btn-dark-outline" onClick={() => setOpen(false)}>
+        <button
+          type="button"
+          className="btn btn-dark-outline"
+          onClick={() => {
+            setOpen(false);
+            autoEndDate.reset(false);
+          }}
+        >
           Cancel
         </button>
       </div>

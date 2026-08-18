@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
+import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
 
 interface EditTripFormProps {
   trip: {
@@ -26,6 +27,10 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
   const [startDate, setStartDate] = useState(trip.startDate);
   const [endDate, setEndDate] = useState(trip.endDate);
   const [timezone, setTimezone] = useState(trip.timezone);
+  // spec-entry-fields-datepickers: an existing Trip always already has a
+  // stored End date -- auto-fill is already "used up" the moment this form
+  // loads, so opening the edit form never auto-overwrites it.
+  const autoEndDate = useAutoEndDate(!!trip.endDate);
   const [description, setDescription] = useState(trip.description ?? '');
   const [coverImage, setCoverImage] = useState(trip.coverImage ?? '');
   const [visibility, setVisibility] = useState(trip.visibility);
@@ -99,7 +104,16 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
             id="edit-start"
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setStartDate(value);
+              // spec-entry-fields-datepickers: End auto-follows Start until
+              // the User explicitly picks their own End -- a no-op here in
+              // practice since an existing Trip's End is always already
+              // "touched" (see the autoEndDate init above), kept for the
+              // same shared wiring shape as NewTripForm/EntryForm.
+              if (!autoEndDate.touched()) setEndDate(value);
+            }}
             required
           />
         </div>
@@ -109,7 +123,14 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
             id="edit-end"
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // review-caught: only a genuinely complete End value counts
+              // as a deliberate choice -- the browser's native clear button
+              // producing '' must not permanently disarm auto-fill.
+              if (value) autoEndDate.markTouched();
+              setEndDate(value);
+            }}
             required
           />
         </div>

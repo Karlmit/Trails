@@ -840,6 +840,28 @@ p {
   flex-wrap: wrap;
 }
 
+/* DateTimeInput (spec-entry-fields-datepickers): date + hour/minute selects
+   laid out in one row -- reuses .row's flex/wrap behavior, but with a
+   tighter gap and narrower minimums than .row's default (var(--space-3) is
+   too wide for 4 short items side by side, e.g. inside EntryForm's paired
+   Start/End `.field`s at half card width) so the three controls fit on one
+   line at typical form widths instead of wrapping the minute select alone
+   onto its own row. */
+.datetime-input {
+  gap: var(--space-1);
+}
+
+.datetime-input input[type='date'] {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.datetime-input select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 3.5rem;
+}
+
 .row-between {
   display: flex;
   align-items: center;

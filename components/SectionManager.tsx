@@ -8,6 +8,7 @@ import {
   SECTION_COLOR_PALETTE,
   SECTION_EMOJI_OPTIONS,
 } from '@/lib/section-colors';
+import { useAutoEndDate, type AutoEndDate } from '@/lib/hooks/useAutoEndDate';
 
 interface SectionDTO {
   id: string;
@@ -120,10 +121,15 @@ function SectionFieldset({
   idPrefix,
   values,
   onChange,
+  autoEndDate,
 }: {
   idPrefix: string;
   values: SectionFormValues;
   onChange: (values: SectionFormValues) => void;
+  // spec-entry-fields-datepickers: shared end-date auto-fill -- the caller
+  // owns a separate instance per form (create vs. each Section's own edit
+  // form) so touched-tracking never bleeds between them.
+  autoEndDate: AutoEndDate;
 }) {
   return (
     <>
@@ -143,7 +149,16 @@ function SectionFieldset({
             id={`${idPrefix}-start`}
             type="date"
             value={values.startDate}
-            onChange={(e) => onChange({ ...values, startDate: e.target.value })}
+            onChange={(e) => {
+              const startDate = e.target.value;
+              // spec-entry-fields-datepickers: End auto-follows Start until
+              // the User explicitly picks their own End.
+              onChange({
+                ...values,
+                startDate,
+                endDate: autoEndDate.touched() ? values.endDate : startDate,
+              });
+            }}
             required
           />
         </div>
@@ -153,7 +168,14 @@ function SectionFieldset({
             id={`${idPrefix}-end`}
             type="date"
             value={values.endDate}
-            onChange={(e) => onChange({ ...values, endDate: e.target.value })}
+            onChange={(e) => {
+              const endDate = e.target.value;
+              // review-caught: only a genuinely complete End value counts
+              // as a deliberate choice -- the browser's native clear button
+              // producing '' must not permanently disarm auto-fill.
+              if (endDate) autoEndDate.markTouched();
+              onChange({ ...values, endDate });
+            }}
             required
           />
         </div>
@@ -176,11 +198,21 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
   const [createValues, setCreateValues] = useState<SectionFormValues>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // spec-entry-fields-datepickers: a brand-new Section form never starts
+  // with an End already stored -- auto-fill starts armed, re-armed via
+  // `.reset(false)` every time the create form's fields are cleared back to
+  // EMPTY_FORM (after a successful create, or Cancel).
+  const createAutoEndDate = useAutoEndDate(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<SectionFormValues>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  // A Section's own End is always already stored (required field) --
+  // re-armed (still to `true`) via `.reset()` in startEdit every time a
+  // *different* Section's inline edit form is opened, so this one shared
+  // instance's touched-tracking never bleeds across Sections.
+  const editAutoEndDate = useAutoEndDate(true);
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
@@ -201,6 +233,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
       }
 
       setCreateValues(EMPTY_FORM);
+      createAutoEndDate.reset(false);
       setOpen(false);
       router.refresh();
     } catch {
@@ -243,6 +276,11 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
       color: section.color,
       emoji: section.emoji,
     });
+    // spec-entry-fields-datepickers: a fresh "form instance" for whichever
+    // Section is now being edited -- its End is always already stored, so
+    // auto-fill never fires (matches "loading an edit form never
+    // auto-overwrites an already-stored End").
+    editAutoEndDate.reset(!!section.endDate);
   }
 
   function cancelEdit() {
@@ -315,6 +353,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
                   idPrefix={`section-edit-${section.id}`}
                   values={editValues}
                   onChange={setEditValues}
+                  autoEndDate={editAutoEndDate}
                 />
                 <div className="row">
                   <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
@@ -379,7 +418,12 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
               {error}
             </div>
           )}
-          <SectionFieldset idPrefix="section-create" values={createValues} onChange={setCreateValues} />
+          <SectionFieldset
+            idPrefix="section-create"
+            values={createValues}
+            onChange={setCreateValues}
+            autoEndDate={createAutoEndDate}
+          />
           <div className="row">
             <button type="submit" className="btn btn-primary" disabled={submitting}>
               {submitting ? 'Adding…' : 'Add Section'}
@@ -390,6 +434,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
               onClick={() => {
                 setOpen(false);
                 setCreateValues(EMPTY_FORM);
+                createAutoEndDate.reset(false);
                 setError(null);
               }}
             >

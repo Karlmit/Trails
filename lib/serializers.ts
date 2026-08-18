@@ -82,6 +82,8 @@ export function serializeTimelineEntry(entry: TimelineEntry) {
     locationLng: decimalToNumber(entry.locationLng),
     locationMapLink: entry.locationMapLink,
     bookingReference: entry.bookingReference,
+    website: entry.website,
+    bookedVia: entry.bookedVia,
     expenseAmount: decimalToNumber(entry.expenseAmount),
     expenseCurrency: entry.expenseCurrency,
     expensePaymentStatus: entry.expensePaymentStatus,

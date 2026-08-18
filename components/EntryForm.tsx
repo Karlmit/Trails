@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
+import { DateTimeInput } from '@/components/DateTimeInput';
+import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
 
 export type CreatableEntryType = 'STAY' | 'TRANSPORT' | 'ACTIVITY' | 'NOTE';
 
@@ -19,6 +21,8 @@ export interface EntryDTO {
   locationAddress: string | null;
   locationMapLink: string | null;
   bookingReference: string | null;
+  website: string | null;
+  bookedVia: string | null;
   expenseAmount: number | null;
   expenseCurrency: string | null;
   expensePaymentStatus: string | null;
@@ -81,10 +85,31 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
   const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
   const [locationMapLink, setLocationMapLink] = useState(seed?.locationMapLink ?? '');
   const [bookingReference, setBookingReference] = useState(seed?.bookingReference ?? '');
+  const [website, setWebsite] = useState(seed?.website ?? '');
+  const [bookedVia, setBookedVia] = useState(seed?.bookedVia ?? '');
   const [expenseAmount, setExpenseAmount] = useState(
     seed?.expenseAmount != null ? String(seed.expenseAmount) : '',
   );
-  const [expenseCurrency, setExpenseCurrency] = useState(seed?.expenseCurrency ?? '');
+  // spec-entry-fields-datepickers: SEK only pre-fills a brand-new Entry's
+  // Expense currency -- edit mode always shows the already-stored value
+  // (including an empty one), never overridden by the default.
+  const [expenseCurrency, setExpenseCurrency] = useState(
+    seed?.expenseCurrency ?? (mode === 'create' ? 'SEK' : ''),
+  );
+  // spec-entry-fields-datepickers: distinguishes "still showing the SEK
+  // default the User never touched" from "a real currency value" -- without
+  // this, a brand-new Entry with nothing but the SEK default and no Expense
+  // amount would look identical to someone deliberately typing a currency
+  // with no amount, and 400 ("Expense requires both an amount and a
+  // currency") the moment the Expense section is otherwise left alone
+  // (FR-22's both-or-neither rule must stay about what the User actually
+  // entered, not about this new pre-fill). Already-true whenever the
+  // currency reflects real data rather than the bare default: edit mode, or
+  // a create-mode seed carrying its own value (e.g. an Idea's estimated
+  // expense currency).
+  const [currencyTouched, setCurrencyTouched] = useState(
+    mode !== 'create' || seed?.expenseCurrency != null,
+  );
   const [expensePaymentStatus, setExpensePaymentStatus] = useState(seed?.expensePaymentStatus ?? '');
   const [expensePaymentNote, setExpensePaymentNote] = useState(seed?.expensePaymentNote ?? '');
   const [contactName, setContactName] = useState(seed?.contactName ?? '');
@@ -108,6 +133,12 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // spec-entry-fields-datepickers: End auto-follows Start until the User
+  // explicitly picks their own End -- already "used up" the moment this
+  // form instance is seeded with an existing End (edit mode, or an
+  // Idea-conversion seed that happens to carry one).
+  const autoEndDate = useAutoEndDate(!!seed?.endAt);
+
   // FR-14: a Note carries no Location, Expense, or booking-reference
   // fields at all -- hidden here, and never sent to the API for this type.
   const showLocation = entryType !== 'NOTE';
@@ -115,6 +146,11 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
   const showEnd = entryType !== 'NOTE';
   const endRequired = entryType === 'STAY' || entryType === 'TRANSPORT';
   const subtypeOptions = SUBTYPES_BY_ENTRY_TYPE[entryType] ?? [];
+  // spec-entry-fields-datepickers: Stay/Transport/Activity no longer show a
+  // separate Title input (showLocation is exactly this 3-type set within
+  // this form -- Note is the only type without Location) -- Location name
+  // doubles as the Entry's title instead, required for exactly these types.
+  const titleFromLocation = showLocation;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -132,9 +168,19 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
       setError(entryType === 'STAY' ? 'Check-out is required.' : 'Arrival is required.');
       return;
     }
+    if (titleFromLocation && !locationName.trim()) {
+      setError('Location name is required.');
+      return;
+    }
+
+    // spec-entry-fields-datepickers: Stay/Transport/Activity send Location
+    // name as both `title` and `locationName` (the form no longer shows a
+    // separate Title input for these types) -- Note keeps its own
+    // independent Title (FR-14, no Location fields at all for Note).
+    const effectiveTitle = titleFromLocation ? locationName : title;
 
     const body: Record<string, unknown> = {
-      title,
+      title: effectiveTitle,
       description: description || null,
       startAt: new Date(startAt).toISOString(),
       notes: notes || null,
@@ -163,9 +209,15 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
       body.locationAddress = locationAddress || null;
       body.locationMapLink = locationMapLink || null;
       body.bookingReference = bookingReference || null;
+      body.website = website || null;
+      body.bookedVia = bookedVia || null;
 
       const amountEntered = expenseAmount.trim() !== '';
-      const currencyEntered = expenseCurrency.trim() !== '';
+      // spec-entry-fields-datepickers: the untouched SEK default alone never
+      // counts as "entered" -- only a real currency value does (the User
+      // explicitly set/changed it, or an amount was also entered, which
+      // makes the still-showing default a deliberate part of this submit).
+      const currencyEntered = expenseCurrency.trim() !== '' && (currencyTouched || amountEntered);
       if (amountEntered || currencyEntered) {
         body.expenseAmount = amountEntered ? Number(expenseAmount) : null;
         body.expenseCurrency = currencyEntered ? expenseCurrency : null;
@@ -254,10 +306,12 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
         </div>
       )}
 
-      <div className="field">
-        <label htmlFor="entry-title">Title</label>
-        <input id="entry-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-      </div>
+      {!titleFromLocation && (
+        <div className="field">
+          <label htmlFor="entry-title">Title</label>
+          <input id="entry-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+        </div>
+      )}
 
       {entryType !== 'NOTE' && (
         <div className="field">
@@ -288,11 +342,15 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
           <label htmlFor="entry-start">
             {entryType === 'TRANSPORT' ? 'Departure' : entryType === 'STAY' ? 'Check-in' : 'Start'}
           </label>
-          <input
+          <DateTimeInput
             id="entry-start"
-            type="datetime-local"
             value={startAt}
-            onChange={(e) => setStartAt(e.target.value)}
+            onChange={(value) => {
+              setStartAt(value);
+              // spec-entry-fields-datepickers: End auto-follows Start until
+              // the User explicitly picks their own End.
+              if (!autoEndDate.touched()) setEndAt(value);
+            }}
             required
           />
         </div>
@@ -301,11 +359,18 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
             <label htmlFor="entry-end">
               {entryType === 'TRANSPORT' ? 'Arrival' : entryType === 'STAY' ? 'Check-out' : 'End (optional)'}
             </label>
-            <input
+            <DateTimeInput
               id="entry-end"
-              type="datetime-local"
               value={endAt}
-              onChange={(e) => setEndAt(e.target.value)}
+              onChange={(value) => {
+                // review-caught: only a genuinely complete End value counts
+                // as a deliberate choice -- DateTimeInput collapses an
+                // incomplete/abandoned selection (e.g. an hour picked but no
+                // date yet) to '', which must not permanently disarm
+                // auto-fill.
+                if (value) autoEndDate.markTouched();
+                setEndAt(value);
+              }}
               required={endRequired}
             />
           </div>
@@ -316,7 +381,12 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
         <>
           <div className="field">
             <label htmlFor="entry-location-name">Location name</label>
-            <input id="entry-location-name" value={locationName} onChange={(e) => setLocationName(e.target.value)} />
+            <input
+              id="entry-location-name"
+              value={locationName}
+              onChange={(e) => setLocationName(e.target.value)}
+              required={titleFromLocation}
+            />
           </div>
           <div className="field">
             <label htmlFor="entry-location-address">Location address</label>
@@ -394,6 +464,26 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
+              <label htmlFor="entry-website">Website</label>
+              <input
+                id="entry-website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://…"
+              />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label htmlFor="entry-booked-via">Booked via</label>
+              <input
+                id="entry-booked-via"
+                value={bookedVia}
+                onChange={(e) => setBookedVia(e.target.value)}
+                placeholder="Booking.com"
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
               <label htmlFor="entry-expense-amount">Expense amount</label>
               <input
                 id="entry-expense-amount"
@@ -409,7 +499,20 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
               <input
                 id="entry-expense-currency"
                 value={expenseCurrency}
-                onChange={(e) => setExpenseCurrency(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  setExpenseCurrency(value);
+                  // review-caught: only count this as "the User entered a
+                  // currency" if the field's value actually differs from
+                  // the untouched SEK default -- otherwise clicking into
+                  // the field and tabbing back out (or retyping the same
+                  // "SEK") would permanently flip this to true, and then an
+                  // Entry saved with no Expense amount would send
+                  // `expenseCurrency: 'SEK'` alone and trip FR-22's
+                  // both-or-neither rule for what looked like an unrelated,
+                  // no-op interaction.
+                  setCurrencyTouched(value !== 'SEK');
+                }}
                 placeholder="USD"
                 maxLength={3}
               />

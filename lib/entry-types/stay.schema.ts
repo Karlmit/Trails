@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { dateTimeField, isDateTimeOrderValid } from '@/lib/validation';
 import {
+  bookedViaField,
   bookingReferenceField,
   contactFields,
   descriptionField,
@@ -11,6 +12,7 @@ import {
   notesField,
   postTripNotesField,
   titleField,
+  websiteField,
 } from './shared-fields.schema';
 
 // FR-11: Entry Subtype is strictly type-specific -- this is the exact set a
@@ -42,7 +44,20 @@ const stayFieldsShape = {
   startAt: dateTimeField,
   endAt: dateTimeField,
   ...locationFields,
+  // spec-entry-fields-datepickers: Location Name doubles as this Entry's
+  // Title now (the form no longer shows a separate Title input for Stay),
+  // so it must actually be present -- overrides locationFields' own
+  // optional/nullable shape, placed after the spread above so it wins.
+  // locationFields itself stays untouched (Idea/ImportantInfo still spread
+  // the original optional shape).
+  locationName: z
+    .string({ required_error: 'Location name is required' })
+    .trim()
+    .min(1, 'Location name is required')
+    .max(200),
   bookingReference: bookingReferenceField,
+  website: websiteField,
+  bookedVia: bookedViaField,
   ...expenseFields,
   ...contactFields,
   notes: notesField,

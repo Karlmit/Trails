@@ -273,6 +273,13 @@ model TimelineEntry {
   // Shared per FR-15, but withheld for Note (FR-14).
   bookingReference String? @map("booking_reference")
 
+  // spec-entry-fields-datepickers: a venue/booking's own website and how it
+  // was booked (e.g. "Booking.com") -- new, additive fields alongside
+  // bookingReference above, same shape/visibility (Stay/Transport/Activity
+  // only, withheld for Note).
+  website   String? @map("website")
+  bookedVia String? @map("booked_via")
+
   // Expense (FR-22 is out of scope for aggregation, but recording one on an
   // Entry here is explicitly in scope per this spec's "Ask First" note).
   expenseAmount        Decimal? @map("expense_amount") @db.Decimal(12, 2)

@@ -16,6 +16,10 @@ export const descriptionField = z.string().trim().max(5000).optional().nullable(
 export const notesField = z.string().trim().max(5000).optional().nullable();
 export const postTripNotesField = z.string().trim().max(5000).optional().nullable();
 export const bookingReferenceField = z.string().trim().max(200).optional().nullable();
+// spec-entry-fields-datepickers: free text, same shape/visibility as
+// bookingReferenceField above (Stay/Transport/Activity only, never Note --
+// wired into those 3 type schemas alongside bookingReference).
+export const bookedViaField = z.string().trim().max(200).optional().nullable();
 
 // spec-guest-access (FR-28/AD-10): shared across all 5 entry-type schemas
 // (Stay/Transport/Activity/Note/BlogPost) -- unlike most other shared
@@ -47,6 +51,30 @@ const locationMapLinkField = z
       }
     },
     { message: 'Map link must be a valid http(s) URL' },
+  );
+
+// spec-entry-fields-datepickers: a venue/booking's own website -- same
+// "well-formed URL + http(s)-only scheme" validation as locationMapLinkField
+// above (this value is also rendered as a clickable `<a href>` verbatim,
+// components/EntryDetailPanel.tsx, so the same stored-XSS-shaped gap
+// applies). Same shape/visibility as bookingReferenceField (Stay/Transport/
+// Activity only, never Note).
+export const websiteField = z
+  .string()
+  .trim()
+  .max(2048)
+  .optional()
+  .nullable()
+  .refine(
+    (value) => {
+      if (!value) return true;
+      try {
+        return ['http:', 'https:'].includes(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Website must be a valid http(s) URL' },
   );
 
 // AD-11: Location is always embedded plain columns, never a shared entity

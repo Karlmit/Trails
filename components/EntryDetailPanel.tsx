@@ -157,6 +157,28 @@ export function EntryDetailPanel({
           </div>
         )}
 
+        {entry.website && (
+          <div>
+            <dt className="text-soft" style={FIELD_LABEL_STYLE}>
+              Website
+            </dt>
+            <dd style={{ margin: 0 }}>
+              <a href={entry.website} target="_blank" rel="noreferrer">
+                {entry.website}
+              </a>
+            </dd>
+          </div>
+        )}
+
+        {entry.bookedVia && (
+          <div>
+            <dt className="text-soft" style={FIELD_LABEL_STYLE}>
+              Booked via
+            </dt>
+            <dd style={{ margin: 0 }}>{entry.bookedVia}</dd>
+          </div>
+        )}
+
         {entry.expenseAmount != null && entry.expenseCurrency && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>

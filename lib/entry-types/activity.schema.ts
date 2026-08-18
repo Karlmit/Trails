@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { dateTimeField, isDateTimeOrderValid } from '@/lib/validation';
 import {
+  bookedViaField,
   bookingReferenceField,
   contactFields,
   descriptionField,
@@ -11,6 +12,7 @@ import {
   notesField,
   postTripNotesField,
   titleField,
+  websiteField,
 } from './shared-fields.schema';
 
 // FR-13: Entry Subtype for Activity.
@@ -43,7 +45,16 @@ const activityFieldsShape = {
   // (single point-in-time) or equal to its start.
   endAt: dateTimeField.optional().nullable(),
   ...locationFields,
+  // spec-entry-fields-datepickers: same override as stay.schema.ts -- see
+  // its comment. locationFields itself stays untouched.
+  locationName: z
+    .string({ required_error: 'Location name is required' })
+    .trim()
+    .min(1, 'Location name is required')
+    .max(200),
   bookingReference: bookingReferenceField,
+  website: websiteField,
+  bookedVia: bookedViaField,
   ...expenseFields,
   ...contactFields,
   notes: notesField,

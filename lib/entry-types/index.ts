@@ -101,6 +101,8 @@ export interface ParsedEntryFields {
   locationLng?: number | null;
   locationMapLink?: string | null;
   bookingReference?: string | null;
+  website?: string | null;
+  bookedVia?: string | null;
   expenseAmount?: number | null;
   expenseCurrency?: string | null;
   expensePaymentStatus?: string | null;
@@ -136,6 +138,8 @@ export function toEntryCreateData(entryType: CreatableEntryType, parsed: ParsedE
     locationLng: parsed.locationLng ?? null,
     locationMapLink: parsed.locationMapLink ?? null,
     bookingReference: parsed.bookingReference ?? null,
+    website: parsed.website ?? null,
+    bookedVia: parsed.bookedVia ?? null,
     expenseAmount: parsed.expenseAmount ?? null,
     expenseCurrency: parsed.expenseCurrency ?? null,
     expensePaymentStatus: parsed.expensePaymentStatus ?? null,
@@ -177,6 +181,8 @@ export function toEntryUpdateData(parsed: ParsedEntryFields) {
     ...(parsed.locationLng !== undefined && { locationLng: parsed.locationLng }),
     ...(parsed.locationMapLink !== undefined && { locationMapLink: parsed.locationMapLink }),
     ...(parsed.bookingReference !== undefined && { bookingReference: parsed.bookingReference }),
+    ...(parsed.website !== undefined && { website: parsed.website }),
+    ...(parsed.bookedVia !== undefined && { bookedVia: parsed.bookedVia }),
     ...(parsed.expenseAmount !== undefined && { expenseAmount: parsed.expenseAmount }),
     ...(parsed.expenseCurrency !== undefined && { expenseCurrency: parsed.expenseCurrency }),
     ...(parsed.expensePaymentStatus !== undefined && {

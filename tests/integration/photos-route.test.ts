@@ -81,7 +81,14 @@ describe.skipIf(!hasTestDatabase)('photos route', () => {
       jsonRequest(
         'http://localhost/api/v1/timeline-entries',
         'POST',
-        { tripId, entryType: 'ACTIVITY', subtype: 'BEACH', title: 'Beach day', startAt: '2026-08-03T10:00:00.000Z' },
+        {
+          tripId,
+          entryType: 'ACTIVITY',
+          subtype: 'BEACH',
+          title: 'Beach day',
+          startAt: '2026-08-03T10:00:00.000Z',
+          locationName: 'The Beach',
+        },
         token,
       ),
     );
