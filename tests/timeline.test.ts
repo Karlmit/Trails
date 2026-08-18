@@ -216,6 +216,38 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
     expect(laidOut.find((d) => d.dateKey === '2026-08-02')!.laneSegments[0]).toBeNull();
   });
 
+  // spec-timeline-at-a-glance: TimelineLaneSegment carries the entry's own
+  // startAt/endAt straight through (sourced from the same EntryForLayout
+  // already passed in, no new query) so the Timeline page can render a
+  // real "{title} · Check-in HH:MM"-style line, per-position, without a
+  // second lookup.
+  it('carries the entry startAt/endAt through onto every lane segment, unchanged across start/middle/end days', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const startAt = new Date('2026-08-03T14:00:00.000Z');
+    const endAt = new Date('2026-08-06T11:00:00.000Z');
+    const entries = [
+      entry({
+        id: 's1',
+        entryType: 'STAY',
+        title: 'Beach Resort',
+        startAt,
+        endAt,
+      }),
+    ];
+
+    const { days: laidOut } = layoutTimelineEntries(days, entries, 'UTC');
+
+    const startDay = laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]!;
+    const middleDay = laidOut.find((d) => d.dateKey === '2026-08-04')!.laneSegments[0]!;
+    const endDay = laidOut.find((d) => d.dateKey === '2026-08-06')!.laneSegments[0]!;
+
+    for (const segment of [startDay, middleDay, endDay]) {
+      expect(segment.startAt).toEqual(startAt);
+      expect(segment.endAt).toEqual(endAt);
+    }
+  });
+
   it('assigns overlapping multi-day entries to different lanes', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
     const days = buildTimelineDays(trip, []);

@@ -730,6 +730,25 @@ p {
   flex-shrink: 0;
 }
 
+/* spec-timeline-at-a-glance: a real, visible text line for a multi-day
+   lane segment's own touched days (start/middle/end), rendered in the
+   day's content area alongside the existing dot list -- NOT a
+   replacement for, or a restyle of, the .timeline-lane-segment pill
+   itself (unchanged, still hover-only via title/aria-label). Reuses
+   .entry-chip's own layout (inline-flex, gap, font size) so it reads as a
+   natural extension of the dot-list pattern; the accent is a small
+   rounded-square bar (rather than .entry-chip-dot's circle) specifically
+   so a "this spans multiple days" line stays visually distinguishable
+   from a single-day dot at a glance, without inventing a heavier new
+   visual language. */
+.entry-chip-span-accent {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--span-color, var(--color-brand-accent));
+  flex-shrink: 0;
+}
+
 .section-legend {
   display: flex;
   flex-wrap: wrap;

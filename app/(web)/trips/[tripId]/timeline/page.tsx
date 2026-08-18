@@ -1,7 +1,12 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { computeTripStatus, dateKeyInTimezone, timeOfDayInTimezone } from '@/lib/trip-status';
-import { buildTimelineDays, layoutTimelineEntries, type EntryForLayout } from '@/lib/timeline';
+import {
+  buildTimelineDays,
+  layoutTimelineEntries,
+  type EntryForLayout,
+  type TimelineLaneSegment,
+} from '@/lib/timeline';
 import {
   sectionColor,
   sectionColorSolid,
@@ -28,6 +33,32 @@ function formatDayLabel(dateKey: string): string {
     day: 'numeric',
     timeZone: 'UTC',
   }).format(date);
+}
+
+function formatHHMM(date: Date, timezone: string): string {
+  const { hour, minute } = timeOfDayInTimezone(date, timezone);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+// spec-timeline-at-a-glance: a real, visible text line for every day a
+// multi-day lane segment touches -- start day gets the entry's own
+// per-type "arrival"-style wording ("Check-in"/"Departure"/"Start") plus
+// its startAt time; end day gets the "departure"-style wording
+// ("Check-out"/"Arrival"/"End") plus its endAt time (always non-null on a
+// day marked isEnd for a genuinely multi-day entry); any day strictly in
+// between is just the title -- the pill itself already communicates
+// "still ongoing." Reuses the exact same per-entry-type ternary
+// EntryDetailPanel/EntryForm already use, no new vocabulary invented.
+function laneSegmentLabel(segment: TimelineLaneSegment, timezone: string): string {
+  if (segment.isStart) {
+    const word = segment.entryType === 'TRANSPORT' ? 'Departure' : segment.entryType === 'STAY' ? 'Check-in' : 'Start';
+    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, timezone)}`;
+  }
+  if (segment.isEnd && segment.endAt) {
+    const word = segment.entryType === 'TRANSPORT' ? 'Arrival' : segment.entryType === 'STAY' ? 'Check-out' : 'End';
+    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, timezone)}`;
+  }
+  return segment.title;
 }
 
 // FR-6, FR-8, FR-9, FR-10: the Timeline -- a git-graph-style spine (left
@@ -114,6 +145,13 @@ export default async function TimelinePage({ params }: PageProps) {
           // renders once there, not on every day within the run (spec's
           // I/O matrix: "a multi-day Section's ... label appears once").
           const showSectionLabel = section !== null && !day.connectsAbove;
+          // spec-timeline-at-a-glance: the lane pills themselves (rendered
+          // below, unchanged) only carry a hover-only `title`/`aria-label`
+          // -- this is the day's own non-null lane segments, rendered as
+          // real visible text lines alongside the dot list.
+          const activeLaneSegments = day.laneSegments.filter(
+            (segment): segment is TimelineLaneSegment => segment !== null,
+          );
 
           return (
             <div
@@ -183,7 +221,7 @@ export default async function TimelinePage({ params }: PageProps) {
                       {trip.timezone})
                     </div>
                   )}
-                  {day.dots.length > 0 ? (
+                  {day.dots.length > 0 && (
                     <div className="entry-dot-list">
                       {day.dots.map((dot) => (
                         <Link
@@ -200,7 +238,23 @@ export default async function TimelinePage({ params }: PageProps) {
                         </Link>
                       ))}
                     </div>
-                  ) : (
+                  )}
+                  {activeLaneSegments.length > 0 && (
+                    <div className="entry-dot-list">
+                      {activeLaneSegments.map((segment) => (
+                        <Link
+                          key={segment.entryId}
+                          href={entryDetailHref(tripId, segment.entryType, segment.entryId)}
+                          className="entry-chip"
+                          style={{ ['--span-color' as string]: entryTypeColor(segment.entryType) }}
+                        >
+                          <span className="entry-chip-span-accent" />
+                          <span>{laneSegmentLabel(segment, trip.timezone)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                  {day.dots.length === 0 && activeLaneSegments.length === 0 && (
                     <div className="timeline-day-empty">No entries yet</div>
                   )}
                 </div>

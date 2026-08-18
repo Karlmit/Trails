@@ -145,6 +145,17 @@ export interface TimelineLaneSegment {
   // so several stacked day-rows read as one continuous pill.
   isStart: boolean;
   isEnd: boolean;
+  // spec-timeline-at-a-glance: the entry's own timestamps, carried straight
+  // through from the `EntryForLayout` already in scope below (no new query)
+  // so the Timeline page can render a real "{title} · Check-in HH:MM"-style
+  // line on the start/end day, per-entry-type-worded exactly like
+  // EntryDetailPanel/EntryForm already do -- see laneSegmentLabel in
+  // app/(web)/trips/[tripId]/timeline/page.tsx. `endAt` mirrors
+  // `EntryForLayout.endAt`'s own nullability, though in practice a segment
+  // marked `isEnd` for a genuinely multi-day entry always has one (a
+  // multi-day entry by definition has a real endAt).
+  startAt: Date;
+  endAt: Date | null;
 }
 
 export interface TimelineDayWithEntries extends TimelineDay {
@@ -232,6 +243,8 @@ export function layoutTimelineEntries(
         title: entry.title,
         isStart: i === firstIndex,
         isEnd: i === lastIndex,
+        startAt: entry.startAt,
+        endAt: entry.endAt,
       });
       segmentsByIndex.set(i, dayLanes);
     }
