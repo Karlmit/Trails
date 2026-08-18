@@ -50,6 +50,20 @@ import { prisma } from '@/lib/prisma';
 //     handler itself, which re-derives the same Trip/Entry/Photo visibility
 //     the Guest-eligible pages already apply -- see that route's own
 //     comment). No other /api/v1/** route is added here.
+//   - Root (`/`), added per direct user feedback (this deployment only ever
+//     plans one Trip at a time): an unauthenticated visitor to `/` lands on
+//     the same "next upcoming or currently Active Trip" decision an
+//     authenticated User gets (`lib/app-landing.ts`'s `decideLandingTrip`,
+//     unchanged), filtered to Public Trips only -- the page itself
+//     (`app/page.tsx`) does that filtering, same "proxy.ts only decides
+//     reachability, the page decides visibility" split as every other
+//     Guest-eligible route. Root is deliberately NOT folded into
+//     `GUEST_ELIGIBLE_PATH` above: that regex is Trip-scoped and always
+//     safe to check with no DB hit, whereas root must never bypass FR-29's
+//     bootstrap gate (a zero-User instance has no Trips to show a Guest
+//     anyway, and must still funnel a fresh visitor to `/signup`) -- so
+//     root's Guest-eligibility is checked separately, after the bootstrap
+//     count, not before it.
 
 const PUBLIC_PAGE_PATHS = new Set(['/login', '/signup']);
 
@@ -128,10 +142,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     // FR-29 bootstrap: an unauthenticated visitor to any protected page on a
-    // brand-new instance (zero Users) lands on /signup, not /login.
+    // brand-new instance (zero Users) lands on /signup, not /login. Checked
+    // before root's own Guest-eligibility below, deliberately -- root must
+    // never show a Guest an empty landing state instead of being funneled
+    // through bootstrap first.
     const userCount = await prisma.user.count();
-    const destination = userCount === 0 ? '/signup' : '/login';
-    return NextResponse.redirect(new URL(destination, request.url));
+    if (userCount === 0) {
+      return NextResponse.redirect(new URL('/signup', request.url));
+    }
+    if (pathname === '/') {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return NextResponse.next();

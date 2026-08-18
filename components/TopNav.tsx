@@ -29,7 +29,7 @@ export function TopNav({ username, role = null }: { username: string | null; rol
         <Image src="/logo.png" alt="" width={32} height={32} priority />
         Trails
       </Link>
-      {username && (
+      {username ? (
         <div className="top-nav-actions">
           <Link href="/trips" className="text-soft">
             Trips
@@ -48,6 +48,15 @@ export function TopNav({ username, role = null }: { username: string | null; rol
           >
             {loggingOut ? 'Logging out…' : 'Log out'}
           </button>
+        </div>
+      ) : (
+        // A Guest sees this on every Guest-eligible page (root, and any
+        // Trip page shared with them) -- the only way back to an actual
+        // account without knowing to type /login manually.
+        <div className="top-nav-actions">
+          <Link href="/login" className="btn btn-dark-outline">
+            Log in
+          </Link>
         </div>
       )}
     </header>

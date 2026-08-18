@@ -40,6 +40,21 @@ describe.skipIf(!hasTestDatabase)('proxy (AD-6/AD-7 auth gate)', () => {
     expect(res.headers.get('location')).toBe('http://localhost/signup');
   });
 
+  it('redirects an unauthenticated root request to /signup on a zero-User instance -- bootstrap wins over Guest root landing', async () => {
+    const res = await proxy(requestFor('/'));
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toBe('http://localhost/signup');
+  });
+
+  it('lets an unauthenticated root request through once a User exists (Guest landing, added for single-Trip-at-a-time deployments)', async () => {
+    await testPrisma().user.create({
+      data: { username: 'sara', passwordHash: 'irrelevant', role: 'ADMIN' },
+    });
+
+    const res = await proxy(requestFor('/'));
+    expect(res.headers.get('x-middleware-next')).toBe('1');
+  });
+
   it('returns a 401 JSON error envelope for an unauthenticated protected API path', async () => {
     const res = await proxy(requestFor('/api/v1/trips'));
     expect(res.status).toBe(401);
