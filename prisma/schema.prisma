@@ -102,6 +102,18 @@ model Section {
   name      String
   startDate DateTime @map("start_date") @db.Date
   endDate   DateTime @map("end_date") @db.Date
+
+  // spec-sections-color-emoji: both nullable — a Section a User never
+  // customizes keeps rendering via the existing auto-cycled fallback
+  // (sectionColor/sectionColorSolid, lib/section-colors.ts), no behavior
+  // change for existing rows or a create/edit that omits them. Stored as a
+  // plain string (not an enum) but only ever set to a member of the
+  // curated SECTION_COLOR_PALETTE/SECTION_EMOJI_OPTIONS constants
+  // (lib/section-colors.ts) — enforced in lib/validation.ts, not a DB
+  // constraint (same "curated set, not free-form input" enforcement point
+  // used elsewhere in this codebase for a fixed list of allowed values).
+  color     String?
+  emoji     String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

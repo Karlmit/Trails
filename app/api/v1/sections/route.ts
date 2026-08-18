@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
         name: parsed.name,
         startDate: parsed.startDate,
         endDate: parsed.endDate,
+        color: parsed.color ?? null,
+        emoji: parsed.emoji ?? null,
       },
     });
 

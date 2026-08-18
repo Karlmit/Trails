@@ -88,6 +88,42 @@ describe.skipIf(!hasTestDatabase)('sections route (overlap rule)', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('rejects a color value outside the curated palette (400)', async () => {
+    const res = await createSection(
+      authedRequest(
+        'POST',
+        { tripId, name: 'Phuket', startDate: '2026-08-03', endDate: '2026-08-07', color: '#ffffff' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an emoji value outside the curated set (400)', async () => {
+    const res = await createSection(
+      authedRequest(
+        'POST',
+        { tripId, name: 'Phuket', startDate: '2026-08-03', endDate: '2026-08-07', emoji: '🦄' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('creates a Section with a curated color and emoji', async () => {
+    const res = await createSection(
+      authedRequest(
+        'POST',
+        { tripId, name: 'Phuket', startDate: '2026-08-03', endDate: '2026-08-07', color: '#c9633f', emoji: '🏖️' },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.color).toBe('#c9633f');
+    expect(body.emoji).toBe('🏖️');
+  });
+
   it('rejects an unauthenticated request', async () => {
     const req = new NextRequest('http://localhost/api/v1/sections', {
       method: 'POST',
@@ -148,6 +184,42 @@ describe.skipIf(!hasTestDatabase)('sections route (detail: PATCH/DELETE)', () =>
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.name).toBe('Phuket (updated)');
+  });
+
+  // Merge-before-validate for color/emoji: `null` (explicit clear) must be
+  // distinguished from omitted (leave the stored value untouched) -- the
+  // same bug class this codebase has hit before with other optional fields.
+  it('a PATCH with color/emoji omitted leaves the stored values untouched', async () => {
+    await patchSection(
+      detailRequest('PATCH', phuketId, { color: '#c9633f', emoji: '🏖️' }, token),
+      sectionParams(phuketId),
+    );
+
+    const res = await patchSection(
+      detailRequest('PATCH', phuketId, { name: 'Phuket (renamed)' }, token),
+      sectionParams(phuketId),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.name).toBe('Phuket (renamed)');
+    expect(body.color).toBe('#c9633f');
+    expect(body.emoji).toBe('🏖️');
+  });
+
+  it('a PATCH with color/emoji explicitly null clears them back to the fallback', async () => {
+    await patchSection(
+      detailRequest('PATCH', phuketId, { color: '#c9633f', emoji: '🏖️' }, token),
+      sectionParams(phuketId),
+    );
+
+    const res = await patchSection(
+      detailRequest('PATCH', phuketId, { color: null, emoji: null }, token),
+      sectionParams(phuketId),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.color).toBeNull();
+    expect(body.emoji).toBeNull();
   });
 
   // Item 3 regression: a one-field PATCH must be checked against the

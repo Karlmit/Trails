@@ -56,6 +56,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         ...(parsed.name !== undefined && { name: parsed.name }),
         ...(parsed.startDate !== undefined && { startDate: parsed.startDate }),
         ...(parsed.endDate !== undefined && { endDate: parsed.endDate }),
+        ...(parsed.color !== undefined && { color: parsed.color }),
+        ...(parsed.emoji !== undefined && { emoji: parsed.emoji }),
       },
     });
 

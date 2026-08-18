@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { locationFields } from '@/lib/entry-types/shared-fields.schema';
+import { SECTION_COLOR_VALUES, SECTION_EMOJI_OPTIONS } from '@/lib/section-colors';
 
 // FR-1: Trip.coverImage was previously a data-model-only field (no UI ever
 // let a User set it -- logged in deferred-work.md as blocked on the
@@ -136,12 +137,38 @@ export const tripUpdateSchema = z
     { message: 'End date must be on or after the start date', path: ['endDate'] },
   );
 
+// spec-sections-color-emoji: both optional AND nullable on create/update --
+// a Section a User never customizes has `color`/`emoji` left `undefined`
+// (create) or omitted entirely (update, existing value untouched, same
+// merge-before-validate convention as name/dates below), while explicitly
+// passing `null` clears a previously-set value back to the auto-cycled
+// fallback (color) / no label emoji (emoji). Curated-set-only, not a free
+// hex/text input (spec's "Ask First" boundary) -- anything else is a clean
+// 400, not silently accepted or dropped.
+const sectionColorField = z
+  .string()
+  .optional()
+  .nullable()
+  .refine((value) => value === undefined || value === null || SECTION_COLOR_VALUES.includes(value), {
+    message: `color must be one of the curated palette values: ${SECTION_COLOR_VALUES.join(', ')}`,
+  });
+
+const sectionEmojiField = z
+  .string()
+  .optional()
+  .nullable()
+  .refine((value) => value === undefined || value === null || SECTION_EMOJI_OPTIONS.includes(value), {
+    message: `emoji must be one of the curated emoji set: ${SECTION_EMOJI_OPTIONS.join(' ')}`,
+  });
+
 export const sectionCreateSchema = z
   .object({
     tripId: z.string().uuid('tripId must be a valid UUID'),
     name: z.string().trim().min(1, 'Name is required').max(200),
     startDate: dateOnly,
     endDate: dateOnly,
+    color: sectionColorField,
+    emoji: sectionEmojiField,
   })
   .refine((data) => data.endDate.getTime() >= data.startDate.getTime(), {
     message: 'End date must be on or after the start date',
@@ -153,6 +180,8 @@ export const sectionUpdateSchema = z
     name: z.string().trim().min(1).max(200).optional(),
     startDate: dateOnly.optional(),
     endDate: dateOnly.optional(),
+    color: sectionColorField,
+    emoji: sectionEmojiField,
   })
   .refine(
     (data) =>

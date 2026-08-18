@@ -50,6 +50,8 @@ export function serializeSection(section: Section) {
     name: section.name,
     startDate: section.startDate.toISOString().slice(0, 10),
     endDate: section.endDate.toISOString().slice(0, 10),
+    color: section.color,
+    emoji: section.emoji,
     createdAt: section.createdAt.toISOString(),
     updatedAt: section.updatedAt.toISOString(),
   };

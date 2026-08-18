@@ -2,7 +2,12 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { computeTripStatus, dateKeyInTimezone, timeOfDayInTimezone } from '@/lib/trip-status';
 import { buildTimelineDays, layoutTimelineEntries, type EntryForLayout } from '@/lib/timeline';
-import { sectionColor, sectionColorSolid } from '@/lib/section-colors';
+import {
+  sectionColor,
+  sectionColorSolid,
+  sectionCustomColorBand,
+  sectionCustomColorSolid,
+} from '@/lib/section-colors';
 import { entryTypeColor } from '@/lib/entry-types/colors';
 import { subtypeLabel } from '@/lib/entry-types/labels';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
@@ -96,8 +101,19 @@ export default async function TimelinePage({ params }: PageProps) {
 
       <div className="stack" style={{ gap: 0 }}>
         {laidOutDays.map((day) => {
-          const bandColor = day.sectionIndex !== null ? sectionColor(day.sectionIndex) : undefined;
-          const railColor = day.sectionIndex !== null ? sectionColorSolid(day.sectionIndex) : undefined;
+          const section = day.sectionIndex !== null ? trip.sections[day.sectionIndex] : null;
+          const bandColor = section
+            ? (section.color && sectionCustomColorBand(section.color)) ?? sectionColor(day.sectionIndex!)
+            : undefined;
+          const railColor = section
+            ? (section.color && sectionCustomColorSolid(section.color)) ?? sectionColorSolid(day.sectionIndex!)
+            : undefined;
+          // A Section's contiguous run on the Timeline starts at the first
+          // day-row that doesn't connect to the row above it (a gap day or
+          // a different Section preceding it) -- the name+emoji label
+          // renders once there, not on every day within the run (spec's
+          // I/O matrix: "a multi-day Section's ... label appears once").
+          const showSectionLabel = section !== null && !day.connectsAbove;
 
           return (
             <div
@@ -142,9 +158,23 @@ export default async function TimelinePage({ params }: PageProps) {
               )}
 
               <div
-                className="timeline-content timeline-section-band"
-                style={bandColor ? { ['--band-color' as string]: bandColor } : undefined}
+                className={`timeline-content timeline-section-band${showSectionLabel ? ' has-section-label' : ''}`}
+                style={
+                  bandColor
+                    ? { ['--band-color' as string]: bandColor, ['--rail-accent-color' as string]: railColor }
+                    : undefined
+                }
               >
+                {showSectionLabel && section && (
+                  <div className="timeline-section-label">
+                    {section.emoji && (
+                      <span className="timeline-section-label-emoji" aria-hidden="true">
+                        {section.emoji}
+                      </span>
+                    )}
+                    <span className="timeline-section-label-name">{section.name}</span>
+                  </div>
+                )}
                 <div className="timeline-day-date">{formatDayLabel(day.dateKey)}</div>
                 <div className="stack" style={{ gap: 'var(--space-1)', flex: 1 }}>
                   {day.isToday && (
