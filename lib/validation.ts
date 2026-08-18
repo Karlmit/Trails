@@ -58,6 +58,15 @@ export function isDateTimeOrderValid(
   return allowEqual ? endAt.getTime() >= startAt.getTime() : endAt.getTime() > startAt.getTime();
 }
 
+// FR-29/FR-30: username/password validation shared by signup
+// (app/api/v1/auth/route.ts) and Admin-issued account creation
+// (app/api/v1/users/route.ts, spec-admin-users) -- one definition so the
+// two paths can't silently drift apart on a future bounds change.
+export const credentialsSchema = z.object({
+  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(64),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(256),
+});
+
 export const timezoneField = z
   .string()
   .trim()

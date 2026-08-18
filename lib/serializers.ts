@@ -7,8 +7,20 @@ import type {
   Section,
   TimelineEntry,
   Trip,
+  User,
 } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
+
+// FR-30, spec-admin-users: `role`/`createdAt` only, alongside `id`/`username`
+// -- `passwordHash` is deliberately never included (spec's "Never" boundary).
+export function serializeUser(user: User) {
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    createdAt: user.createdAt.toISOString(),
+  };
+}
 
 export function serializeTrip(trip: Trip) {
   return {

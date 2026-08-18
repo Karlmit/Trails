@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function TopNav({ username }: { username: string | null }) {
+// FR-30, spec-admin-users: `role` is optional/omittable by any existing
+// caller (defaults to `null`, same as a logged-out `username`) -- the
+// "Admin" link only renders for `role === 'ADMIN'`, never for a `USER` or
+// logged-out visitor.
+export function TopNav({ username, role = null }: { username: string | null; role?: string | null }) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -30,6 +34,11 @@ export function TopNav({ username }: { username: string | null }) {
           <Link href="/trips" className="text-soft">
             Trips
           </Link>
+          {role === 'ADMIN' && (
+            <Link href="/admin/users" className="text-soft">
+              Admin
+            </Link>
+          )}
           <span className="text-soft">{username}</span>
           <button
             type="button"

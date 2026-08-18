@@ -9,6 +9,8 @@ export function apiError(status: number, code: string, message: string) {
 
 export const Errors = {
   unauthorized: () => apiError(401, 'UNAUTHORIZED', 'Authentication required'),
+  forbidden: (message = 'You do not have access to this resource') =>
+    apiError(403, 'FORBIDDEN', message),
   invalidCredentials: () => apiError(401, 'INVALID_CREDENTIALS', 'Invalid username or password'),
   validation: (message: string) => apiError(400, 'VALIDATION_ERROR', message),
   notFound: (message = 'Not found') => apiError(404, 'NOT_FOUND', message),

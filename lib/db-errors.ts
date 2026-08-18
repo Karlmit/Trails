@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 const POSTGRES_EXCLUSION_VIOLATION = '23P01';
 const POSTGRES_FOREIGN_KEY_VIOLATION = '23503';
 const POSTGRES_SERIALIZATION_FAILURE = '40001';
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 const SECTIONS_OVERLAP_CONSTRAINT = 'sections_no_overlap_per_trip';
 
@@ -60,6 +61,18 @@ export function isForeignKeyViolationError(err: unknown): boolean {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false;
   if (err.code === 'P2003') return true;
   return driverCause(err)?.code === POSTGRES_FOREIGN_KEY_VIOLATION;
+}
+
+/**
+ * A unique-constraint violation -- e.g. spec-admin-users' `POST /api/v1/users`
+ * racing another request for the same `username`. Matches Prisma's own code
+ * as well as the raw Postgres SQLSTATE as a fallback (same pattern as
+ * isForeignKeyViolationError above).
+ */
+export function isUniqueConstraintViolationError(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (err.code === 'P2002') return true;
+  return driverCause(err)?.code === POSTGRES_UNIQUE_VIOLATION;
 }
 
 /**

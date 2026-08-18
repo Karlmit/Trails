@@ -1,23 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
-import { z, ZodError } from 'zod';
+import { ZodError } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { issueSession, revokeSession, COOKIE_SECURE, SESSION_COOKIE_NAME } from '@/lib/session';
 import { Errors } from '@/lib/api-errors';
 import { extractToken } from '@/lib/auth';
 import { isSerializationFailure } from '@/lib/db-errors';
+import { credentialsSchema } from '@/lib/validation';
 
 // FR-29/FR-30, AD-6, AD-7: signup (zero-Users bootstrap gate) + login/logout,
 // all on one Route Handler file, discriminated by HTTP method:
 //   PUT    /api/v1/auth  -- signup, only reachable while `users` is empty
 //   POST   /api/v1/auth  -- login
 //   DELETE /api/v1/auth  -- logout
-
-const credentialsSchema = z.object({
-  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(64),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(256),
-});
+//
+// credentialsSchema is shared with app/api/v1/users/route.ts (spec-admin-
+// users) via lib/validation.ts -- previously duplicated verbatim in both
+// files, a drift risk a review caught (a future bounds change to one copy
+// silently not applying to the other). One source of truth now; this
+// swap changes only where the identical Zod chain is defined, not its
+// values or the zero-Users bootstrap logic below.
 
 function setSessionCookie(response: NextResponse, token: string, expiresAt: Date) {
   response.cookies.set(SESSION_COOKIE_NAME, token, {

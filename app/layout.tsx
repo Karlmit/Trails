@@ -18,7 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={appFont.variable}>
       <body>
-        <TopNav username={user?.username ?? null} />
+        <TopNav username={user?.username ?? null} role={user?.role ?? null} />
         {children}
       </body>
     </html>
