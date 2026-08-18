@@ -253,13 +253,30 @@ model TimelineEntry {
   title       String
   description String?
 
-  // AD-1: one shared temporal pair for every type, both UTC (AD-8). `endAt`
-  // is NULL for a Note (date-only) and may be NULL for a point-in-time
-  // Activity; Stay/Transport always populate it (checked in the per-type
-  // Zod schema, not a DB constraint, so the error stays a clean 400 per
-  // AD-1's "validated ... against exactly one Zod schema per entry_type").
+  // AD-1: one shared temporal pair for every type. Per a later correction
+  // to AD-8: these are the traveler's own literal wall-clock digits, not
+  // real UTC instants -- stored as UTC purely as a column-type convenience
+  // (dateTimeField, lib/validation.ts, never applies a real timezone
+  // conversion unless startTimezone/endTimezone below says otherwise).
+  // `endAt` is NULL for a Note (date-only) and may be NULL for a
+  // point-in-time Activity; Stay/Transport always populate it (checked in
+  // the per-type Zod schema, not a DB constraint, so the error stays a
+  // clean 400 per AD-1's "validated ... against exactly one Zod schema per
+  // entry_type").
   startAt DateTime  @map("start_at") @db.Timestamptz(6)
   endAt   DateTime? @map("end_at") @db.Timestamptz(6)
+
+  // spec-timeline-ux-and-timezone (correction): NULL (the default, and the
+  // only option for every type but Transport) means startAt/endAt are
+  // literal wall-clock digits with no real timezone attached at all -- see
+  // startAt/endAt's own comment. A traveler-declared IANA zone here means
+  // the stored instant is instead a real, correctly-computed UTC instant
+  // that must be converted through *this* zone to recover the intended
+  // clock time -- for a Transport Entry whose departure and arrival are in
+  // different real timezones (a flight), so the Timeline places each leg
+  // correctly and "arrival after departure" validates against real time.
+  startTimezone String? @map("start_timezone")
+  endTimezone   String? @map("end_timezone")
 
   // AD-11: Location is embedded plain columns, never a shared entity --
   // one Location per row, used by Stay/Transport/Activity, left NULL for

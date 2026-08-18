@@ -1,4 +1,4 @@
-import { dateKeyOfDateColumn } from '@/lib/trip-status';
+import { dateKeyOfDateColumn, entryEndpointDateKey } from '@/lib/trip-status';
 
 export interface TimelineDay {
   dateKey: string; // YYYY-MM-DD
@@ -129,6 +129,13 @@ export interface EntryForLayout {
   title: string;
   startAt: Date;
   endAt: Date | null;
+  // spec-timeline-ux-and-timezone (correction): NULL for every type but
+  // Transport -- see TimelineEntry.startTimezone's own schema comment. When
+  // set, startAt/endAt are real UTC instants that must be converted through
+  // this zone (entryEndpointDateKey/entryEndpointClockTime, lib/trip-status.ts)
+  // to recover the traveler's intended day/clock time for this leg.
+  startTimezone: string | null;
+  endTimezone: string | null;
 }
 
 export interface TimelineEntryDot {
@@ -159,6 +166,11 @@ export interface TimelineLaneSegment {
   // multi-day entry by definition has a real endAt).
   startAt: Date;
   endAt: Date | null;
+  // Same zone-resolution rule as `EntryForLayout` -- carried through so
+  // laneSegmentLabel (timeline/page.tsx) can display the correct clock time
+  // for this leg.
+  startTimezone: string | null;
+  endTimezone: string | null;
 }
 
 export interface TimelineDayWithEntries extends TimelineDay {
@@ -187,8 +199,8 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
   const sorted = [...entries].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   for (const entry of sorted) {
-    const startKey = dateKeyOfDateColumn(entry.startAt);
-    const endKey = entry.endAt ? dateKeyOfDateColumn(entry.endAt) : startKey;
+    const startKey = entryEndpointDateKey(entry.startAt, entry.startTimezone);
+    const endKey = entry.endAt ? entryEndpointDateKey(entry.endAt, entry.endTimezone) : startKey;
 
     if (startKey === endKey) {
       const index = days.findIndex((day) => day.dateKey === startKey);
@@ -244,6 +256,8 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
         isEnd: i === lastIndex,
         startAt: entry.startAt,
         endAt: entry.endAt,
+        startTimezone: entry.startTimezone,
+        endTimezone: entry.endTimezone,
       });
       segmentsByIndex.set(i, dayLanes);
     }

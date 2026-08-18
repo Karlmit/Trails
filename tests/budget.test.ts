@@ -17,6 +17,7 @@ function entry(overrides: Partial<BudgetEntryInput> & { id: string }): BudgetEnt
     entryType: 'STAY',
     title: 'Untitled',
     startAt: new Date('2026-08-03T10:00:00.000Z'),
+    startTimezone: null,
     expenseAmount: 100,
     expenseCurrency: 'USD',
     expensePaymentStatus: null,
@@ -143,6 +144,17 @@ describe('deriveLineItems / Section filter (I/O matrix: filter by Section, AD-2)
     const entries = [entry({ id: '1', startAt: new Date('2026-08-05T20:00:00.000Z') })];
     const [lineItem] = deriveLineItems(entries, sections);
     expect(lineItem.sectionId).toBe('sec-1');
+  });
+
+  // spec-timeline-ux-and-timezone (correction): a Transport leg's own
+  // declared startTimezone converts its real UTC instant through that zone
+  // for Section attribution, unlike a naive entry (startTimezone: null).
+  it("attributes a Transport leg by its own declared timezone's calendar date", () => {
+    // Real instant 2026-08-05T20:00Z: literal UTC date is Aug 5 (sec-1), but
+    // Asia/Tokyo (+9) reads it as Aug 6 (sec-2).
+    const entries = [entry({ id: '1', entryType: 'TRANSPORT', startAt: new Date('2026-08-05T20:00:00.000Z'), startTimezone: 'Asia/Tokyo' })];
+    const [lineItem] = deriveLineItems(entries, sections);
+    expect(lineItem.sectionId).toBe('sec-2');
   });
 });
 

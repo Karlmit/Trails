@@ -9,7 +9,7 @@ import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
-import { formatEntryDateTime } from '@/lib/trip-status';
+import { formatEntryEndpointDateTime } from '@/lib/trip-status';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -22,6 +22,7 @@ export function EntryDetailPanel({
   entry: initialEntry,
   readOnly = false,
   photos,
+  tripTimezone,
 }: {
   tripId: string;
   entry: EntryDTO;
@@ -34,6 +35,11 @@ export function EntryDetailPanel({
   // required for a Guest, whose session-less browser can't self-fetch
   // GET /api/v1/photos. See PhotoGallery's own `initialPhotos` comment.
   photos?: PhotoDTO[];
+  // spec-timeline-ux-and-timezone (correction): only ever consulted by the
+  // edit form, to seed a Transport's Departure/Arrival timezone pickers --
+  // this panel's own Start/End display always uses the Entry's own
+  // startTimezone/endTimezone (entry.startTimezone/endTimezone), never this.
+  tripTimezone: string;
 }) {
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
@@ -67,6 +73,7 @@ export function EntryDetailPanel({
         tripId={tripId}
         mode="edit"
         entry={entry}
+        tripTimezone={tripTimezone}
         onSaved={(updated) => {
           setEntry(updated);
           setEditing(false);
@@ -118,14 +125,14 @@ export function EntryDetailPanel({
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
               {entry.entryType === 'TRANSPORT' ? 'Departure' : entry.entryType === 'STAY' ? 'Check-in' : 'Start'}
             </dt>
-            <dd style={{ margin: 0 }}>{formatEntryDateTime(entry.startAt)}</dd>
+            <dd style={{ margin: 0 }}>{formatEntryEndpointDateTime(new Date(entry.startAt), entry.startTimezone)}</dd>
           </div>
           {entry.endAt && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
                 {entry.entryType === 'TRANSPORT' ? 'Arrival' : entry.entryType === 'STAY' ? 'Check-out' : 'End'}
               </dt>
-              <dd style={{ margin: 0 }}>{formatEntryDateTime(entry.endAt)}</dd>
+              <dd style={{ margin: 0 }}>{formatEntryEndpointDateTime(new Date(entry.endAt), entry.endTimezone)}</dd>
             </div>
           )}
         </dl>

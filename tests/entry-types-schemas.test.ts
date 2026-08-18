@@ -225,6 +225,68 @@ describe('lib/entry-types/*.schema.ts', () => {
       expect(result.success).toBe(true);
     });
 
+    // spec-timeline-ux-and-timezone (correction): startTimezone/endTimezone
+    // are optional/nullable IANA-validated fields -- the actual real-instant
+    // recomputation is Route Handler territory (applyEntryLegTimezones),
+    // not this schema's job.
+    it('accepts valid startTimezone/endTimezone values', () => {
+      const result = transportCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-03T10:00:00.000Z',
+        startTimezone: 'Asia/Bangkok',
+        endTimezone: 'America/Los_Angeles',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.startTimezone).toBe('Asia/Bangkok');
+        expect(result.data.endTimezone).toBe('America/Los_Angeles');
+      }
+    });
+
+    it('rejects an invalid IANA timezone string', () => {
+      const result = transportCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-03T10:00:00.000Z',
+        startTimezone: 'Not/A_Real_Zone',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('defaults startTimezone/endTimezone to undefined when omitted', () => {
+      const result = transportCreateSchema.safeParse({ ...base, endAt: '2026-08-03T10:00:00.000Z' });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.startTimezone).toBeUndefined();
+        expect(result.data.endTimezone).toBeUndefined();
+      }
+    });
+
+    // This is exactly the user-reported correctness gap: a long-haul flight
+    // whose arrival *literal clock time* reads earlier than its departure's
+    // is a perfectly normal flight, not an inverted pair -- the schema must
+    // not reject it purely on that naive comparison once either leg
+    // declares a real timezone (the Route Handler re-checks order against
+    // the real, zone-corrected instants instead).
+    it('accepts an arrival literal clock time earlier than departure once a leg declares a timezone', () => {
+      const result = transportCreateSchema.safeParse({
+        ...base,
+        startAt: '2026-08-05T18:00:00.000Z',
+        endAt: '2026-08-05T12:00:00.000Z',
+        startTimezone: 'Asia/Tokyo',
+        endTimezone: 'America/Los_Angeles',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('still rejects a naive arrival-not-later-than-departure when neither leg declares a timezone', () => {
+      const result = transportCreateSchema.safeParse({
+        ...base,
+        startAt: '2026-08-05T18:00:00.000Z',
+        endAt: '2026-08-05T12:00:00.000Z',
+      });
+      expect(result.success).toBe(false);
+    });
+
     // Item 1: `.strict()` must match Note's schema across every type.
     it('rejects an unexpected field (strict schema, matches Note)', () => {
       const result = transportCreateSchema.safeParse({

@@ -20,6 +20,12 @@ export interface TravelModeEntry {
   entryType: string;
   startAt: Date;
   endAt: Date | null;
+  // spec-timeline-ux-and-timezone (correction): NULL for every type but
+  // Transport. `findCurrentStay`/`findCurrentActivity` are type-filtered to
+  // STAY/ACTIVITY, which never set this (always null) -- only
+  // `findNextByType` (which runs across every type, Transport included)
+  // actually branches on it, per-entry.
+  startTimezone: string | null;
 }
 
 /**
@@ -81,8 +87,16 @@ export function findCurrentActivity<T extends TravelModeEntry>(
  * omitted/null -- "next TimelineEntry overall") with the smallest `startAt`
  * that is `> now`. Four independent lookups per the spec (overall,
  * Transport, Activity, Stay) -- the next entry of any type may or may not
- * be the same row as e.g. the next Transport, so each is its own call. Same
- * `tripLocalNow` re-projection as `findCurrentStay`/`findCurrentActivity`.
+ * be the same row as e.g. the next Transport, so each is its own call.
+ *
+ * Unlike `findCurrentStay`/`findCurrentActivity` (type-filtered to
+ * STAY/ACTIVITY, which never carry a real `startTimezone`), this runs
+ * across every type including TRANSPORT -- so each entry's own comparison
+ * frame is resolved individually: a Transport leg with a declared real
+ * timezone stores a real UTC instant, compared directly against the real
+ * `now`; every other entry is the naive-literal case, compared against
+ * `now` re-projected onto the Trip's own local wall-clock digits
+ * (`tripLocalNow`), same as `findCurrentStay`/`findCurrentActivity`.
  */
 export function findNextByType<T extends TravelModeEntry>(
   entries: T[],
@@ -91,9 +105,10 @@ export function findNextByType<T extends TravelModeEntry>(
   entryType?: string | null,
 ): T | null {
   const localNow = tripLocalNow(now, timezone);
+  const referenceTime = (entry: TravelModeEntry) => (entry.startTimezone ? now : localNow).getTime();
   const candidates = entries.filter(
     (entry) =>
-      (entryType == null || entry.entryType === entryType) && entry.startAt.getTime() > localNow.getTime(),
+      (entryType == null || entry.entryType === entryType) && entry.startAt.getTime() > referenceTime(entry),
   );
   return candidates.reduce<T | null>((soonest, entry) => {
     if (!soonest || entry.startAt.getTime() < soonest.startAt.getTime()) return entry;

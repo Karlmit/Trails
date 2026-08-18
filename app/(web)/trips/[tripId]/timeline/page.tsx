@@ -1,6 +1,11 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { computeTripStatus, dateKeyInTimezone, entryClockTime, timeOfDayInTimezone } from '@/lib/trip-status';
+import {
+  computeTripStatus,
+  dateKeyInTimezone,
+  entryEndpointClockTime,
+  timeOfDayInTimezone,
+} from '@/lib/trip-status';
 import {
   buildTimelineDays,
   layoutTimelineEntries,
@@ -36,11 +41,14 @@ function formatDayLabel(dateKey: string): string {
 }
 
 // An entry's own recorded startAt/endAt is its literal wall-clock digits
-// (see dateTimeField's comment) -- `entryClockTime` reads them back with
-// zero timezone conversion, never the Trip's own declared timezone (that's
-// `timeOfDayInTimezone`, used elsewhere on this page only for `now`).
-function formatHHMM(date: Date): string {
-  const { hour, minute } = entryClockTime(date);
+// (see dateTimeField's comment) by default -- `zone` null reads them back
+// with zero timezone conversion, never the Trip's own declared timezone
+// (that's `timeOfDayInTimezone`, used elsewhere on this page only for
+// `now`). `zone` non-null is a traveler-declared real timezone for this
+// specific leg (Transport-only, e.g. a flight's arrival airport) -- the
+// stored value is then a real UTC instant, converted through that zone.
+function formatHHMM(date: Date, zone: string | null): string {
+  const { hour, minute } = entryEndpointClockTime(date, zone);
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
@@ -56,11 +64,11 @@ function formatHHMM(date: Date): string {
 function laneSegmentLabel(segment: TimelineLaneSegment): string {
   if (segment.isStart) {
     const word = segment.entryType === 'TRANSPORT' ? 'Departure' : segment.entryType === 'STAY' ? 'Check-in' : 'Start';
-    return `${segment.title} · ${word} ${formatHHMM(segment.startAt)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, segment.startTimezone)}`;
   }
   if (segment.isEnd && segment.endAt) {
     const word = segment.entryType === 'TRANSPORT' ? 'Arrival' : segment.entryType === 'STAY' ? 'Check-out' : 'End';
-    return `${segment.title} · ${word} ${formatHHMM(segment.endAt)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, segment.endTimezone)}`;
   }
   return segment.title;
 }
@@ -120,6 +128,8 @@ export default async function TimelinePage({ params }: PageProps) {
     title: entry.title,
     startAt: entry.startAt,
     endAt: entry.endAt,
+    startTimezone: entry.startTimezone,
+    endTimezone: entry.endTimezone,
   }));
   const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
 

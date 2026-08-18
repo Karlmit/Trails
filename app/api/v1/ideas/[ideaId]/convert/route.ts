@@ -9,6 +9,7 @@ import { isForeignKeyViolationError, isRecordNotFoundError } from '@/lib/db-erro
 import { isUuid } from '@/lib/uuid';
 import { clearOrphanedExpenseDependents } from '@/lib/entry-types/shared-fields.schema';
 import {
+  applyEntryLegTimezones,
   CREATABLE_ENTRY_TYPES,
   CREATE_SCHEMAS,
   entryOutsideTripRangeError,
@@ -82,10 +83,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     throw err;
   }
 
+  const legError = applyEntryLegTimezones(entryType, parsed);
+  if (legError) return Errors.validation(legError);
+
   const trip = await prisma.trip.findUnique({ where: { id: idea.tripId } });
   if (!trip) return Errors.notFound('Trip not found');
 
-  const rangeError = entryOutsideTripRangeError(trip, parsed.startAt as Date, parsed.endAt ?? null);
+  const rangeError = entryOutsideTripRangeError(
+    trip,
+    parsed.startAt as Date,
+    parsed.endAt ?? null,
+    parsed.startTimezone ?? null,
+    parsed.endTimezone ?? null,
+  );
   if (rangeError) return Errors.validation(rangeError);
 
   // Same defensive clear as timeline-entries POST (FR-22).

@@ -3,9 +3,13 @@ import {
   computeTripStatus,
   dateKeyInTimezone,
   entryClockTime,
+  entryEndpointClockTime,
+  entryEndpointDateKey,
   formatEntryDateTime,
+  formatEntryEndpointDateTime,
   tripDurationDays,
   tripLocalNow,
+  zonedWallClockToUtc,
 } from '@/lib/trip-status';
 
 function dateOnly(iso: string): Date {
@@ -120,5 +124,57 @@ describe('tripLocalNow', () => {
     const localNow = tripLocalNow(new Date('2026-08-05T22:00:00.000Z'), 'Asia/Bangkok');
     expect(localNow.getUTCDate()).toBe(6);
     expect(localNow.getUTCHours()).toBe(5);
+  });
+});
+
+// spec-timeline-ux-and-timezone (correction): the inverse of tripLocalNow --
+// used only when a traveler declares a real timezone for one Transport leg.
+describe('zonedWallClockToUtc', () => {
+  it('is the exact inverse of tripLocalNow', () => {
+    const literalDigits = new Date('2026-08-05T15:00:00.000Z');
+    const realInstant = zonedWallClockToUtc(literalDigits, 'Asia/Bangkok');
+    // Reading the real instant back through the same zone must recover the
+    // exact literal digits we started with.
+    expect(tripLocalNow(realInstant, 'Asia/Bangkok').getTime()).toBe(literalDigits.getTime());
+  });
+
+  it('is a no-op for UTC', () => {
+    const literalDigits = new Date('2026-08-05T15:00:00.000Z');
+    expect(zonedWallClockToUtc(literalDigits, 'UTC').getTime()).toBe(literalDigits.getTime());
+  });
+
+  it('correctly handles a westbound zone where local clock time reads earlier than a naive read', () => {
+    // 15:00 literal digits, meant as 15:00 in America/Los_Angeles (UTC-7 in
+    // August) -- the real UTC instant is 22:00 the same day.
+    const literalDigits = new Date('2026-08-05T15:00:00.000Z');
+    const realInstant = zonedWallClockToUtc(literalDigits, 'America/Los_Angeles');
+    expect(realInstant.toISOString()).toBe('2026-08-05T22:00:00.000Z');
+  });
+});
+
+// spec-timeline-ux-and-timezone (correction): the shared zone-or-literal
+// resolver every display/day-bucketing call site uses for an Entry's own
+// startAt/endAt.
+describe('entryEndpointClockTime / entryEndpointDateKey / formatEntryEndpointDateTime', () => {
+  it('reads literally when zone is null (every type but an overridden Transport leg)', () => {
+    const date = new Date('2026-08-05T15:00:00.000Z');
+    expect(entryEndpointClockTime(date, null)).toEqual({ hour: 15, minute: 0 });
+    expect(entryEndpointDateKey(date, null)).toBe('2026-08-05');
+    expect(formatEntryEndpointDateTime(date, null)).toBe(formatEntryDateTime(date));
+  });
+
+  it('converts through the declared zone when non-null', () => {
+    // A real UTC instant of 09:00 reads as 16:00 in Asia/Bangkok (+7).
+    const date = new Date('2026-08-05T09:00:00.000Z');
+    expect(entryEndpointClockTime(date, 'Asia/Bangkok')).toEqual({ hour: 16, minute: 0 });
+    expect(entryEndpointDateKey(date, 'Asia/Bangkok')).toBe('2026-08-05');
+    expect(formatEntryEndpointDateTime(date, 'Asia/Bangkok')).toContain('16:00');
+  });
+
+  it('a zone conversion can roll the day-key forward relative to the literal UTC date', () => {
+    // 22:00 UTC is 05:00 the *next* day in Asia/Bangkok.
+    const date = new Date('2026-08-05T22:00:00.000Z');
+    expect(entryEndpointDateKey(date, null)).toBe('2026-08-05');
+    expect(entryEndpointDateKey(date, 'Asia/Bangkok')).toBe('2026-08-06');
   });
 });

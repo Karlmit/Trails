@@ -252,6 +252,60 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
     expect(res.status).toBe(400);
   });
 
+  // spec-timeline-ux-and-timezone (correction): a Transport leg's own
+  // declared timezone -- the user-reported correctness gap this closes.
+  it('creates a Transport entry with different departure/arrival timezones, storing the real UTC instant (201)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'TRANSPORT',
+          title: 'Flight to LA',
+          subtype: 'FLIGHT',
+          startAt: '2026-08-05T18:00:00.000Z', // literal 18:00, Tokyo departure
+          endAt: '2026-08-05T12:00:00.000Z', // literal 12:00, same literal day, LA arrival
+          startTimezone: 'Asia/Tokyo',
+          endTimezone: 'America/Los_Angeles',
+          locationName: 'Los Angeles International Airport',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    // Real instants: 09:00 UTC departure (Tokyo +9), 19:00 UTC arrival (LA
+    // -7 in August) -- a normal ~10h flight, even though the literal 12:00
+    // arrival clock time reads earlier than the literal 18:00 departure.
+    expect(body.startAt).toBe('2026-08-05T09:00:00.000Z');
+    expect(body.endAt).toBe('2026-08-05T19:00:00.000Z');
+    expect(body.startTimezone).toBe('Asia/Tokyo');
+    expect(body.endTimezone).toBe('America/Los_Angeles');
+  });
+
+  it('rejects a cross-timezone Transport whose real instants are still genuinely out of order (400)', async () => {
+    const res = await createEntry(
+      jsonRequest(
+        'http://localhost/api/v1/timeline-entries',
+        'POST',
+        {
+          tripId,
+          entryType: 'TRANSPORT',
+          title: 'Backwards flight',
+          subtype: 'FLIGHT',
+          startAt: '2026-08-05T15:00:00.000Z',
+          endAt: '2026-08-05T10:00:00.000Z',
+          startTimezone: 'UTC',
+          endTimezone: 'UTC',
+          locationName: 'Nowhere Airport',
+        },
+        token,
+      ),
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('creates a single-day Activity with no end datetime (201)', async () => {
     const res = await createEntry(
       jsonRequest(

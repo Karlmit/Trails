@@ -120,6 +120,19 @@ export const timezoneField = z
   .min(1, 'Timezone is required')
   .refine(isValidTimezone, { message: 'Must be a valid IANA timezone identifier' });
 
+// spec-timeline-ux-and-timezone (correction): TimelineEntry.startTimezone/
+// endTimezone -- unlike the Trip's own `timezoneField` above, always
+// optional and nullable (NULL is the meaningful default: "no override,
+// literal digits" -- see dateTimeField's comment), and Transport-only in
+// practice.
+export const entryTimezoneField = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isValidTimezone, { message: 'Must be a valid IANA timezone identifier' })
+  .optional()
+  .nullable();
+
 export const tripCreateSchema = z
   .object({
     name: z.string().trim().min(1, 'Name is required').max(200),

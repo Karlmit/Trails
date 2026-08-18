@@ -26,7 +26,7 @@ export default async function NewEntryPage({ params }: PageProps) {
         </Link>
       </div>
       <p className="text-soft">Stay, Transport, Activity, or Note -- pick a type below.</p>
-      <EntryForm tripId={tripId} mode="create" />
+      <EntryForm tripId={tripId} mode="create" tripTimezone={trip.timezone} />
     </main>
   );
 }

@@ -8,13 +8,16 @@
 // boundary) -- this recomputes from the raw Entry rows on every call.
 
 import { sectionIndexForDateKey, type SectionRange } from '@/lib/timeline';
-import { dateKeyOfDateColumn } from '@/lib/trip-status';
+import { entryEndpointDateKey } from '@/lib/trip-status';
 
 export interface BudgetEntryInput {
   id: string;
   entryType: string;
   title: string;
   startAt: Date;
+  // spec-timeline-ux-and-timezone (correction): NULL for every type but
+  // Transport -- see TimelineEntry.startTimezone's own schema comment.
+  startTimezone: string | null;
   // Both required here -- the caller (the page) only ever passes rows it
   // already queried with `expenseAmount: { not: null }`, and FR-22's "both
   // or neither" rule (lib/entry-types/shared-fields.schema.ts's
@@ -68,7 +71,7 @@ export function deriveLineItems(
   sections: BudgetSectionInput[],
 ): BudgetLineItem[] {
   return entries.map((entry) => {
-    const dateKey = dateKeyOfDateColumn(entry.startAt);
+    const dateKey = entryEndpointDateKey(entry.startAt, entry.startTimezone);
     const sectionIndex = sectionIndexForDateKey(dateKey, sections);
     return {
       ...entry,

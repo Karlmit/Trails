@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dateTimeField, isDateTimeOrderValid } from '@/lib/validation';
+import { dateTimeField, entryTimezoneField, isDateTimeOrderValid } from '@/lib/validation';
 import {
   bookedViaField,
   bookingReferenceField,
@@ -50,6 +50,16 @@ const transportFieldsShape = {
   // the code comment in lib/entry-types/shared-fields.schema.ts.
   startAt: dateTimeField,
   endAt: dateTimeField,
+  // spec-timeline-ux-and-timezone (correction): NULL (default) means
+  // startAt/endAt above are literal digits, no real timezone attached at
+  // all (dateTimeField's comment) -- exactly like every other type. Set
+  // only when departure and arrival airports are in different real
+  // timezones; the Route Handler (not this schema) applies it, since the
+  // order check below needs a real, correctly-computed instant to compare
+  // (a long-haul flight can land at a literal clock time earlier than it
+  // departed).
+  startTimezone: entryTimezoneField,
+  endTimezone: entryTimezoneField,
   ...locationFields,
   // spec-entry-fields-datepickers: same override as stay.schema.ts -- see
   // its comment. locationFields itself stays untouched.
@@ -79,7 +89,14 @@ export const transportFieldsSchema = z.object(transportFieldsShape).strict();
 export const transportCreateSchema = z
   .object({ tripId: z.string().uuid('tripId must be a valid UUID'), ...transportFieldsShape })
   .strict()
-  .refine((data) => isDateTimeOrderValid(data.startAt, data.endAt), {
+  // spec-timeline-ux-and-timezone (correction): skipped whenever either leg
+  // declares a real timezone -- startAt/endAt are still the naive,
+  // pre-conversion digits at this point, so a same-schema comparison can't
+  // tell a genuinely-invalid pair from a perfectly normal long-haul flight
+  // whose arrival *local clock time* reads earlier than its departure's.
+  // The Route Handler re-checks order itself (mergedDateOrderError) after
+  // applying startTimezone/endTimezone, once real instants exist to compare.
+  .refine((data) => (data.startTimezone || data.endTimezone ? true : isDateTimeOrderValid(data.startAt, data.endAt)), {
     message: 'Arrival must be later than departure',
     path: ['endAt'],
   })

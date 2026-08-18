@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { computeTripStatus, dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
+import { computeTripStatus, dateKeyInTimezone, entryEndpointDateKey } from '@/lib/trip-status';
 import { sectionIndexForDateKey } from '@/lib/timeline';
 import { timelineVisibleEntryWhere, entryDetailHref } from '@/lib/entry-types';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
@@ -19,17 +19,20 @@ interface TravelModeEntryRow {
   title: string;
   startAt: Date;
   endAt: Date | null;
+  startTimezone: string | null;
   locationName: string | null;
   locationAddress: string | null;
 }
 
 // An Entry's own recorded startAt is its literal wall-clock digits (see
-// dateTimeField's comment) -- pinned to UTC explicitly here so the
-// formatted time is always exactly what the traveler typed, never
-// re-localized through the Trip's own declared timezone.
-function formatEntryTime(date: Date): string {
+// dateTimeField's comment) by default -- `zone` null pins the format to UTC
+// explicitly so it's always exactly what the traveler typed, never
+// re-localized through the Trip's own declared timezone. `zone` non-null
+// (Transport only, e.g. a flight's departure airport) means the stored
+// value is a real UTC instant, converted through that zone instead.
+function formatEntryTime(date: Date, zone: string | null): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
+    timeZone: zone ?? 'UTC',
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -90,6 +93,7 @@ export default async function TravelModePage({ params }: PageProps) {
         title: true,
         startAt: true,
         endAt: true,
+        startTimezone: true,
         locationName: true,
         locationAddress: true,
       },
@@ -115,7 +119,7 @@ export default async function TravelModePage({ params }: PageProps) {
   // localized to the Trip's own timezone), rendered as a simple list on
   // this page rather than a separate route.
   const todaysEntries = entries
-    .filter((entry) => dateKeyOfDateColumn(entry.startAt) === todayKey)
+    .filter((entry) => entryEndpointDateKey(entry.startAt, entry.startTimezone) === todayKey)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   function EntryRow({ entry }: { entry: TravelModeEntryRow }) {
@@ -127,7 +131,7 @@ export default async function TravelModePage({ params }: PageProps) {
           <span className="text-soft">
             {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
             {entry.subtype ? ` · ${subtypeLabel(entry.subtype)}` : ''} ·{' '}
-            {formatEntryTime(entry.startAt)}
+            {formatEntryTime(entry.startAt, entry.startTimezone)}
           </span>
         </div>
         {mapsUrl && (

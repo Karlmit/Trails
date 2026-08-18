@@ -76,6 +76,8 @@ export function serializeTimelineEntry(entry: TimelineEntry) {
     description: entry.description,
     startAt: entry.startAt.toISOString(),
     endAt: entry.endAt ? entry.endAt.toISOString() : null,
+    startTimezone: entry.startTimezone,
+    endTimezone: entry.endTimezone,
     locationName: entry.locationName,
     locationAddress: entry.locationAddress,
     locationLat: decimalToNumber(entry.locationLat),

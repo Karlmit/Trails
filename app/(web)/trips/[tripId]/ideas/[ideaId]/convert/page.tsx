@@ -21,6 +21,9 @@ export default async function ConvertIdeaPage({ params }: PageProps) {
   const idea = await prisma.idea.findUnique({ where: { id: ideaId } });
   if (!idea || idea.tripId !== tripId) notFound();
 
+  const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+  if (!trip) notFound();
+
   const dto = serializeIdea(idea);
 
   return (
@@ -39,6 +42,7 @@ export default async function ConvertIdeaPage({ params }: PageProps) {
       <EntryForm
         tripId={tripId}
         mode="create"
+        tripTimezone={trip.timezone}
         initialValues={{
           title: dto.title,
           locationName: dto.locationName,

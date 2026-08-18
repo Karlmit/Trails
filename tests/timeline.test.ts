@@ -154,7 +154,7 @@ describe('buildTimelineDays (FR-8)', () => {
 // each other within a lane.
 describe('layoutTimelineEntries (FR-11..FR-15)', () => {
   function entry(overrides: Partial<EntryForLayout> & Pick<EntryForLayout, 'id' | 'title' | 'startAt'>): EntryForLayout {
-    return { entryType: 'ACTIVITY', subtype: null, endAt: null, ...overrides };
+    return { entryType: 'ACTIVITY', subtype: null, endAt: null, startTimezone: null, endTimezone: null, ...overrides };
   }
 
   it('renders a single-day entry (no endAt) as a dot, not a lane pill', () => {
@@ -378,6 +378,33 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
 
     expect(laneCount).toBe(0);
     expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots.map((d) => d.id)).toEqual(['a1']);
+  });
+
+  // spec-timeline-ux-and-timezone (correction): a Transport leg's own
+  // declared timezone (startTimezone/endTimezone) is the one exception --
+  // its real UTC instant is converted through that zone for day-bucketing,
+  // unlike every naive (zone: null) entry above.
+  it("buckets a Transport leg by its own declared timezone's calendar date, not the literal UTC date", () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({
+        id: 'flight-1',
+        entryType: 'TRANSPORT',
+        title: 'Overnight flight',
+        // Real instant 22:00 UTC on Aug 3 -- Asia/Bangkok (+7) reads it as
+        // 05:00 Aug 4.
+        startAt: new Date('2026-08-03T22:00:00.000Z'),
+        endAt: new Date('2026-08-03T22:30:00.000Z'),
+        startTimezone: 'Asia/Bangkok',
+        endTimezone: 'Asia/Bangkok',
+      }),
+    ];
+
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
+
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots).toHaveLength(0);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-04')!.dots.map((d) => d.id)).toEqual(['flight-1']);
   });
 
   it('drops an entry dated entirely outside the Trip range rather than crashing', () => {

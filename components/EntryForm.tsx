@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
 import { DateTimeInput } from '@/components/DateTimeInput';
+import { TimezoneSelect } from '@/components/TimezoneSelect';
 import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
+import { entryEndpointClockTime, entryEndpointDateKey } from '@/lib/trip-status';
 
 export type CreatableEntryType = 'STAY' | 'TRANSPORT' | 'ACTIVITY' | 'NOTE';
 
@@ -17,6 +19,10 @@ export interface EntryDTO {
   description: string | null;
   startAt: string;
   endAt: string | null;
+  // spec-timeline-ux-and-timezone (correction): NULL for every type but
+  // Transport -- see TimelineEntry.startTimezone's own schema comment.
+  startTimezone: string | null;
+  endTimezone: string | null;
   locationName: string | null;
   locationAddress: string | null;
   locationMapLink: string | null;
@@ -39,6 +45,10 @@ export interface EntryDTO {
 interface EntryFormProps {
   tripId: string;
   mode: 'create' | 'edit';
+  // spec-timeline-ux-and-timezone (correction): seeds Transport's own
+  // Departure/Arrival timezone pickers when neither is already set on
+  // `entry` -- every other type ignores this entirely (no picker shown).
+  tripTimezone: string;
   entry?: EntryDTO;
   // spec-ideas (FR-17): pre-fills a *create*-mode form (e.g. from an Idea's
   // title/estimated expense) without supplying a full EntryDTO -- ignored
@@ -56,25 +66,42 @@ interface EntryFormProps {
 const ENTRY_TYPES: CreatableEntryType[] = ['STAY', 'TRANSPORT', 'ACTIVITY', 'NOTE'];
 
 // `DateTimeInput` (and the raw `startAt`/`endAt` state it drives) works
-// entirely in `YYYY-MM-DDTHH:mm` literal digits -- an Entry's own recorded
-// time is never converted through any timezone, the browser's or the
-// Trip's own (see dateTimeField's comment for why). Pre-filling the edit
-// form must read those literal digits back with UTC getters, not local
-// ones -- a local read here would show the wrong clock time to anyone
-// editing from a browser set to a different timezone than whoever created
-// the Entry, and silently shift the value if they saved without noticing.
-function toDateTimeLocal(iso: string | null): string {
+// entirely in `YYYY-MM-DDTHH:mm` literal digits. `zone` is null for every
+// type but Transport -- an Entry's own recorded time is then never
+// converted through any timezone, the browser's or the Trip's own (see
+// dateTimeField's comment for why), so pre-filling the edit form must read
+// those literal digits back with UTC getters, not local ones -- a local
+// read here would show the wrong clock time to anyone editing from a
+// browser set to a different timezone than whoever created the Entry, and
+// silently shift the value if they saved without noticing. `zone` non-null
+// (Transport only, e.g. a flight's arrival airport) means the stored value
+// is a real UTC instant that must be converted through that same zone to
+// recover the correct pre-fill -- entryEndpointDateKey/entryEndpointClockTime
+// (lib/trip-status.ts) resolve both cases identically to how the Timeline/
+// EntryDetailPanel display them.
+function toDateTimeLocal(iso: string | null, zone: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
+  const dateKey = entryEndpointDateKey(date, zone);
+  const { hour, minute } = entryEndpointClockTime(date, zone);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  return `${dateKey}T${pad(hour)}:${pad(minute)}`;
 }
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved, onCancel }: EntryFormProps) {
+export function EntryForm({
+  tripId,
+  mode,
+  tripTimezone,
+  entry,
+  initialValues,
+  apiUrl,
+  onSaved,
+  onCancel,
+}: EntryFormProps) {
   const router = useRouter();
   // `entry` (edit mode) always wins; `initialValues` only ever seeds a
   // create-mode form (spec-ideas' convert step).
@@ -83,8 +110,14 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
   const [subtype, setSubtype] = useState(seed?.subtype ?? '');
   const [title, setTitle] = useState(seed?.title ?? '');
   const [description, setDescription] = useState(seed?.description ?? '');
-  const [startAt, setStartAt] = useState(toDateTimeLocal(seed?.startAt ?? null));
-  const [endAt, setEndAt] = useState(toDateTimeLocal(seed?.endAt ?? null));
+  // spec-timeline-ux-and-timezone (correction): Transport-only pickers,
+  // defaulting to the Trip's own timezone -- "it should default to the
+  // Trip's timezone, but a few times we need to define it" (e.g. a
+  // flight's departure and arrival airports in different real zones).
+  const [startTimezone, setStartTimezone] = useState(seed?.startTimezone ?? tripTimezone);
+  const [endTimezone, setEndTimezone] = useState(seed?.endTimezone ?? tripTimezone);
+  const [startAt, setStartAt] = useState(toDateTimeLocal(seed?.startAt ?? null, seed?.startTimezone ?? null));
+  const [endAt, setEndAt] = useState(toDateTimeLocal(seed?.endAt ?? null, seed?.endTimezone ?? null));
   const [locationName, setLocationName] = useState(seed?.locationName ?? '');
   const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
   const [locationMapLink, setLocationMapLink] = useState(seed?.locationMapLink ?? '');
@@ -256,6 +289,17 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
         seat: seat || null,
         baggageInfo: baggageInfo || null,
       };
+      // spec-timeline-ux-and-timezone (correction): only Transport's own
+      // schema accepts these fields -- every other type's `.strict()`
+      // schema would 400 on an unexpected key, so this must stay inside
+      // the TRANSPORT branch. Sent as the picker's own IANA string (never
+      // `''`, which TimezoneSelect emits only mid-typing before a
+      // selection commits -- falls back to the Trip's own timezone so an
+      // in-progress, uncommitted edit never accidentally submits a blank
+      // zone); the Route Handler computes the real UTC instant from this
+      // plus the literal `startAt`/`endAt` above.
+      body.startTimezone = startTimezone || tripTimezone;
+      body.endTimezone = endTimezone || tripTimezone;
     }
 
     if (mode === 'create') {
@@ -388,6 +432,25 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
           </div>
         )}
       </div>
+
+      {entryType === 'TRANSPORT' && (
+        // spec-timeline-ux-and-timezone (correction): "it should default to
+        // the Trip's timezone, but a few times we need to define it -- for
+        // example flights, as some flights start in one timezone and end up
+        // in another." Both default to the Trip's own timezone (seeded
+        // above) and are only ever shown for Transport -- every other type
+        // implicitly uses the Trip's timezone with no picker at all.
+        <div className="row">
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="entry-start-timezone">Departure timezone</label>
+            <TimezoneSelect id="entry-start-timezone" initialValue={startTimezone} onChange={setStartTimezone} required />
+          </div>
+          <div className="field" style={{ flex: 1 }}>
+            <label htmlFor="entry-end-timezone">Arrival timezone</label>
+            <TimezoneSelect id="entry-end-timezone" initialValue={endTimezone} onChange={setEndTimezone} required />
+          </div>
+        </div>
+      )}
 
       {showLocation && (
         <>

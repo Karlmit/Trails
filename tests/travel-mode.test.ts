@@ -26,6 +26,7 @@ function entry(overrides: Partial<TravelModeEntry> & { id: string; entryType: st
   return {
     startAt: new Date('2026-08-10T10:00:00.000Z'),
     endAt: null,
+    startTimezone: null,
     ...overrides,
   };
 }
@@ -239,6 +240,28 @@ describe('findNextByType (I/O matrix: nothing left today / next per category)', 
     const activity = entry({ id: 'act-1', entryType: 'ACTIVITY', startAt: new Date('2026-08-10T15:00:00.000Z') });
     expect(findNextByType([activity], localNow, 'UTC')?.id).toBe('act-1');
     expect(findNextByType([activity], localNow, 'Asia/Bangkok')).toBeNull();
+  });
+
+  // spec-timeline-ux-and-timezone (correction): a Transport leg with a real
+  // declared startTimezone stores a real UTC instant -- comparing it
+  // against `now` re-projected through the Trip's own (unrelated) timezone
+  // would be wrong. It must compare against the real, un-projected `now`
+  // instead, unlike every naive (startTimezone: null) entry.
+  it("compares a Transport leg's real instant against the real `now`, not the Trip-timezone-projected one", () => {
+    const now = new Date('2026-08-10T11:00:00.000Z');
+    // Real instant is 12:00 UTC -- 1 hour after `now`, so still "next"
+    // regardless of the Trip's own declared timezone.
+    const transport = entry({
+      id: 'flight-1',
+      entryType: 'TRANSPORT',
+      startAt: new Date('2026-08-10T12:00:00.000Z'),
+      startTimezone: 'Asia/Tokyo',
+    });
+    // Under the old (buggy) naive comparison, Trip tz Bangkok (+7) would
+    // project `now` to 18:00, which is *after* the flight's real 12:00
+    // instant, wrongly excluding it.
+    expect(findNextByType([transport], now, 'Asia/Bangkok', 'TRANSPORT')?.id).toBe('flight-1');
+    expect(findNextByType([transport], now, 'UTC', 'TRANSPORT')?.id).toBe('flight-1');
   });
 });
 

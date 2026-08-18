@@ -64,7 +64,13 @@ export default async function EntryDetailPage({ params }: PageProps) {
       <Link href={`/trips/${tripId}/timeline`} className="text-soft">
         Back to Timeline
       </Link>
-      <EntryDetailPanel tripId={tripId} entry={dto} readOnly={viewer.type === 'guest'} photos={photos} />
+      <EntryDetailPanel
+        tripId={tripId}
+        entry={dto}
+        readOnly={viewer.type === 'guest'}
+        photos={photos}
+        tripTimezone={trip.timezone}
+      />
     </main>
   );
 }

@@ -1,7 +1,7 @@
 import type { EntrySubtype, Prisma } from '@prisma/client';
 import type { z } from 'zod';
 import { isDateTimeOrderValid } from '@/lib/validation';
-import { dateKeyOfDateColumn } from '@/lib/trip-status';
+import { dateKeyOfDateColumn, entryEndpointDateKey, zonedWallClockToUtc } from '@/lib/trip-status';
 import { activityCreateSchema, activityUpdateSchema } from './activity.schema';
 import { blogPostCreateSchema, blogPostUpdateSchema } from './blog-post.schema';
 import { noteCreateSchema, noteUpdateSchema } from './note.schema';
@@ -95,6 +95,13 @@ export interface ParsedEntryFields {
   subtype?: string;
   startAt?: Date;
   endAt?: Date | null;
+  // spec-timeline-ux-and-timezone (correction): only Transport's own schema
+  // ever populates these (a flight's departure/arrival airports in
+  // different real zones) -- every other type's parsed output simply never
+  // sets them, so toEntryCreateData/toEntryUpdateData's generic
+  // `?? null`/`!== undefined` handling below applies unchanged.
+  startTimezone?: string | null;
+  endTimezone?: string | null;
   locationName?: string | null;
   locationAddress?: string | null;
   locationLat?: number | null;
@@ -132,6 +139,8 @@ export function toEntryCreateData(entryType: CreatableEntryType, parsed: ParsedE
     description: parsed.description ?? null,
     startAt: parsed.startAt as Date,
     endAt: parsed.endAt ?? null,
+    startTimezone: parsed.startTimezone ?? null,
+    endTimezone: parsed.endTimezone ?? null,
     locationName: parsed.locationName ?? null,
     locationAddress: parsed.locationAddress ?? null,
     locationLat: parsed.locationLat ?? null,
@@ -175,6 +184,8 @@ export function toEntryUpdateData(parsed: ParsedEntryFields) {
     ...(parsed.subtype !== undefined && { subtype: parsed.subtype as EntrySubtype }),
     ...(parsed.startAt !== undefined && { startAt: parsed.startAt }),
     ...(parsed.endAt !== undefined && { endAt: parsed.endAt }),
+    ...(parsed.startTimezone !== undefined && { startTimezone: parsed.startTimezone }),
+    ...(parsed.endTimezone !== undefined && { endTimezone: parsed.endTimezone }),
     ...(parsed.locationName !== undefined && { locationName: parsed.locationName }),
     ...(parsed.locationAddress !== undefined && { locationAddress: parsed.locationAddress }),
     ...(parsed.locationLat !== undefined && { locationLat: parsed.locationLat }),
@@ -231,6 +242,54 @@ export function mergedDateOrderError(
       : 'End must be on or after the start';
   }
   return null; // NOTE and BLOG_POST never have an endAt (no schema field for it).
+}
+
+/**
+ * Applies a Transport leg's own declared timezone (if any) to `parsed`,
+ * mutating `startAt`/`endAt` in place into the real, correctly-computed UTC
+ * instant those literal digits actually represent -- then re-checks
+ * start/end order against that real instant, since a long-haul flight can
+ * have an arrival *local clock time* earlier than its departure's, which
+ * the naive same-schema `.refine()` (transport.schema.ts) deliberately
+ * skips whenever a zone is set, deferring to this check instead. No-op
+ * (and no error) for every other entry type, and for a Transport that never
+ * set startTimezone/endTimezone -- the same naive-literal path every type
+ * already uses. Called by both `POST /api/v1/timeline-entries` and
+ * `POST /api/v1/ideas/[ideaId]/convert` right after parsing, before the
+ * Trip-range check (which must see the corrected instant too).
+ */
+export function applyEntryLegTimezones(entryType: CreatableEntryType, parsed: ParsedEntryFields): string | null {
+  if (entryType !== 'TRANSPORT') return null;
+  if (parsed.startTimezone && parsed.startAt) {
+    parsed.startAt = zonedWallClockToUtc(parsed.startAt, parsed.startTimezone);
+  }
+  if (parsed.endTimezone && parsed.endAt) {
+    parsed.endAt = zonedWallClockToUtc(parsed.endAt, parsed.endTimezone);
+  }
+  if (parsed.endAt) {
+    return mergedDateOrderError(entryType, parsed.startAt as Date, parsed.endAt);
+  }
+  return null;
+}
+
+/**
+ * Same zone-correction as `applyEntryLegTimezones`, for a PATCH: applies
+ * only to whichever of startAt/endAt was actually resubmitted alongside its
+ * own timezone *in this same request* -- there is no support for a
+ * zone-only PATCH re-deriving a new instant from the already-stored one
+ * (EntryForm always resubmits the whole field pair together, so this never
+ * limits the actual UI). The caller's own existing merge-then-
+ * `mergedDateOrderError` logic (app/api/v1/timeline-entries/[entryId]/route.ts)
+ * picks up the corrected value unchanged.
+ */
+export function applyEntryLegTimezonesForUpdate(entryType: CreatableEntryType, parsed: ParsedEntryFields): void {
+  if (entryType !== 'TRANSPORT') return;
+  if (parsed.startAt !== undefined && parsed.startTimezone) {
+    parsed.startAt = zonedWallClockToUtc(parsed.startAt, parsed.startTimezone);
+  }
+  if (parsed.endAt && parsed.endTimezone) {
+    parsed.endAt = zonedWallClockToUtc(parsed.endAt, parsed.endTimezone);
+  }
 }
 
 /**
@@ -308,6 +367,8 @@ export function entryOutsideTripRangeError(
   trip: { startDate: Date; endDate: Date },
   startAt: Date,
   endAt: Date | null,
+  startTimezone: string | null = null,
+  endTimezone: string | null = null,
 ): string | null {
   const tripStartKey = dateKeyOfDateColumn(trip.startDate);
   const tripEndKey = dateKeyOfDateColumn(trip.endDate);
@@ -315,13 +376,15 @@ export function entryOutsideTripRangeError(
   // An Entry's own recorded startAt/endAt is its literal calendar date --
   // never re-localized through the Trip's timezone (see dateTimeField's
   // comment) -- so this is a plain UTC day-key, the same one
-  // layoutTimelineEntries/deriveLineItems use for the same field.
-  const startKey = dateKeyOfDateColumn(startAt);
+  // layoutTimelineEntries/deriveLineItems use for the same field, UNLESS a
+  // traveler declared a specific real timezone for this leg (Transport
+  // only -- entryEndpointDateKey resolves both cases).
+  const startKey = entryEndpointDateKey(startAt, startTimezone);
   if (startKey < tripStartKey || startKey > tripEndKey) {
     return `Start must fall within the Trip's dates (${tripStartKey} to ${tripEndKey})`;
   }
   if (endAt) {
-    const endKey = dateKeyOfDateColumn(endAt);
+    const endKey = entryEndpointDateKey(endAt, endTimezone);
     if (endKey < tripStartKey || endKey > tripEndKey) {
       return `End must fall within the Trip's dates (${tripStartKey} to ${tripEndKey})`;
     }

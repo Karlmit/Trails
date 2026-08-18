@@ -101,6 +101,68 @@ export function tripLocalNow(now: Date, timezone: string): Date {
 }
 
 /**
+ * The inverse of `tripLocalNow`: given literal wall-clock digits (as a Date
+ * whose UTC-read components carry them, e.g. from `dateTimeField`) and the
+ * IANA timezone those digits are actually meant to represent, returns the
+ * real UTC instant they correspond to. Used only when a traveler has
+ * explicitly declared a specific timezone for one leg of a Transport Entry
+ * (e.g. a flight's departure and arrival airports are in different real
+ * zones) -- every other Entry field stays untouched, literal digits with no
+ * real timezone attached at all (see `dateTimeField`'s comment).
+ *
+ * Implemented by iterative refinement (the standard technique absent a
+ * timezone-database library): guess the instant is the literal digits
+ * read as UTC, check what those digits actually read as in the target
+ * zone, and correct by the difference. Converges in at most two passes for
+ * every real-world case; the only inherent ambiguity (a wall-clock time
+ * that either repeats or never occurs, in the ~1-hour window around a DST
+ * transition) is a property of the zone itself, not this function.
+ */
+export function zonedWallClockToUtc(literalDigits: Date, timezone: string): Date {
+  let guess = literalDigits.getTime();
+  for (let i = 0; i < 3; i += 1) {
+    const guessedInZone = tripLocalNow(new Date(guess), timezone);
+    const diff = literalDigits.getTime() - guessedInZone.getTime();
+    if (diff === 0) break;
+    guess += diff;
+  }
+  return new Date(guess);
+}
+
+/**
+ * Resolves the hour/minute to display for one endpoint (start or end) of an
+ * Entry's own recorded time. `zone`, when set, is a traveler-declared real
+ * IANA timezone for this specific leg (Transport-only, e.g. a flight's
+ * arrival airport) -- the stored value is then a real UTC instant that must
+ * be converted through that zone to recover the intended wall-clock digits.
+ * `zone` absent (the default, and the only option for every non-Transport
+ * type) means the stored value already *is* the literal digits -- read with
+ * `entryClockTime`, zero conversion.
+ */
+export function entryEndpointClockTime(date: Date, zone: string | null): { hour: number; minute: number } {
+  return zone ? timeOfDayInTimezone(date, zone) : entryClockTime(date);
+}
+
+/** Same `zone`-aware resolution as `entryEndpointClockTime`, for the day key. */
+export function entryEndpointDateKey(date: Date, zone: string | null): string {
+  return zone ? dateKeyInTimezone(date, zone) : dateKeyOfDateColumn(date);
+}
+
+/** Same `zone`-aware resolution as `entryEndpointClockTime`, for display formatting. */
+export function formatEntryEndpointDateTime(date: Date, zone: string | null): string {
+  if (!zone) return formatEntryDateTime(date);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
+/**
  * Computes Trip Status (FR-2) from the Trip's start/end dates relative to
  * "today" in the Trip's own timezone. Never manually overridable.
  */

@@ -9,6 +9,7 @@ import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
 import { clearOrphanedExpenseDependents } from '@/lib/entry-types/shared-fields.schema';
 import {
+  applyEntryLegTimezones,
   CREATABLE_ENTRY_TYPES,
   CREATE_SCHEMAS,
   entryOutsideTripRangeError,
@@ -77,11 +78,20 @@ export async function POST(request: NextRequest) {
     throw err;
   }
 
+  const legError = applyEntryLegTimezones(entryType, parsed);
+  if (legError) return Errors.validation(legError);
+
   const tripId = parsed.tripId as string;
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip) return Errors.notFound('Trip not found');
 
-  const rangeError = entryOutsideTripRangeError(trip, parsed.startAt as Date, parsed.endAt ?? null);
+  const rangeError = entryOutsideTripRangeError(
+    trip,
+    parsed.startAt as Date,
+    parsed.endAt ?? null,
+    parsed.startTimezone ?? null,
+    parsed.endTimezone ?? null,
+  );
   if (rangeError) return Errors.validation(rangeError);
 
   // FR-22: an Expense amount+currency pair passed `hasExpensePair` above

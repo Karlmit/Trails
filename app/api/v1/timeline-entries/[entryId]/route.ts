@@ -11,6 +11,7 @@ import { isUuid } from '@/lib/uuid';
 import { clearOrphanedExpenseDependents, hasExpensePair } from '@/lib/entry-types/shared-fields.schema';
 import {
   UPDATE_SCHEMAS,
+  applyEntryLegTimezonesForUpdate,
   entryOutsideTripRangeError,
   isCreatableEntryType,
   mergedDateOrderError,
@@ -100,6 +101,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     throw err;
   }
 
+  // spec-timeline-ux-and-timezone (correction): applied before the merge
+  // below, so a Transport leg's own declared timezone (resubmitted
+  // alongside its own startAt/endAt in this same PATCH -- see the
+  // function's own comment) is already the real, correctly-computed
+  // instant by the time order/range are checked.
+  applyEntryLegTimezonesForUpdate(entryType, parsed);
+
   // Merge-before-checking-order, same pattern as Section/Trip PATCH so a
   // one-field PATCH can never invert the pair.
   const mergedStartAt = parsed.startAt ?? existing.startAt;
@@ -112,7 +120,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   // Timeline (layoutTimelineEntries defensively drops it).
   const trip = await prisma.trip.findUnique({ where: { id: existing.tripId } });
   if (!trip) return Errors.notFound('Trip not found');
-  const rangeError = entryOutsideTripRangeError(trip, mergedStartAt, mergedEndAt);
+  const mergedStartTimezone = parsed.startTimezone !== undefined ? parsed.startTimezone : existing.startTimezone;
+  const mergedEndTimezone = parsed.endTimezone !== undefined ? parsed.endTimezone : existing.endTimezone;
+  const rangeError = entryOutsideTripRangeError(
+    trip,
+    mergedStartAt,
+    mergedEndAt,
+    mergedStartTimezone,
+    mergedEndTimezone,
+  );
   if (rangeError) return Errors.validation(rangeError);
 
   // Same merge for the Expense pair (FR-22): amount and currency must
