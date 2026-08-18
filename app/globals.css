@@ -27,6 +27,15 @@
   --color-gold-light: #dfc49d;
   --color-gold-lightest: #faf6ee;
 
+  /* spec-timeline-visual-redesign: the Stay ribbon's two alternating tones
+     -- deliberately neutral (not drawn from the Section palette's coded
+     hues below) so the ribbon reads as a structural device, "you are
+     physically here," rather than another piece of color-coded metadata.
+     Two adjacent Stays are always visually distinguishable, including at a
+     same-day handoff. */
+  --stay-ribbon-a: #333d3a;
+  --stay-ribbon-b: #a1793f;
+
   /* Text */
   --color-text: rgba(0, 0, 0, 0.87);
   --color-text-soft: rgba(0, 0, 0, 0.58);
@@ -464,136 +473,120 @@ p {
   transform: scale(0.95);
 }
 
-/* Timeline -- git-graph-style spine (spec-timeline-ux-and-timezone).
-   Each day is a row split into a graph column (rail + node) and a content
-   column. Rows sit flush (the wrapping .stack uses gap: 0) so a rail
-   segment's bottom half meets the next row's top half with no seam. The
-   rail/node system is built generally enough that a future TimelineEntry
-   dot (single-day, on the spine) or line (multi-day, on an offset lane)
-   can slot into .timeline-graph later without restructuring this markup. */
-.timeline-row {
-  display: flex;
-  align-items: stretch;
+/* spec-timeline-visual-redesign: a CSS Grid, not stacked flex rows -- the
+   previous design's "lines end abruptly" complaint traced back to a
+   continuous-looking multi-day pill actually being N separately-styled
+   per-row segments faking continuity with border-radius tricks; any seam
+   between them (a 1px row border, a rounding mismatch) broke the illusion.
+   A Stay's ribbon is now one real grid item spanning `grid-row: start /
+   end+1` -- genuinely one continuous shape, and CSS Grid's implicit row
+   sizing (each row auto-sized to its tallest item) handles every day's own
+   variable content height with no client-side measurement at all.
+   Columns: date | one ribbon lane per column (usually just one) | content.
+   `.timeline-grid-row` is `display: contents` -- React needs one wrapping
+   element per day in the `.map()`, but the grid itself must see that day's
+   background/date/content cells as direct children, not nested one level
+   inside a wrapper that would otherwise become a single grid item itself. */
+.timeline-grid {
+  display: grid;
+  column-gap: var(--space-3);
+  row-gap: 0;
+}
+
+.timeline-grid-row {
+  display: contents;
+}
+
+.timeline-row-bg {
+  grid-column: 1 / -1;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   scroll-margin-top: 96px;
+  /* Section color-block (spec-sections-color-emoji): a filled background
+     block, not just a thin left border, so a multi-day Section reads as
+     one visually distinct block spanning its contiguous day-rows.
+     `background` deliberately has NO fallback value (review-caught
+     regression: a fallback here made every gap day -- no Section at all --
+     render as a solid opaque mint fill). `--band-color` is only ever set
+     inline when a day actually belongs to a Section; on any other day the
+     unresolved var() makes `background` invalid at compute time, which
+     resolves to its initial value (transparent). */
+  background: var(--band-color);
 }
 
-.timeline-row:first-child .timeline-rail-above,
-.timeline-row:last-child .timeline-rail-below {
-  display: none;
+.timeline-row-bg.is-today {
+  box-shadow: inset 3px 0 0 var(--color-gold);
 }
 
-.timeline-graph {
-  position: relative;
-  width: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Default (muted/discontinuous) rail: a thin dashed line -- a gap day, or
-   a Section boundary, never draws a solid connection across it. */
-.timeline-rail {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  border-left: 3px dashed rgba(0, 0, 0, 0.16);
-}
-
-.timeline-rail-above {
-  top: 0;
-  bottom: 50%;
-}
-
-.timeline-rail-below {
-  top: 50%;
-  bottom: 0;
-}
-
-/* Connected (continuous, same-Section) rail: solid and in that Section's
-   color -- the "rail visibly changes color/style at each transition"
-   acceptance criterion. */
-.timeline-rail.is-connected {
-  border-left-style: solid;
-  border-left-color: var(--rail-color, var(--color-brand-accent));
-}
-
-.timeline-node {
-  position: relative;
-  z-index: 1;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--node-color, rgba(0, 0, 0, 0.22));
-  border: 2px solid var(--color-canvas);
-}
-
-/* Today's node: a direct homage to GitKraken's dashed-ring HEAD marker --
-   larger, gold (the one reserved ceremonial accent per DESIGN.md), with a
-   dashed ring drawn around it via ::after rather than a solid halo. */
-.timeline-row.is-today .timeline-node {
-  width: 18px;
-  height: 18px;
-  background: var(--color-gold);
-}
-
-.timeline-row.is-today .timeline-node::after {
-  content: '';
-  position: absolute;
-  inset: -7px;
-  border: 2px dashed var(--color-gold);
-  border-radius: 50%;
-}
-
-.timeline-content {
-  position: relative;
-  display: flex;
-  gap: var(--space-4);
+.timeline-date-cell {
   padding: var(--space-3) 0;
-  flex: 1;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.timeline-row-bg.is-today + .timeline-date-cell {
+  color: var(--color-gold);
+}
+
+.timeline-content-cell {
+  position: relative;
+  padding: var(--space-3) 0;
   min-width: 0;
 }
 
-/* Section color-block redesign (spec-sections-color-emoji): a filled
-   background block (not just a thin left border) so a multi-day Section
-   reads as one visually distinct block spanning its contiguous day-rows,
-   with the left rail kept as an accent on top of it.
-
-   `background` deliberately has NO fallback value (review-caught
-   regression: a fallback here made every gap day -- no Section at all --
-   render as a solid opaque mint fill, indistinguishable from a real
-   Section block; that's not this class's job). `--band-color` is only ever
-   set inline when a day actually belongs to a Section
-   (app/(web)/trips/[tripId]/timeline/page.tsx); on any other day the
-   unresolved var() makes `background` invalid at compute time, which
-   resolves to its initial value (transparent) -- exactly the pre-this-spec
-   behavior. `border-left` keeps its original mint-line fallback -- that
-   thin accent on a gap day is pre-existing behavior this spec never
-   touched. */
-.timeline-section-band {
-  background: var(--band-color);
-  border-left: 6px solid var(--rail-accent-color, var(--band-color, var(--color-brand-mint)));
-  padding-left: var(--space-3);
+/* spec-timeline-visual-redesign: a Stay's own continuous "ribbon" -- the
+   one Entry Type that represents *being somewhere* for a span of days, so
+   it's the one type that gets a genuine multi-row visual object (grid-row
+   spans multiple day-rows as a single element, see the .timeline-grid
+   comment above). Rounded caps at both real ends (its own check-in/
+   check-out) give it a deliberately physical, luggage-tag-ribbon quality;
+   `.is-truncated` (its bottom end was shortened by one day to make room
+   for a handoff marker, see .timeline-handoff below) drops the bottom
+   rounding so the ribbon visually runs straight into the marker rather
+   than looking like it stopped early for no reason. */
+.timeline-ribbon {
+  grid-column: 2;
+  z-index: 1;
+  width: 100%;
+  margin: var(--space-3) 0;
+  background: var(--ribbon-color);
+  border-radius: 5px;
 }
 
-/* Reserves room for .timeline-section-label -- only on the specific
-   day-row that actually renders one (review-caught: previously applied to
-   .timeline-section-band unconditionally, wasting 96px on every other row
-   including gap days that will never show a label). */
-.timeline-section-band.has-section-label {
-  padding-right: calc(var(--space-3) + 96px);
+.timeline-ribbon.is-truncated {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
 }
 
-/* The Section's name+emoji label -- rendered once, on the first day-row of
-   a Section's contiguous run (day.connectsAbove === false), positioned in
-   the upper-right corner of that row's content area per the spec's Intent.
-   A solid pill (not transparent) so it stays legible over the translucent
-   color block, and sits above the row's own dot-list/current-marker
-   content (z-index) without participating in that content's flex layout
-   (position: absolute) -- verified live not to collide with
-   .timeline-current-marker (spec's Task 4 live-verification note). */
+/* spec-timeline-visual-redesign: the day two Stays meet -- one's
+   check-out, the next's check-in, both real (both TimelineDayLines still
+   render normally in the content column). Rather than force one ribbon to
+   visually "win" that day (the previous design's silent-data-loss bug),
+   it gets this small two-tone marker instead: a half-and-half circle,
+   outgoing Stay's color on top, incoming Stay's color on bottom -- read at
+   a glance as a hand-off, not a collision. */
+/* `align-self: start` + a top margin matching .timeline-ribbon's own --
+   a day's row is as tall as its (possibly multi-line) content, so
+   centering vertically would float this marker away from the one place it
+   actually needs to sit: exactly where the outgoing ribbon's shortened
+   bottom edge meets the incoming ribbon's top edge, both of which align to
+   this same row's top (that's what .timeline-ribbon's own margin does). */
+.timeline-handoff {
+  align-self: start;
+  justify-self: center;
+  /* Above .timeline-ribbon (z-index: 1) -- both the outgoing and incoming
+     ribbon occupy this exact grid cell too (the shared day), and DOM order
+     alone would let whichever renders later paint over this marker. */
+  z-index: 2;
+  margin-top: var(--space-3);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(to bottom, var(--handoff-color-a) 50%, var(--handoff-color-b) 50%);
+  border: 2px solid var(--color-canvas);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
 .timeline-section-label {
   position: absolute;
   top: var(--space-2);
@@ -625,17 +618,6 @@ p {
   text-overflow: ellipsis;
 }
 
-.timeline-day-date {
-  min-width: 84px;
-  flex-shrink: 0;
-  font-weight: 600;
-  color: var(--color-text-soft);
-}
-
-.timeline-row.is-today .timeline-day-date {
-  color: var(--color-gold);
-}
-
 .timeline-day-empty {
   color: var(--color-text-soft);
   font-style: italic;
@@ -651,6 +633,7 @@ p {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
 }
 
 .timeline-current-marker::before {
@@ -659,47 +642,6 @@ p {
   height: 10px;
   border-radius: 50%;
   background: var(--color-gold);
-}
-
-/* TimelineEntry rendering (spec-timeline-entries, FR-11..FR-15): a
-   single-day entry is a colored-dot "chip" in the day's content column
-   (below); a multi-day entry is a colored pill running down its own offset
-   lane, placed between the graph column and the Section band so it never
-   visually collides with the Section rail. */
-.timeline-lanes {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-  align-items: stretch;
-  /* A Trip with many simultaneous multi-day entries must scroll within its
-     own region instead of blowing out the page's horizontal layout -- the
-     inline width (laneCount * 12px, set per-row in the Timeline page) is
-     capped here rather than left unbounded. */
-  max-width: 160px;
-  overflow-x: auto;
-}
-
-.timeline-lane-segment,
-.timeline-lane-empty {
-  width: 8px;
-  flex-shrink: 0;
-}
-
-.timeline-lane-segment {
-  display: block;
-  background: var(--segment-color, var(--color-brand-accent));
-}
-
-.timeline-lane-segment.is-start {
-  border-top-left-radius: 4px;
-  border-top-right-radius: 4px;
-  margin-top: 6px;
-}
-
-.timeline-lane-segment.is-end {
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
-  margin-bottom: 6px;
 }
 
 .entry-dot-list {
@@ -730,24 +672,6 @@ p {
   flex-shrink: 0;
 }
 
-/* spec-timeline-at-a-glance: a real, visible text line for a multi-day
-   lane segment's own touched days (start/middle/end), rendered in the
-   day's content area alongside the existing dot list -- NOT a
-   replacement for, or a restyle of, the .timeline-lane-segment pill
-   itself (unchanged, still hover-only via title/aria-label). Reuses
-   .entry-chip's own layout (inline-flex, gap, font size) so it reads as a
-   natural extension of the dot-list pattern; the accent is a small
-   rounded-square bar (rather than .entry-chip-dot's circle) specifically
-   so a "this spans multiple days" line stays visually distinguishable
-   from a single-day dot at a glance, without inventing a heavier new
-   visual language. */
-.entry-chip-span-accent {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: var(--span-color, var(--color-brand-accent));
-  flex-shrink: 0;
-}
 
 .section-legend {
   display: flex;

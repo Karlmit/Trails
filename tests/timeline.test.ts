@@ -86,108 +86,47 @@ describe('buildTimelineDays (FR-8)', () => {
     const trip = { startDate: dateOnly('2026-08-10'), endDate: dateOnly('2026-08-01') };
     expect(() => buildTimelineDays(trip, [])).toThrow(/endDate.*precedes.*startDate/i);
   });
-
-  // spec-timeline-ux-and-timezone: graph-column rail connectivity is
-  // derived purely from neighboring days' sectionIndex -- continuous only
-  // when both sides share the same non-null Section.
-  describe('rail connectivity (connectsAbove/connectsBelow)', () => {
-    it('connects two adjacent days that share the same Section', () => {
-      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') };
-      const sections = [{ startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') }];
-      const days = buildTimelineDays(trip, sections);
-
-      const first = days.find((d) => d.dateKey === '2026-08-01')!;
-      const middle = days.find((d) => d.dateKey === '2026-08-02')!;
-      const last = days.find((d) => d.dateKey === '2026-08-03')!;
-
-      expect(first.connectsAbove).toBe(false); // no day before the range
-      expect(first.connectsBelow).toBe(true);
-      expect(middle.connectsAbove).toBe(true);
-      expect(middle.connectsBelow).toBe(true);
-      expect(last.connectsAbove).toBe(true);
-      expect(last.connectsBelow).toBe(false); // no day after the range
-    });
-
-    it('does not connect across a gap day (no Section on one or both sides)', () => {
-      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-03') };
-      const sections = [{ startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-01') }];
-      const days = buildTimelineDays(trip, sections);
-
-      const sectionDay = days.find((d) => d.dateKey === '2026-08-01')!;
-      const gapDay = days.find((d) => d.dateKey === '2026-08-02')!;
-      const anotherGapDay = days.find((d) => d.dateKey === '2026-08-03')!;
-
-      expect(sectionDay.connectsBelow).toBe(false);
-      expect(gapDay.connectsAbove).toBe(false);
-      expect(gapDay.connectsBelow).toBe(false);
-      expect(anotherGapDay.connectsAbove).toBe(false);
-    });
-
-    it('does not connect across a Section boundary (two different Sections, touching endpoints)', () => {
-      const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
-      const sections = [
-        { startDate: dateOnly('2026-08-03'), endDate: dateOnly('2026-08-07') },
-        { startDate: dateOnly('2026-08-07'), endDate: dateOnly('2026-08-10') },
-      ];
-      const days = buildTimelineDays(trip, sections);
-
-      const withinFirst = days.find((d) => d.dateKey === '2026-08-05')!;
-      const boundaryDay = days.find((d) => d.dateKey === '2026-08-07')!; // belongs to section 0 (FR-5)
-      const afterBoundary = days.find((d) => d.dateKey === '2026-08-08')!; // belongs to section 1
-
-      expect(withinFirst.connectsAbove).toBe(true);
-      expect(withinFirst.connectsBelow).toBe(true);
-      // The boundary day is attributed to section 0, but its neighbor
-      // (2026-08-08) belongs to section 1 -- different sectionIndex, so no
-      // connection renders across the boundary.
-      expect(boundaryDay.sectionIndex).toBe(0);
-      expect(boundaryDay.connectsAbove).toBe(true);
-      expect(boundaryDay.connectsBelow).toBe(false);
-      expect(afterBoundary.sectionIndex).toBe(1);
-      expect(afterBoundary.connectsAbove).toBe(false);
-    });
-  });
 });
 
-// spec-timeline-entries: FR-11..FR-15 rendering -- single-day entries are
-// dots, multi-day entries are pills on an offset lane, never overlapping
-// each other within a lane.
-describe('layoutTimelineEntries (FR-11..FR-15)', () => {
+// spec-timeline-visual-redesign: every Entry touching a day gets its own
+// line there, always -- a plain per-day array, never a lane-indexed "slot"
+// that a later entry could silently overwrite (the user-reported bug: a
+// Stay's own check-out day, or a Transport's own arrival day, disappearing
+// whenever another Entry happened to touch the same day).
+describe('layoutTimelineEntries -- per-day lines (no data loss on a shared day)', () => {
   function entry(overrides: Partial<EntryForLayout> & Pick<EntryForLayout, 'id' | 'title' | 'startAt'>): EntryForLayout {
     return { entryType: 'ACTIVITY', subtype: null, endAt: null, startTimezone: null, endTimezone: null, ...overrides };
   }
 
-  it('renders a single-day entry (no endAt) as a dot, not a lane pill', () => {
+  it('renders a single-day entry (no endAt) as one line, isStart and isEnd both true', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
     const days = buildTimelineDays(trip, []);
     const entries = [entry({ id: 'a1', title: 'Boat tour', startAt: new Date('2026-08-03T09:00:00.000Z') })];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
+    const { days: laidOut, stayRibbons } = layoutTimelineEntries(days, entries);
 
-    expect(laneCount).toBe(0);
+    expect(stayRibbons).toHaveLength(0);
     const day = laidOut.find((d) => d.dateKey === '2026-08-03')!;
-    expect(day.dots.map((d) => d.id)).toEqual(['a1']);
-    expect(laidOut.every((d) => d.laneSegments.length === 0)).toBe(true);
+    expect(day.lines.map((l) => l.entryId)).toEqual(['a1']);
+    expect(day.lines[0].isStart).toBe(true);
+    expect(day.lines[0].isEnd).toBe(true);
   });
 
-  // User-reported: a single-day Stay/Transport dot showed only its title,
-  // with no Check-in/Departure time at all -- carries startAt/startTimezone
-  // through so the Timeline page can render one (dotTimeLabel).
-  it('carries startAt/startTimezone through onto a single-day dot', () => {
+  it('carries startAt/startTimezone through onto a single-day line', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
     const days = buildTimelineDays(trip, []);
     const startAt = new Date('2026-08-03T09:00:00.000Z');
     const entries = [
-      entry({ id: 's1', entryType: 'STAY', title: 'Day-use Hotel', startAt, startTimezone: 'Asia/Bangkok' }),
+      entry({ id: 's1', entryType: 'STAY', title: 'Day-use Hotel', startAt, endAt: startAt, startTimezone: 'Asia/Bangkok' }),
     ];
 
     const { days: laidOut } = layoutTimelineEntries(days, entries);
-    const dot = laidOut.find((d) => d.dateKey === '2026-08-03')!.dots[0];
-    expect(dot.startAt).toEqual(startAt);
-    expect(dot.startTimezone).toBe('Asia/Bangkok');
+    const line = laidOut.find((d) => d.dateKey === '2026-08-03')!.lines[0];
+    expect(line.startAt).toEqual(startAt);
+    expect(line.startTimezone).toBe('Asia/Bangkok');
   });
 
-  it('renders an entry whose end equals its start as a dot (Activity point-in-time)', () => {
+  it('renders an entry whose end equals its start as one line (Activity point-in-time)', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
     const days = buildTimelineDays(trip, []);
     const entries = [
@@ -200,10 +139,10 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
     ];
 
     const { days: laidOut } = layoutTimelineEntries(days, entries);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots).toHaveLength(1);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.lines).toHaveLength(1);
   });
 
-  it('renders a multi-night Stay as one continuous pill, not separate dots', () => {
+  it('gives a multi-night Stay one line per day it spans, isStart only on the first, isEnd only on the last', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
     const days = buildTimelineDays(trip, []);
     const entries = [
@@ -216,56 +155,44 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
 
-    expect(laneCount).toBe(1);
     const spanned = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06'];
     for (const dateKey of spanned) {
       const day = laidOut.find((d) => d.dateKey === dateKey)!;
-      expect(day.laneSegments[0]?.entryId).toBe('s1');
-      expect(day.dots).toHaveLength(0);
+      expect(day.lines.map((l) => l.entryId)).toEqual(['s1']);
     }
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]?.isStart).toBe(true);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]?.isEnd).toBe(false);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-06')!.laneSegments[0]?.isEnd).toBe(true);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-06')!.laneSegments[0]?.isStart).toBe(false);
-    // Days outside the Stay's span carry no segment in that lane.
-    expect(laidOut.find((d) => d.dateKey === '2026-08-02')!.laneSegments[0]).toBeNull();
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.lines[0].isStart).toBe(true);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.lines[0].isEnd).toBe(false);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-06')!.lines[0].isEnd).toBe(true);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-06')!.lines[0].isStart).toBe(false);
+    // A day outside the Stay's span has no line for it at all.
+    expect(laidOut.find((d) => d.dateKey === '2026-08-02')!.lines).toHaveLength(0);
   });
 
-  // spec-timeline-at-a-glance: TimelineLaneSegment carries the entry's own
-  // startAt/endAt straight through (sourced from the same EntryForLayout
-  // already passed in, no new query) so the Timeline page can render a
-  // real "{title} · Check-in HH:MM"-style line, per-position, without a
-  // second lookup.
-  it('carries the entry startAt/endAt through onto every lane segment, unchanged across start/middle/end days', () => {
+  it('carries the entry startAt/endAt through onto every line, unchanged across start/middle/end days', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
     const days = buildTimelineDays(trip, []);
     const startAt = new Date('2026-08-03T14:00:00.000Z');
     const endAt = new Date('2026-08-06T11:00:00.000Z');
-    const entries = [
-      entry({
-        id: 's1',
-        entryType: 'STAY',
-        title: 'Beach Resort',
-        startAt,
-        endAt,
-      }),
-    ];
+    const entries = [entry({ id: 's1', entryType: 'STAY', title: 'Beach Resort', startAt, endAt })];
 
     const { days: laidOut } = layoutTimelineEntries(days, entries);
 
-    const startDay = laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]!;
-    const middleDay = laidOut.find((d) => d.dateKey === '2026-08-04')!.laneSegments[0]!;
-    const endDay = laidOut.find((d) => d.dateKey === '2026-08-06')!.laneSegments[0]!;
+    const startDay = laidOut.find((d) => d.dateKey === '2026-08-03')!.lines[0];
+    const middleDay = laidOut.find((d) => d.dateKey === '2026-08-04')!.lines[0];
+    const endDay = laidOut.find((d) => d.dateKey === '2026-08-06')!.lines[0];
 
-    for (const segment of [startDay, middleDay, endDay]) {
-      expect(segment.startAt).toEqual(startAt);
-      expect(segment.endAt).toEqual(endAt);
+    for (const line of [startDay, middleDay, endDay]) {
+      expect(line.startAt).toEqual(startAt);
+      expect(line.endAt).toEqual(endAt);
     }
   });
 
-  it('assigns overlapping multi-day entries to different lanes', () => {
+  // spec-timeline-visual-redesign: Transport never competes with a Stay for
+  // lane space (it has none), so both simply get their own line on
+  // whatever day(s) they touch -- including a day they *share*.
+  it('gives both a Stay and an overlapping Transport their own line on a shared day', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
     const days = buildTimelineDays(trip, []);
     const entries = [
@@ -277,7 +204,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
         endAt: new Date('2026-08-06T11:00:00.000Z'),
       }),
       entry({
-        id: 's2',
+        id: 't1',
         entryType: 'TRANSPORT',
         title: 'Rental car',
         startAt: new Date('2026-08-04T09:00:00.000Z'),
@@ -285,93 +212,14 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
+    const { days: laidOut, stayRibbons } = layoutTimelineEntries(days, entries);
 
-    expect(laneCount).toBe(2);
+    // Only the Stay gets a ribbon -- Transport never does.
+    expect(stayRibbons).toHaveLength(1);
+    expect(stayRibbons[0].entryId).toBe('s1');
+
     const overlapDay = laidOut.find((d) => d.dateKey === '2026-08-04')!;
-    const lanes = overlapDay.laneSegments.map((s) => s?.entryId).filter(Boolean);
-    expect(new Set(lanes).size).toBe(2);
-  });
-
-  it('reuses a lane for a second entry that starts only after the first ends', () => {
-    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
-    const days = buildTimelineDays(trip, []);
-    const entries = [
-      entry({
-        id: 's1',
-        entryType: 'STAY',
-        title: 'Hotel A',
-        startAt: new Date('2026-08-02T14:00:00.000Z'),
-        endAt: new Date('2026-08-04T11:00:00.000Z'),
-      }),
-      entry({
-        id: 's2',
-        entryType: 'STAY',
-        title: 'Hotel B',
-        startAt: new Date('2026-08-06T14:00:00.000Z'),
-        endAt: new Date('2026-08-08T11:00:00.000Z'),
-      }),
-    ];
-
-    const { laneCount } = layoutTimelineEntries(days, entries);
-    expect(laneCount).toBe(1);
-  });
-
-  // Item 9: touching (non-overlapping) entries must not waste a lane -- a
-  // Stay ending the same day a following Stay begins should reuse the lane,
-  // matching Section's "touching endpoints are not an overlap" convention.
-  it('reuses a lane for a second entry that starts the same day the first ends (touching, not overlapping)', () => {
-    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
-    const days = buildTimelineDays(trip, []);
-    const entries = [
-      entry({
-        id: 's1',
-        entryType: 'STAY',
-        title: 'Hotel A',
-        startAt: new Date('2026-08-02T14:00:00.000Z'),
-        endAt: new Date('2026-08-04T11:00:00.000Z'),
-      }),
-      entry({
-        id: 's2',
-        entryType: 'STAY',
-        title: 'Hotel B',
-        startAt: new Date('2026-08-04T14:00:00.000Z'),
-        endAt: new Date('2026-08-06T11:00:00.000Z'),
-      }),
-    ];
-
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
-    expect(laneCount).toBe(1);
-    // Days exclusively within each entry's own span still carry that
-    // entry's segment.
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]?.entryId).toBe('s1');
-    expect(laidOut.find((d) => d.dateKey === '2026-08-05')!.laneSegments[0]?.entryId).toBe('s2');
-  });
-
-  // Truly overlapping (not just touching) entries must still get separate
-  // lanes -- this is the boundary the loosened reuse check must not cross.
-  it('still assigns different lanes when entries actually overlap by a day', () => {
-    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
-    const days = buildTimelineDays(trip, []);
-    const entries = [
-      entry({
-        id: 's1',
-        entryType: 'STAY',
-        title: 'Hotel A',
-        startAt: new Date('2026-08-02T14:00:00.000Z'),
-        endAt: new Date('2026-08-05T11:00:00.000Z'),
-      }),
-      entry({
-        id: 's2',
-        entryType: 'STAY',
-        title: 'Hotel B',
-        startAt: new Date('2026-08-04T14:00:00.000Z'),
-        endAt: new Date('2026-08-06T11:00:00.000Z'),
-      }),
-    ];
-
-    const { laneCount } = layoutTimelineEntries(days, entries);
-    expect(laneCount).toBe(2);
+    expect(overlapDay.lines.map((l) => l.entryId).sort()).toEqual(['s1', 't1']);
   });
 
   // spec-timeline-ux-and-timezone (correction): an Entry's own startAt/endAt
@@ -391,10 +239,9 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
-
-    expect(laneCount).toBe(0);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots.map((d) => d.id)).toEqual(['a1']);
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.lines.map((l) => l.entryId)).toEqual(['a1']);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-04')!.lines).toHaveLength(0);
   });
 
   // spec-timeline-ux-and-timezone (correction): a Transport leg's own
@@ -419,24 +266,217 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
     ];
 
     const { days: laidOut } = layoutTimelineEntries(days, entries);
-
-    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots).toHaveLength(0);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-04')!.dots.map((d) => d.id)).toEqual(['flight-1']);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.lines).toHaveLength(0);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-04')!.lines.map((l) => l.entryId)).toEqual(['flight-1']);
   });
 
   it('drops an entry dated entirely outside the Trip range rather than crashing', () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-05') };
     const days = buildTimelineDays(trip, []);
-    const entries = [
-      entry({
-        id: 'x1',
-        title: 'Out of range',
-        startAt: new Date('2026-09-01T00:00:00.000Z'),
-      }),
-    ];
+    const entries = [entry({ id: 'x1', title: 'Out of range', startAt: new Date('2026-09-01T00:00:00.000Z') })];
 
     expect(() => layoutTimelineEntries(days, entries)).not.toThrow();
     const { days: laidOut } = layoutTimelineEntries(days, entries);
-    expect(laidOut.every((d) => d.dots.length === 0)).toBe(true);
+    expect(laidOut.every((d) => d.lines.length === 0)).toBe(true);
+  });
+
+  // The exact user-reported scenario: a flight arriving the day OZO Phuket
+  // checks in must never lose either line.
+  it('gives a Transport arrival and an unrelated Stay check-in their own lines on the same shared day', () => {
+    const trip = { startDate: dateOnly('2026-11-15'), endDate: dateOnly('2026-11-25') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({
+        id: 'flight-1',
+        entryType: 'TRANSPORT',
+        title: 'Got to Phuket',
+        startAt: new Date('2026-11-17T10:00:00.000Z'),
+        endAt: new Date('2026-11-18T02:00:00.000Z'),
+      }),
+      entry({
+        id: 'ozo',
+        entryType: 'STAY',
+        title: 'OZO Phuket',
+        startAt: new Date('2026-11-18T14:00:00.000Z'),
+        endAt: new Date('2026-11-23T11:00:00.000Z'),
+      }),
+    ];
+
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
+    const sharedDay = laidOut.find((d) => d.dateKey === '2026-11-18')!;
+    const ids = sharedDay.lines.map((l) => l.entryId).sort();
+    expect(ids).toEqual(['flight-1', 'ozo']);
+    expect(sharedDay.lines.find((l) => l.entryId === 'flight-1')!.isEnd).toBe(true);
+    expect(sharedDay.lines.find((l) => l.entryId === 'ozo')!.isStart).toBe(true);
+  });
+});
+
+describe('layoutTimelineEntries -- Stay ribbons', () => {
+  function entry(overrides: Partial<EntryForLayout> & Pick<EntryForLayout, 'id' | 'title' | 'startAt'>): EntryForLayout {
+    return { entryType: 'STAY', subtype: null, endAt: null, startTimezone: null, endTimezone: null, ...overrides };
+  }
+
+  it('spans a single Stay from its check-in day index to its check-out day index, lane 0', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({
+        id: 's1',
+        title: 'Beach Resort',
+        startAt: new Date('2026-08-03T14:00:00.000Z'),
+        endAt: new Date('2026-08-06T11:00:00.000Z'),
+      }),
+    ];
+
+    const { stayRibbons } = layoutTimelineEntries(days, entries);
+    expect(stayRibbons).toHaveLength(1);
+    expect(stayRibbons[0]).toMatchObject({ entryId: 's1', startDayIndex: 2, endDayIndex: 5, laneIndex: 0, colorIndex: 0 });
+  });
+
+  it('alternates colorIndex by chronological order among Stays, even with a gap between them', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-20') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 's1', title: 'Hotel A', startAt: new Date('2026-08-02T14:00:00.000Z'), endAt: new Date('2026-08-04T11:00:00.000Z') }),
+      entry({ id: 's2', title: 'Hotel B', startAt: new Date('2026-08-10T14:00:00.000Z'), endAt: new Date('2026-08-12T11:00:00.000Z') }),
+    ];
+
+    const { stayRibbons } = layoutTimelineEntries(days, entries);
+    expect(stayRibbons.find((r) => r.entryId === 's1')?.colorIndex).toBe(0);
+    expect(stayRibbons.find((r) => r.entryId === 's2')?.colorIndex).toBe(1);
+  });
+
+  it('uses one lane for two Stays that never overlap', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 's1', title: 'Hotel A', startAt: new Date('2026-08-02T14:00:00.000Z'), endAt: new Date('2026-08-04T11:00:00.000Z') }),
+      entry({ id: 's2', title: 'Hotel B', startAt: new Date('2026-08-06T14:00:00.000Z'), endAt: new Date('2026-08-08T11:00:00.000Z') }),
+    ];
+
+    const { stayLaneCount } = layoutTimelineEntries(days, entries);
+    expect(stayLaneCount).toBe(1);
+  });
+
+  it('still uses two lanes when two Stays genuinely overlap by a day', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 's1', title: 'Hotel A', startAt: new Date('2026-08-02T14:00:00.000Z'), endAt: new Date('2026-08-05T11:00:00.000Z') }),
+      entry({ id: 's2', title: 'Hotel B', startAt: new Date('2026-08-04T14:00:00.000Z'), endAt: new Date('2026-08-06T11:00:00.000Z') }),
+    ];
+
+    const { stayLaneCount, stayRibbons } = layoutTimelineEntries(days, entries);
+    expect(stayLaneCount).toBe(2);
+    const lanes = new Set(stayRibbons.map((r) => r.laneIndex));
+    expect(lanes.size).toBe(2);
+  });
+
+  // This is the exact user-reported bug: OZO Phuket's own check-out day
+  // (2026-11-23) is the same day Thiwson Beach Resort checks in -- both
+  // must be visible (via the day's own `lines`, checked above), and the
+  // ribbon system must record this as a clean handoff, not overlap or
+  // silently drop one Stay's ribbon.
+  it('shortens the outgoing ribbon by one day and records a handoff when two Stays touch', () => {
+    const trip = { startDate: dateOnly('2026-11-15'), endDate: dateOnly('2026-11-27') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({
+        id: 'ozo',
+        title: 'OZO Phuket',
+        startAt: new Date('2026-11-18T14:00:00.000Z'),
+        endAt: new Date('2026-11-23T11:00:00.000Z'),
+      }),
+      entry({
+        id: 'thiwson',
+        title: 'Thiwson Beach Resort',
+        startAt: new Date('2026-11-23T15:00:00.000Z'),
+        endAt: new Date('2026-11-26T12:00:00.000Z'),
+      }),
+    ];
+
+    const { stayRibbons, stayHandoffs, stayLaneCount } = layoutTimelineEntries(days, entries);
+
+    // Both touching Stays share the one lane (the whole point of the
+    // touching-reuse convention).
+    expect(stayLaneCount).toBe(1);
+
+    const ozoDayIndex = days.findIndex((d) => d.dateKey === '2026-11-18');
+    const checkoutDayIndex = days.findIndex((d) => d.dateKey === '2026-11-23');
+    const thiwsonEndIndex = days.findIndex((d) => d.dateKey === '2026-11-26');
+
+    const ozoRibbon = stayRibbons.find((r) => r.entryId === 'ozo')!;
+    // Shortened by one day -- ends the day *before* the shared check-out/
+    // check-in day, not on it.
+    expect(ozoRibbon.startDayIndex).toBe(ozoDayIndex);
+    expect(ozoRibbon.endDayIndex).toBe(checkoutDayIndex - 1);
+    expect(ozoRibbon.truncatedForHandoff).toBe(true);
+
+    const thiwsonRibbon = stayRibbons.find((r) => r.entryId === 'thiwson')!;
+    expect(thiwsonRibbon.startDayIndex).toBe(checkoutDayIndex);
+    expect(thiwsonRibbon.endDayIndex).toBe(thiwsonEndIndex);
+    expect(thiwsonRibbon.truncatedForHandoff).toBe(false);
+
+    expect(stayHandoffs).toHaveLength(1);
+    expect(stayHandoffs[0]).toMatchObject({
+      dayIndex: checkoutDayIndex,
+      laneIndex: 0,
+      outgoingEntryId: 'ozo',
+      incomingEntryId: 'thiwson',
+    });
+    // The two touching Stays alternate color, so the handoff marker's two
+    // halves are always visually distinguishable.
+    expect(stayHandoffs[0].outgoingColorIndex).not.toBe(stayHandoffs[0].incomingColorIndex);
+  });
+
+  it('does not record a handoff for two Stays that are merely adjacent with a real gap day between them', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 's1', title: 'Hotel A', startAt: new Date('2026-08-02T14:00:00.000Z'), endAt: new Date('2026-08-04T11:00:00.000Z') }),
+      entry({ id: 's2', title: 'Hotel B', startAt: new Date('2026-08-05T14:00:00.000Z'), endAt: new Date('2026-08-07T11:00:00.000Z') }),
+    ];
+
+    const { stayHandoffs } = layoutTimelineEntries(days, entries);
+    expect(stayHandoffs).toHaveLength(0);
+  });
+
+  // Regression: colorIndex must alternate against *this lane's own*
+  // previous occupant, not a global running count -- an unrelated Stay
+  // that briefly claims a second lane (a genuine overlap elsewhere on the
+  // Trip) must never shift the parity of a real touching handoff
+  // elsewhere, or its two ribbons could end up the same color, making the
+  // handoff marker invisible (both halves identical).
+  it('keeps a real handoff two-toned even when an unrelated overlapping Stay claims a second lane in between', () => {
+    const trip = { startDate: dateOnly('2026-11-15'), endDate: dateOnly('2026-11-30') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 'ozo', title: 'OZO Phuket', startAt: new Date('2026-11-18T14:00:00.000Z'), endAt: new Date('2026-11-23T11:00:00.000Z') }),
+      // Genuinely overlaps OZO by a day -- forced into a second lane,
+      // between OZO and Thiwson in start order.
+      entry({ id: 'overlap', title: 'Overlap Hotel', startAt: new Date('2026-11-20T12:00:00.000Z'), endAt: new Date('2026-11-21T12:00:00.000Z') }),
+      entry({ id: 'thiwson', title: 'Thiwson Beach Resort', startAt: new Date('2026-11-23T15:00:00.000Z'), endAt: new Date('2026-11-26T12:00:00.000Z') }),
+    ];
+
+    const { stayHandoffs } = layoutTimelineEntries(days, entries);
+    const handoff = stayHandoffs.find((h) => h.outgoingEntryId === 'ozo' && h.incomingEntryId === 'thiwson');
+    expect(handoff).toBeDefined();
+    expect(handoff!.outgoingColorIndex).not.toBe(handoff!.incomingColorIndex);
+  });
+
+  // Degenerate case: a same-day (check-in === check-out) Stay immediately
+  // followed by another must not crash or invert the ribbon's range.
+  it('does not shorten a same-day Stay ribbon below its own single day', () => {
+    const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
+    const days = buildTimelineDays(trip, []);
+    const entries = [
+      entry({ id: 's1', title: 'Day-use Hotel', startAt: new Date('2026-08-03T08:00:00.000Z'), endAt: new Date('2026-08-03T20:00:00.000Z') }),
+      entry({ id: 's2', title: 'Hotel B', startAt: new Date('2026-08-03T21:00:00.000Z'), endAt: new Date('2026-08-05T11:00:00.000Z') }),
+    ];
+
+    expect(() => layoutTimelineEntries(days, entries)).not.toThrow();
+    const { stayRibbons } = layoutTimelineEntries(days, entries);
+    const s1 = stayRibbons.find((r) => r.entryId === 's1')!;
+    expect(s1.startDayIndex).toBeLessThanOrEqual(s1.endDayIndex);
   });
 });

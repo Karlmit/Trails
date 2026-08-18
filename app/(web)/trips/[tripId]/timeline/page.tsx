@@ -11,8 +11,8 @@ import {
   buildTimelineDays,
   layoutTimelineEntries,
   type EntryForLayout,
-  type TimelineEntryDot,
-  type TimelineLaneSegment,
+  type StayHandoff,
+  type TimelineDayLine,
 } from '@/lib/timeline';
 import {
   sectionColor,
@@ -31,6 +31,9 @@ import { TimelineAutoScroll } from '@/components/TimelineAutoScroll';
 interface PageProps {
   params: Promise<{ tripId: string }>;
 }
+
+const DATE_COLUMN_WIDTH = 84;
+const RIBBON_COLUMN_WIDTH = 10;
 
 function formatDayLabel(dateKey: string): string {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
@@ -56,51 +59,59 @@ function formatHHMM(date: Date, zone: string | null, tripTimezone: string): stri
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}${timezoneDisclosure(zone, tripTimezone)}`;
 }
 
-// User-reported: a single-day Stay/Transport (e.g. a domestic flight, or a
-// day-use hotel booking) rendered as a dot showed only its title -- no
-// Check-in/Departure time at all, unlike a multi-day entry's lane segment.
-// Mirrors laneSegmentLabel's start-day wording exactly; Activity/Note dots
-// aren't given a time label at all (`null`), so the caller falls back to
-// showing `subtype` instead, matching the existing (unaffected) behavior.
-function dotTimeLabel(dot: TimelineEntryDot, tripTimezone: string): string | null {
-  const word = dot.entryType === 'TRANSPORT' ? 'Departure' : dot.entryType === 'STAY' ? 'Check-in' : null;
-  return word ? `${word} ${formatHHMM(dot.startAt, dot.startTimezone, tripTimezone)}` : null;
+// spec-timeline-visual-redesign: every day an Entry touches gets exactly
+// one line, always -- a single-day Entry (isStart and isEnd both true), or
+// any day a multi-day Entry spans. Stay/Transport show a real Check-in/
+// Check-out or Departure/Arrival time on their first/last day (a domestic
+// flight or a day-use hotel booking is "first and last" on the same single
+// day, and still gets its time); any day strictly between is just the
+// title, since the Stay's own ribbon (drawn separately, see
+// app/globals.css) already communicates "still ongoing" for Stay, and a
+// multi-day Activity/Note has no such device so its own middle days stay
+// plain too, matching the pre-redesign behavior. Activity/Note never show
+// a time at all -- the caller falls back to showing `subtype` instead.
+function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: string; showSubtype: boolean } {
+  const isTimedType = line.entryType === 'TRANSPORT' || line.entryType === 'STAY';
+  if (!isTimedType) {
+    return { text: line.title, showSubtype: true };
+  }
+  if (line.isStart) {
+    const word = line.entryType === 'TRANSPORT' ? 'Departure' : 'Check-in';
+    return { text: `${line.title} · ${word} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`, showSubtype: false };
+  }
+  if (line.isEnd && line.endAt) {
+    const word = line.entryType === 'TRANSPORT' ? 'Arrival' : 'Check-out';
+    return { text: `${line.title} · ${word} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`, showSubtype: false };
+  }
+  return { text: line.title, showSubtype: false };
 }
 
-// spec-timeline-at-a-glance: a real, visible text line for every day a
-// multi-day lane segment touches -- start day gets the entry's own
-// per-type "arrival"-style wording ("Check-in"/"Departure"/"Start") plus
-// its startAt time; end day gets the "departure"-style wording
-// ("Check-out"/"Arrival"/"End") plus its endAt time (always non-null on a
-// day marked isEnd for a genuinely multi-day entry); any day strictly in
-// between is just the title -- the pill itself already communicates
-// "still ongoing." Reuses the exact same per-entry-type ternary
-// EntryDetailPanel/EntryForm already use, no new vocabulary invented.
-function laneSegmentLabel(segment: TimelineLaneSegment, tripTimezone: string): string {
-  if (segment.isStart) {
-    const word = segment.entryType === 'TRANSPORT' ? 'Departure' : segment.entryType === 'STAY' ? 'Check-in' : 'Start';
-    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, segment.startTimezone, tripTimezone)}`;
-  }
-  if (segment.isEnd && segment.endAt) {
-    const word = segment.entryType === 'TRANSPORT' ? 'Arrival' : segment.entryType === 'STAY' ? 'Check-out' : 'End';
-    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, segment.endTimezone, tripTimezone)}`;
-  }
-  return segment.title;
-}
-
-// FR-6, FR-8, FR-9, FR-10: the Timeline -- a git-graph-style spine (left
-// graph column: rail + node per day) plus read-only Section color bands,
-// gap days kept visible, auto-scroll + current-position marker for an
-// Active Trip. Section add/remove lives on /trips/[tripId]/sections; this
-// page renders, it never mutates Sections directly.
-//
-// spec-timeline-entries: TimelineEntries now render on the same spine
-// (lib/timeline.ts's layoutTimelineEntries -- FR-11..FR-15): a single-day
-// entry as a dot/chip in the day's content, a multi-day entry as a colored
-// pill running down an offset lane between the graph column and the
-// Section band, so it never collides with the Section rail. The FAB (the
-// one exception to "Timeline is view-only" per DESIGN.md/PRD) launches the
-// separate /entries/new create page rather than editing inline here.
+// spec-timeline-visual-redesign: replaces the git-graph-style dot rail +
+// offset "lane" pill system entirely. User-reported ("the timeline looks
+// very messy... lines end abruptly... travel lines share the same space as
+// stay lines"): the previous design ran Sections, Stays, and Transport all
+// through one generic colored-band/lane abstraction, so touching entries
+// (a Stay's own check-out day and the next Stay's check-in day; a
+// Transport's arrival day and whatever else landed there) fought over one
+// shared per-day "cell" -- whichever was processed last silently won,
+// erasing the other's text entirely (the reported "OZO Phuket checkout"
+// and "flight arrival" bugs). Now:
+//   - A Section is a plain background tint across the whole row (unchanged)
+//     plus its name pill on the first day of its run.
+//   - A Stay is the one Entry Type that represents *being somewhere* for a
+//     span of days, so it alone gets a continuous "ribbon": one real CSS
+//     Grid item spanning `startDayIndex`..`endDayIndex` grid rows (so it's
+//     genuinely one continuous shape, not stacked per-day segments faking
+//     continuity -- variable row heights are handled natively by the grid,
+//     no client JS measurement needed). Two Stays meeting on the same day
+//     (one's check-out, the next's check-in) get a small two-tone handoff
+//     marker on that shared day instead of forcing one ribbon to "win" it.
+//   - Transport/Activity are transitions, not places -- they never get a
+//     ribbon or a lane at all, only their own text line(s), so they can
+//     never compete with a Stay's ribbon for space.
+//   - Every Entry that touches a day gets its own line in that day's
+//     `lines` array (lib/timeline.ts) -- a plain list, not a lane-indexed
+//     slot, so nothing can be silently overwritten.
 export default async function TimelinePage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
@@ -146,7 +157,15 @@ export default async function TimelinePage({ params }: PageProps) {
     startTimezone: entry.startTimezone,
     endTimezone: entry.endTimezone,
   }));
-  const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
+  const { days: laidOutDays, stayRibbons, stayHandoffs, stayLaneCount } = layoutTimelineEntries(days, entriesForLayout);
+
+  const ribbonLaneCount = Math.max(stayLaneCount, 1);
+  const gridTemplateColumns = `${DATE_COLUMN_WIDTH}px repeat(${ribbonLaneCount}, ${RIBBON_COLUMN_WIDTH}px) 1fr`;
+
+  const handoffsByDayIndex = new Map<number, StayHandoff>();
+  for (const handoff of stayHandoffs) handoffsByDayIndex.set(handoff.dayIndex, handoff);
+
+  const ribbonColorVar = (colorIndex: 0 | 1) => `var(--stay-ribbon-${colorIndex === 0 ? 'a' : 'b'})`;
 
   return (
     <main className="page">
@@ -159,8 +178,8 @@ export default async function TimelinePage({ params }: PageProps) {
         </p>
       )}
 
-      <div className="stack" style={{ gap: 0 }}>
-        {laidOutDays.map((day) => {
+      <div className="timeline-grid" style={{ gridTemplateColumns }}>
+        {laidOutDays.map((day, index) => {
           const section = day.sectionIndex !== null ? trip.sections[day.sectionIndex] : null;
           const bandColor = section
             ? (section.color && sectionCustomColorBand(section.color)) ?? sectionColor(day.sectionIndex!)
@@ -168,69 +187,43 @@ export default async function TimelinePage({ params }: PageProps) {
           const railColor = section
             ? (section.color && sectionCustomColorSolid(section.color)) ?? sectionColorSolid(day.sectionIndex!)
             : undefined;
-          // A Section's contiguous run on the Timeline starts at the first
-          // day-row that doesn't connect to the row above it (a gap day or
-          // a different Section preceding it) -- the name+emoji label
-          // renders once there, not on every day within the run (spec's
-          // I/O matrix: "a multi-day Section's ... label appears once").
-          const showSectionLabel = section !== null && !day.connectsAbove;
-          // spec-timeline-at-a-glance: the lane pills themselves (rendered
-          // below, unchanged) only carry a hover-only `title`/`aria-label`
-          // -- this is the day's own non-null lane segments, rendered as
-          // real visible text lines alongside the dot list.
-          const activeLaneSegments = day.laneSegments.filter(
-            (segment): segment is TimelineLaneSegment => segment !== null,
-          );
+          const previousSectionIndex = index > 0 ? laidOutDays[index - 1].sectionIndex : null;
+          const showSectionLabel = section !== null && day.sectionIndex !== previousSectionIndex;
+          const rowLine = index + 1;
+          const handoff = handoffsByDayIndex.get(index);
 
           return (
-            <div
-              key={day.dateKey}
-              id={`day-${day.dateKey}`}
-              className={`timeline-row${day.isToday ? ' is-today' : ''}`}
-            >
-              <div className="timeline-graph">
-                <div
-                  className={`timeline-rail timeline-rail-above${day.connectsAbove ? ' is-connected' : ''}`}
-                  style={day.connectsAbove ? { ['--rail-color' as string]: railColor } : undefined}
-                />
-                <div
-                  className="timeline-node"
-                  style={!day.isToday && railColor ? { ['--node-color' as string]: railColor } : undefined}
-                />
-                <div
-                  className={`timeline-rail timeline-rail-below${day.connectsBelow ? ' is-connected' : ''}`}
-                  style={day.connectsBelow ? { ['--rail-color' as string]: railColor } : undefined}
-                />
+            <div key={day.dateKey} className="timeline-grid-row">
+              <div
+                id={`day-${day.dateKey}`}
+                className={`timeline-row-bg${day.isToday ? ' is-today' : ''}`}
+                style={{
+                  gridRow: rowLine,
+                  ...(bandColor ? { ['--band-color' as string]: bandColor, ['--rail-accent-color' as string]: railColor } : undefined),
+                }}
+              />
+
+              <div className="timeline-date-cell" style={{ gridRow: rowLine, gridColumn: 1 }}>
+                {formatDayLabel(day.dateKey)}
               </div>
 
-              {laneCount > 0 && (
-                <div className="timeline-lanes" style={{ width: laneCount * 12 }}>
-                  {day.laneSegments.map((segment, laneIndex) =>
-                    segment ? (
-                      <Link
-                        key={laneIndex}
-                        href={entryDetailHref(tripId, segment.entryType, segment.entryId)}
-                        className={`timeline-lane-segment${segment.isStart ? ' is-start' : ''}${
-                          segment.isEnd ? ' is-end' : ''
-                        }`}
-                        style={{ ['--segment-color' as string]: entryTypeColor(segment.entryType) }}
-                        title={segment.title}
-                        aria-label={segment.title}
-                      />
-                    ) : (
-                      <span key={laneIndex} className="timeline-lane-empty" />
-                    ),
-                  )}
-                </div>
+              {handoff && (
+                <div
+                  className="timeline-handoff"
+                  style={{
+                    gridRow: rowLine,
+                    gridColumn: 2 + handoff.laneIndex,
+                    ['--handoff-color-a' as string]: ribbonColorVar(handoff.outgoingColorIndex),
+                    ['--handoff-color-b' as string]: ribbonColorVar(handoff.incomingColorIndex),
+                  }}
+                  title="Check-out / Check-in the same day"
+                  aria-hidden="true"
+                />
               )}
 
               <div
-                className={`timeline-content timeline-section-band${showSectionLabel ? ' has-section-label' : ''}`}
-                style={
-                  bandColor
-                    ? { ['--band-color' as string]: bandColor, ['--rail-accent-color' as string]: railColor }
-                    : undefined
-                }
+                className="timeline-content-cell"
+                style={{ gridRow: rowLine, gridColumn: 2 + ribbonLaneCount }}
               >
                 {showSectionLabel && section && (
                   <div className="timeline-section-label">
@@ -242,62 +235,55 @@ export default async function TimelinePage({ params }: PageProps) {
                     <span className="timeline-section-label-name">{section.name}</span>
                   </div>
                 )}
-                <div className="timeline-day-date">{formatDayLabel(day.dateKey)}</div>
-                <div className="stack" style={{ gap: 'var(--space-1)', flex: 1 }}>
-                  {day.isToday && (
-                    <div className="timeline-current-marker">
-                      Today · {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')} (
-                      {trip.timezone})
-                    </div>
-                  )}
-                  {day.dots.length > 0 && (
-                    <div className="entry-dot-list">
-                      {day.dots.map((dot) => {
-                        const timeLabel = dotTimeLabel(dot, trip.timezone);
-                        return (
-                          <Link
-                            key={dot.id}
-                            href={entryDetailHref(tripId, dot.entryType, dot.id)}
-                            className="entry-chip"
-                          >
-                            <span
-                              className="entry-chip-dot"
-                              style={{ ['--dot-color' as string]: entryTypeColor(dot.entryType) }}
-                            />
-                            <span>{dot.title}</span>
-                            {timeLabel ? (
-                              <span className="text-soft">· {timeLabel}</span>
-                            ) : (
-                              dot.subtype && <span className="text-soft">· {subtypeLabel(dot.subtype)}</span>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {activeLaneSegments.length > 0 && (
-                    <div className="entry-dot-list">
-                      {activeLaneSegments.map((segment) => (
+                {day.isToday && (
+                  <div className="timeline-current-marker">
+                    Today · {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')} (
+                    {trip.timezone})
+                  </div>
+                )}
+                {day.lines.length > 0 ? (
+                  <div className="entry-dot-list">
+                    {day.lines.map((line) => {
+                      const { text, showSubtype } = dayLineLabel(line, trip.timezone);
+                      return (
                         <Link
-                          key={segment.entryId}
-                          href={entryDetailHref(tripId, segment.entryType, segment.entryId)}
+                          key={line.entryId}
+                          href={entryDetailHref(tripId, line.entryType, line.entryId)}
                           className="entry-chip"
-                          style={{ ['--span-color' as string]: entryTypeColor(segment.entryType) }}
                         >
-                          <span className="entry-chip-span-accent" />
-                          <span>{laneSegmentLabel(segment, trip.timezone)}</span>
+                          <span
+                            className="entry-chip-dot"
+                            style={{ ['--dot-color' as string]: entryTypeColor(line.entryType) }}
+                          />
+                          <span>{text}</span>
+                          {showSubtype && line.subtype && (
+                            <span className="text-soft">· {subtypeLabel(line.subtype)}</span>
+                          )}
                         </Link>
-                      ))}
-                    </div>
-                  )}
-                  {day.dots.length === 0 && activeLaneSegments.length === 0 && (
-                    <div className="timeline-day-empty">No entries yet</div>
-                  )}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="timeline-day-empty">No entries yet</div>
+                )}
               </div>
             </div>
           );
         })}
+
+        {stayRibbons.map((ribbon) => (
+          <div
+            key={ribbon.entryId}
+            className={`timeline-ribbon${ribbon.truncatedForHandoff ? ' is-truncated' : ''}`}
+            style={{
+              gridRow: `${ribbon.startDayIndex + 1} / ${ribbon.endDayIndex + 2}`,
+              gridColumn: 2 + ribbon.laneIndex,
+              ['--ribbon-color' as string]: ribbonColorVar(ribbon.colorIndex),
+            }}
+            title={ribbon.title}
+            aria-hidden="true"
+          />
+        ))}
       </div>
 
       {viewer.type === 'user' && (
