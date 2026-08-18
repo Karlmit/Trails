@@ -132,7 +132,20 @@ export function EntryForm({
         ? (tripStartDate ?? '')
         : '',
   );
-  const [endAt, setEndAt] = useState(toDateTimeLocal(seed?.endAt ?? null, seed?.endTimezone ?? null));
+  // User-reported: Start now defaults its *date* to the Trip's own first
+  // day, so its native date-picker opens already on the right month --
+  // but End was left blank, so *its* picker still opened on today's month
+  // instead (many clicks away when planning a trip months out). End
+  // mirrors Start's own initial seed here for exactly the same reason;
+  // the existing auto-follow wiring below (autoEndDate) still updates it
+  // to match whatever the User actually picks for Start, unchanged.
+  const [endAt, setEndAt] = useState(
+    seed?.endAt
+      ? toDateTimeLocal(seed.endAt, seed.endTimezone ?? null)
+      : mode === 'create'
+        ? (tripStartDate ?? '')
+        : '',
+  );
   const [locationName, setLocationName] = useState(seed?.locationName ?? '');
   const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
   const [locationMapLink, setLocationMapLink] = useState(seed?.locationMapLink ?? '');
