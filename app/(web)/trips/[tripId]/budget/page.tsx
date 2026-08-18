@@ -72,7 +72,7 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
       expensePaymentNote: entry.expensePaymentNote,
     }));
 
-  const groups = aggregateBudget(budgetEntries, trip.sections, trip.timezone, {
+  const groups = aggregateBudget(budgetEntries, trip.sections, {
     entryType,
     sectionId,
   });

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeTripStatus, dateKeyInTimezone, tripDurationDays } from '@/lib/trip-status';
+import {
+  computeTripStatus,
+  dateKeyInTimezone,
+  entryClockTime,
+  formatEntryDateTime,
+  tripDurationDays,
+  tripLocalNow,
+} from '@/lib/trip-status';
 
 function dateOnly(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
@@ -69,5 +76,49 @@ describe('dateKeyInTimezone', () => {
     // 2026-01-01T02:00:00Z is still 2025-12-31 in America/Los_Angeles.
     const key = dateKeyInTimezone(new Date('2026-01-01T02:00:00.000Z'), 'America/Los_Angeles');
     expect(key).toBe('2025-12-31');
+  });
+});
+
+// spec-timeline-ux-and-timezone: an Entry's own recorded startAt/endAt are
+// literal wall-clock digits (see dateTimeField's comment) -- entryClockTime
+// reads them back with zero conversion, unlike timeOfDayInTimezone (for
+// `now` only).
+describe('entryClockTime', () => {
+  it("reads an Entry's literal UTC-stored hour/minute with no timezone conversion", () => {
+    expect(entryClockTime(new Date('2026-08-05T15:00:00.000Z'))).toEqual({ hour: 15, minute: 0 });
+  });
+});
+
+describe('formatEntryDateTime', () => {
+  it("formats an Entry's own timestamp pinned to UTC, immune to any timezone", () => {
+    expect(formatEntryDateTime('2026-08-05T15:00:00.000Z')).toBe('Aug 5, 2026, 15:00');
+  });
+
+  it('accepts a Date object directly, same as a string', () => {
+    expect(formatEntryDateTime(new Date('2026-08-05T15:00:00.000Z'))).toBe('Aug 5, 2026, 15:00');
+  });
+});
+
+describe('tripLocalNow', () => {
+  it("re-projects a real moment onto the Trip's own local wall-clock digits", () => {
+    // 09:00 UTC is 16:00 in Asia/Bangkok (UTC+7).
+    const localNow = tripLocalNow(new Date('2026-08-05T09:00:00.000Z'), 'Asia/Bangkok');
+    expect(localNow.getUTCFullYear()).toBe(2026);
+    expect(localNow.getUTCMonth()).toBe(7); // August, 0-indexed
+    expect(localNow.getUTCDate()).toBe(5);
+    expect(localNow.getUTCHours()).toBe(16);
+    expect(localNow.getUTCMinutes()).toBe(0);
+  });
+
+  it('is a no-op for a UTC Trip timezone', () => {
+    const now = new Date('2026-08-05T09:00:00.000Z');
+    expect(tripLocalNow(now, 'UTC').getTime()).toBe(now.getTime());
+  });
+
+  it('rolls over to the next calendar day when the offset pushes past midnight', () => {
+    // 22:00 UTC is 05:00 the next day in Asia/Bangkok (UTC+7).
+    const localNow = tripLocalNow(new Date('2026-08-05T22:00:00.000Z'), 'Asia/Bangkok');
+    expect(localNow.getUTCDate()).toBe(6);
+    expect(localNow.getUTCHours()).toBe(5);
   });
 });

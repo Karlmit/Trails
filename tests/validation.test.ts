@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dateTimeField,
   isDateOrderValid,
   isValidTimezone,
   sectionCreateSchema,
@@ -21,6 +22,28 @@ describe('isDateOrderValid', () => {
 
   it('rejects endDate before startDate', () => {
     expect(isDateOrderValid(dateOnly('2026-08-10'), dateOnly('2026-08-01'))).toBe(false);
+  });
+});
+
+// spec-timeline-ux-and-timezone: an Entry's own recorded startAt/endAt are
+// the traveler's literal wall-clock digits, stored verbatim regardless of
+// the server's own runtime timezone -- see the field's own comment.
+describe('dateTimeField', () => {
+  it('treats a zone-less datetime string (the shape every date/time picker submits) as UTC', () => {
+    expect(dateTimeField.parse('2026-08-05T15:00').toISOString()).toBe('2026-08-05T15:00:00.000Z');
+  });
+
+  it('treats a zone-less datetime string with seconds as UTC too', () => {
+    expect(dateTimeField.parse('2026-08-05T15:00:30').toISOString()).toBe('2026-08-05T15:00:30.000Z');
+  });
+
+  it('leaves an explicitly-zoned string unchanged', () => {
+    expect(dateTimeField.parse('2026-08-05T15:00:00.000+02:00').toISOString()).toBe('2026-08-05T13:00:00.000Z');
+    expect(dateTimeField.parse('2026-08-05T15:00:00.000Z').toISOString()).toBe('2026-08-05T15:00:00.000Z');
+  });
+
+  it('rejects an unparsable string', () => {
+    expect(() => dateTimeField.parse('not-a-date')).toThrow();
   });
 });
 

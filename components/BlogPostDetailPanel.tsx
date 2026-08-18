@@ -7,6 +7,7 @@ import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
+import { formatEntryDateTime } from '@/lib/trip-status';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -127,7 +128,7 @@ export function BlogPostDetailPanel({
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
             Date
           </dt>
-          <dd style={{ margin: 0 }}>{new Date(post.startAt).toLocaleString()}</dd>
+          <dd style={{ margin: 0 }}>{formatEntryDateTime(post.startAt)}</dd>
         </dl>
 
         {post.description && (

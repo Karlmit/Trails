@@ -1,4 +1,4 @@
-import { dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 
 export interface TimelineDay {
   dateKey: string; // YYYY-MM-DD
@@ -21,15 +21,17 @@ export interface SectionRange {
 }
 
 /**
- * AD-2: "Membership is computed as ... always timezone-localized ... never
- * a raw UTC comparison" -- the one containment check every Section-
- * membership-by-date read path shares. `dateKey` is a caller-computed
- * `YYYY-MM-DD` (via dateKeyOfDateColumn for a calendar day, or
- * dateKeyInTimezone for an Entry's own timestamp -- see lib/budget.ts,
- * which reuses this exact function against an Entry's `startAt` anchor
- * date rather than reimplementing the containment predicate). Returns the
- * matching Section's index into `sections`, or `null` when no Section
- * covers that day.
+ * The one containment check every Section-membership-by-date read path
+ * shares. `dateKey` is a caller-computed `YYYY-MM-DD` -- `dateKeyOfDateColumn`
+ * in every case: a calendar day for the Timeline's own day rows, and (per a
+ * later correction to AD-2/AD-8) an Entry's own literal `startAt`/`endAt`
+ * anchor date too, never re-localized through the Trip's timezone -- see
+ * dateTimeField's comment (lib/validation.ts) for why an Entry's own
+ * recorded time is treated as a naive wall-clock value, not a real instant.
+ * lib/budget.ts reuses this exact function against an Entry's `startAt`
+ * anchor date rather than reimplementing the containment predicate.
+ * Returns the matching Section's index into `sections`, or `null` when no
+ * Section covers that day.
  */
 export function sectionIndexForDateKey(dateKey: string, sections: SectionRange[]): number | null {
   const index = sections.findIndex(
@@ -112,9 +114,10 @@ export function buildTimelineDays(
 }
 
 // spec-timeline-entries: TimelineEntry rendering on the graph spine. A
-// single-day entry (its start/end fall on the same calendar day, in the
-// Trip's own timezone per AD-8) is a dot on that day's node/content. A
-// multi-day entry spans a colored pill down an offset lane, kept distinct
+// single-day entry (its start/end fall on the same literal calendar day --
+// an Entry's own recorded startAt/endAt are never re-localized through any
+// timezone, see dateTimeField's comment) is a dot on that day's
+// node/content. A multi-day entry spans a colored pill down an offset lane, kept distinct
 // from the Section rail/band column so it never visually collides with it
 // (FR-11..FR-15 I/O matrix: "multi-day entries render as spanning pills on
 // an offset lane, not overlapping the Section rail").
@@ -175,11 +178,7 @@ export interface TimelineLayout {
  * into buildTimelineDays -- so Section-band logic and Entry-layout logic
  * stay independently testable, per this spec's "unit-tested" task.
  */
-export function layoutTimelineEntries(
-  days: TimelineDay[],
-  entries: EntryForLayout[],
-  timezone: string,
-): TimelineLayout {
+export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayout[]): TimelineLayout {
   const dotsByIndex = new Map<number, TimelineEntryDot[]>();
   const segmentsByIndex = new Map<number, Map<number, TimelineLaneSegment>>();
   // Lane index -> dateKey of the last day that lane is occupied through.
@@ -188,8 +187,8 @@ export function layoutTimelineEntries(
   const sorted = [...entries].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   for (const entry of sorted) {
-    const startKey = dateKeyInTimezone(entry.startAt, timezone);
-    const endKey = entry.endAt ? dateKeyInTimezone(entry.endAt, timezone) : startKey;
+    const startKey = dateKeyOfDateColumn(entry.startAt);
+    const endKey = entry.endAt ? dateKeyOfDateColumn(entry.endAt) : startKey;
 
     if (startKey === endKey) {
       const index = days.findIndex((day) => day.dateKey === startKey);

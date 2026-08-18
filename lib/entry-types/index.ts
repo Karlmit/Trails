@@ -1,7 +1,7 @@
 import type { EntrySubtype, Prisma } from '@prisma/client';
 import type { z } from 'zod';
 import { isDateTimeOrderValid } from '@/lib/validation';
-import { dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { activityCreateSchema, activityUpdateSchema } from './activity.schema';
 import { blogPostCreateSchema, blogPostUpdateSchema } from './blog-post.schema';
 import { noteCreateSchema, noteUpdateSchema } from './note.schema';
@@ -305,19 +305,23 @@ export function stripEntryFieldsForGuest<
 }
 
 export function entryOutsideTripRangeError(
-  trip: { startDate: Date; endDate: Date; timezone: string },
+  trip: { startDate: Date; endDate: Date },
   startAt: Date,
   endAt: Date | null,
 ): string | null {
   const tripStartKey = dateKeyOfDateColumn(trip.startDate);
   const tripEndKey = dateKeyOfDateColumn(trip.endDate);
 
-  const startKey = dateKeyInTimezone(startAt, trip.timezone);
+  // An Entry's own recorded startAt/endAt is its literal calendar date --
+  // never re-localized through the Trip's timezone (see dateTimeField's
+  // comment) -- so this is a plain UTC day-key, the same one
+  // layoutTimelineEntries/deriveLineItems use for the same field.
+  const startKey = dateKeyOfDateColumn(startAt);
   if (startKey < tripStartKey || startKey > tripEndKey) {
     return `Start must fall within the Trip's dates (${tripStartKey} to ${tripEndKey})`;
   }
   if (endAt) {
-    const endKey = dateKeyInTimezone(endAt, trip.timezone);
+    const endKey = dateKeyOfDateColumn(endAt);
     if (endKey < tripStartKey || endKey > tripEndKey) {
       return `End must fall within the Trip's dates (${tripStartKey} to ${tripEndKey})`;
     }

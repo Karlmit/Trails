@@ -9,6 +9,7 @@ import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
+import { formatEntryDateTime } from '@/lib/trip-status';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -117,14 +118,14 @@ export function EntryDetailPanel({
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
               {entry.entryType === 'TRANSPORT' ? 'Departure' : entry.entryType === 'STAY' ? 'Check-in' : 'Start'}
             </dt>
-            <dd style={{ margin: 0 }}>{new Date(entry.startAt).toLocaleString()}</dd>
+            <dd style={{ margin: 0 }}>{formatEntryDateTime(entry.startAt)}</dd>
           </div>
           {entry.endAt && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
                 {entry.entryType === 'TRANSPORT' ? 'Arrival' : entry.entryType === 'STAY' ? 'Check-out' : 'End'}
               </dt>
-              <dd style={{ margin: 0 }}>{new Date(entry.endAt).toLocaleString()}</dd>
+              <dd style={{ margin: 0 }}>{formatEntryDateTime(entry.endAt)}</dd>
             </div>
           )}
         </dl>

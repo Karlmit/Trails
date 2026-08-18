@@ -13,7 +13,7 @@
 // in lib/trip-status.ts -- deterministic and unit-testable; the page passes
 // the real clock in, tests pass a fixed Date.
 
-import { dateKeyInTimezone } from '@/lib/trip-status';
+import { dateKeyInTimezone, dateKeyOfDateColumn, tripLocalNow } from '@/lib/trip-status';
 
 export interface TravelModeEntry {
   id: string;
@@ -25,31 +25,40 @@ export interface TravelModeEntry {
 /**
  * Current Stay: `startAt <= now <= endAt` among STAY entries (both fields
  * required/non-null on Stay -- a clean range check, per the spec's "Current
- * Stay / current Transport-in-progress" semantics). If more than one Stay's
- * range covers `now` (e.g. overlapping bookings -- unusual but possible),
- * the one with the earliest `startAt` wins, a simple deterministic
- * tie-break.
+ * Stay / current Transport-in-progress" semantics). `startAt`/`endAt` are
+ * an Entry's own literal wall-clock digits (see dateTimeField's comment),
+ * not real instants -- `now` (a real moment) is first re-projected onto the
+ * Trip's own local wall-clock digits (`tripLocalNow`) so both sides of the
+ * comparison are in the same naive frame; comparing the raw real `now`
+ * directly would silently assume the Trip's local time is always UTC. If
+ * more than one Stay's range covers it (e.g. overlapping bookings --
+ * unusual but possible), the one with the earliest `startAt` wins, a simple
+ * deterministic tie-break.
  */
-export function findCurrentStay<T extends TravelModeEntry>(entries: T[], now: Date): T | null {
+export function findCurrentStay<T extends TravelModeEntry>(entries: T[], now: Date, timezone: string): T | null {
+  const localNow = tripLocalNow(now, timezone);
   const matches = entries.filter(
     (entry) =>
       entry.entryType === 'STAY' &&
       entry.endAt !== null &&
-      entry.startAt.getTime() <= now.getTime() &&
-      now.getTime() <= entry.endAt.getTime(),
+      entry.startAt.getTime() <= localNow.getTime() &&
+      localNow.getTime() <= entry.endAt.getTime(),
   );
   return earliestStart(matches);
 }
 
 /**
  * Current Activity: `startAt <= now` AND (`endAt` set ? `now <= endAt` :
- * `dateKeyInTimezone(startAt, tz) === todayKey`) -- Activity's `endAt` is
+ * `dateKeyOfDateColumn(startAt) === todayKey`) -- Activity's `endAt` is
  * optional (a point-in-time Activity, e.g. "Museum tour at 2pm"). A
  * point-in-time Activity stays Current for the remainder of the calendar
  * day it starts, mirroring how the Timeline already treats single-day
  * entries as belonging to that whole day rather than one instant. Same
- * earliest-`startAt` tie-break as `findCurrentStay` if more than one
- * matches.
+ * `tripLocalNow` re-projection as `findCurrentStay` for the real-time
+ * comparisons, and the same earliest-`startAt` tie-break if more than one
+ * matches. `todayKey` itself stays real-time-based (`dateKeyInTimezone` on
+ * the real `now`) -- only the Entry's own side of each comparison is a
+ * literal, unconverted read.
  */
 export function findCurrentActivity<T extends TravelModeEntry>(
   entries: T[],
@@ -57,11 +66,12 @@ export function findCurrentActivity<T extends TravelModeEntry>(
   timezone: string,
 ): T | null {
   const todayKey = dateKeyInTimezone(now, timezone);
+  const localNow = tripLocalNow(now, timezone);
   const matches = entries.filter((entry) => {
     if (entry.entryType !== 'ACTIVITY') return false;
-    if (entry.startAt.getTime() > now.getTime()) return false;
-    if (entry.endAt !== null) return now.getTime() <= entry.endAt.getTime();
-    return dateKeyInTimezone(entry.startAt, timezone) === todayKey;
+    if (entry.startAt.getTime() > localNow.getTime()) return false;
+    if (entry.endAt !== null) return localNow.getTime() <= entry.endAt.getTime();
+    return dateKeyOfDateColumn(entry.startAt) === todayKey;
   });
   return earliestStart(matches);
 }
@@ -71,16 +81,19 @@ export function findCurrentActivity<T extends TravelModeEntry>(
  * omitted/null -- "next TimelineEntry overall") with the smallest `startAt`
  * that is `> now`. Four independent lookups per the spec (overall,
  * Transport, Activity, Stay) -- the next entry of any type may or may not
- * be the same row as e.g. the next Transport, so each is its own call.
+ * be the same row as e.g. the next Transport, so each is its own call. Same
+ * `tripLocalNow` re-projection as `findCurrentStay`/`findCurrentActivity`.
  */
 export function findNextByType<T extends TravelModeEntry>(
   entries: T[],
   now: Date,
+  timezone: string,
   entryType?: string | null,
 ): T | null {
+  const localNow = tripLocalNow(now, timezone);
   const candidates = entries.filter(
     (entry) =>
-      (entryType == null || entry.entryType === entryType) && entry.startAt.getTime() > now.getTime(),
+      (entryType == null || entry.entryType === entryType) && entry.startAt.getTime() > localNow.getTime(),
   );
   return candidates.reduce<T | null>((soonest, entry) => {
     if (!soonest || entry.startAt.getTime() < soonest.startAt.getTime()) return entry;

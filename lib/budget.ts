@@ -8,7 +8,7 @@
 // boundary) -- this recomputes from the raw Entry rows on every call.
 
 import { sectionIndexForDateKey, type SectionRange } from '@/lib/timeline';
-import { dateKeyInTimezone } from '@/lib/trip-status';
+import { dateKeyOfDateColumn } from '@/lib/trip-status';
 
 export interface BudgetEntryInput {
   id: string;
@@ -58,16 +58,17 @@ export interface BudgetFilters {
  * Section bands -- rather than reimplementing it, so Budget's notion of
  * "which Section does this Entry belong to" can never drift from the
  * Timeline's. Per AD-2's multi-day-entry attribution rule, only the
- * Entry's own `startAt` anchor date (localized to the Trip's timezone per
- * AD-8) is used -- an Entry is never attributed to more than one Section.
+ * Entry's own `startAt` anchor date is used (its literal calendar date --
+ * an Entry's own recorded time is never re-localized through any timezone,
+ * see dateTimeField's comment) -- an Entry is never attributed to more than
+ * one Section.
  */
 export function deriveLineItems(
   entries: BudgetEntryInput[],
   sections: BudgetSectionInput[],
-  timezone: string,
 ): BudgetLineItem[] {
   return entries.map((entry) => {
-    const dateKey = dateKeyInTimezone(entry.startAt, timezone);
+    const dateKey = dateKeyOfDateColumn(entry.startAt);
     const sectionIndex = sectionIndexForDateKey(dateKey, sections);
     return {
       ...entry,
@@ -110,8 +111,7 @@ export function groupByCurrency(lineItems: BudgetLineItem[]): BudgetCurrencyGrou
 export function aggregateBudget(
   entries: BudgetEntryInput[],
   sections: BudgetSectionInput[],
-  timezone: string,
   filters: BudgetFilters,
 ): BudgetCurrencyGroup[] {
-  return groupByCurrency(filterLineItems(deriveLineItems(entries, sections, timezone), filters));
+  return groupByCurrency(filterLineItems(deriveLineItems(entries, sections), filters));
 }

@@ -70,11 +70,27 @@ export function isDateOrderValid(startDate: Date, endDate: Date): boolean {
  * TimelineEntry's `start_at`/`end_at` (AD-1) are full timestamps, not
  * calendar dates -- unlike `dateOnly` above, this preserves time-of-day and
  * accepts any ISO 8601 datetime string.
+ *
+ * A datetime string with no explicit zone (the shape every date/time picker
+ * in this app submits, e.g. `2026-08-05T15:00`) is always treated as UTC
+ * here, regardless of the server's own runtime timezone -- these are the
+ * traveler's own literal, wall-clock digits, and the app deliberately never
+ * applies any real timezone conversion to an Entry's own recorded time
+ * (only to `now`, for Trip Status / the Timeline's current-position marker
+ * -- see lib/trip-status.ts's `timeOfDayInTimezone`/`dateKeyInTimezone`).
+ * Relying on `new Date(value)`'s own "no zone = server-local time" behavior
+ * would make storage depend on whatever timezone the Node process happens
+ * to run in -- true today (the Docker image runs as UTC) but not a
+ * guaranteed invariant, so it's made explicit here instead. A string that
+ * DOES carry an explicit zone (`Z` or a numeric offset) is parsed as-is,
+ * unchanged.
  */
+const UNZONED_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
 export const dateTimeField = z
   .string()
   .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'Must be a valid date/time' })
-  .transform((value) => new Date(value));
+  .transform((value) => new Date(UNZONED_DATETIME.test(value) ? `${value}Z` : value));
 
 /**
  * Shared start/end ordering check for TimelineEntry types (FR-11/FR-12

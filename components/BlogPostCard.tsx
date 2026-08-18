@@ -18,7 +18,12 @@ import type { BlogPostDTO } from '@/components/BlogPostForm';
 export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; readOnly?: boolean }) {
   void readOnly;
   const isPublished = post.publishedAt !== null;
+  // post.startAt is the Post's own recorded date -- its literal digits, per
+  // the same never-timezone-converted contract as a TimelineEntry's own
+  // startAt (dateTimeField's comment) -- pinned to UTC explicitly so it's
+  // never shifted by the viewer's browser timezone.
   const date = new Date(post.startAt).toLocaleDateString(undefined, {
+    timeZone: 'UTC',
     weekday: 'short',
     month: 'short',
     day: 'numeric',

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { computeTripStatus, dateKeyInTimezone, timeOfDayInTimezone } from '@/lib/trip-status';
+import { computeTripStatus, dateKeyInTimezone, entryClockTime, timeOfDayInTimezone } from '@/lib/trip-status';
 import {
   buildTimelineDays,
   layoutTimelineEntries,
@@ -35,8 +35,12 @@ function formatDayLabel(dateKey: string): string {
   }).format(date);
 }
 
-function formatHHMM(date: Date, timezone: string): string {
-  const { hour, minute } = timeOfDayInTimezone(date, timezone);
+// An entry's own recorded startAt/endAt is its literal wall-clock digits
+// (see dateTimeField's comment) -- `entryClockTime` reads them back with
+// zero timezone conversion, never the Trip's own declared timezone (that's
+// `timeOfDayInTimezone`, used elsewhere on this page only for `now`).
+function formatHHMM(date: Date): string {
+  const { hour, minute } = entryClockTime(date);
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
@@ -49,14 +53,14 @@ function formatHHMM(date: Date, timezone: string): string {
 // between is just the title -- the pill itself already communicates
 // "still ongoing." Reuses the exact same per-entry-type ternary
 // EntryDetailPanel/EntryForm already use, no new vocabulary invented.
-function laneSegmentLabel(segment: TimelineLaneSegment, timezone: string): string {
+function laneSegmentLabel(segment: TimelineLaneSegment): string {
   if (segment.isStart) {
     const word = segment.entryType === 'TRANSPORT' ? 'Departure' : segment.entryType === 'STAY' ? 'Check-in' : 'Start';
-    return `${segment.title} · ${word} ${formatHHMM(segment.startAt, timezone)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.startAt)}`;
   }
   if (segment.isEnd && segment.endAt) {
     const word = segment.entryType === 'TRANSPORT' ? 'Arrival' : segment.entryType === 'STAY' ? 'Check-out' : 'End';
-    return `${segment.title} · ${word} ${formatHHMM(segment.endAt, timezone)}`;
+    return `${segment.title} · ${word} ${formatHHMM(segment.endAt)}`;
   }
   return segment.title;
 }
@@ -117,7 +121,7 @@ export default async function TimelinePage({ params }: PageProps) {
     startAt: entry.startAt,
     endAt: entry.endAt,
   }));
-  const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout, trip.timezone);
+  const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
 
   return (
     <main className="page">
@@ -249,7 +253,7 @@ export default async function TimelinePage({ params }: PageProps) {
                           style={{ ['--span-color' as string]: entryTypeColor(segment.entryType) }}
                         >
                           <span className="entry-chip-span-accent" />
-                          <span>{laneSegmentLabel(segment, trip.timezone)}</span>
+                          <span>{laneSegmentLabel(segment)}</span>
                         </Link>
                       ))}
                     </div>

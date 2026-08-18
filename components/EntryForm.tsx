@@ -55,15 +55,19 @@ interface EntryFormProps {
 
 const ENTRY_TYPES: CreatableEntryType[] = ['STAY', 'TRANSPORT', 'ACTIVITY', 'NOTE'];
 
-// datetime-local inputs want `YYYY-MM-DDTHH:mm` in the *browser's* local
-// time -- converted back to a real ISO instant on submit. (Known v1
-// simplification: there is no per-Trip-timezone entry widget yet, so this
-// reads/writes in whatever timezone the browser itself is set to.)
+// `DateTimeInput` (and the raw `startAt`/`endAt` state it drives) works
+// entirely in `YYYY-MM-DDTHH:mm` literal digits -- an Entry's own recorded
+// time is never converted through any timezone, the browser's or the
+// Trip's own (see dateTimeField's comment for why). Pre-filling the edit
+// form must read those literal digits back with UTC getters, not local
+// ones -- a local read here would show the wrong clock time to anyone
+// editing from a browser set to a different timezone than whoever created
+// the Entry, and silently shift the value if they saved without noticing.
 function toDateTimeLocal(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
 function str(value: unknown): string {
@@ -182,17 +186,25 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
     const body: Record<string, unknown> = {
       title: effectiveTitle,
       description: description || null,
-      startAt: new Date(startAt).toISOString(),
+      // Sent as the raw `YYYY-MM-DDTHH:mm` literal, not routed through a
+      // client-side `Date` object -- `new Date(startAt).toISOString()`
+      // would silently reinterpret it in the *submitting browser's own*
+      // local timezone before converting to UTC, corrupting the literal
+      // digits the traveler just typed. `dateTimeField` (lib/validation.ts)
+      // treats an unzoned datetime string as UTC, so sending it as-is
+      // stores exactly what was typed, with zero timezone involved.
+      startAt,
       notes: notes || null,
       postTripNotes: postTripNotes || null,
     };
 
     if (showEnd) {
       // Send `endAt` whenever this type shows the field at all -- both a
-      // new value (converted to an ISO instant) and an explicit clear
-      // (`null`) so blanking the field on edit actually clears it
-      // server-side instead of leaving the stale stored value in place.
-      body.endAt = endAt ? new Date(endAt).toISOString() : null;
+      // new literal value and an explicit clear (`null`) so blanking the
+      // field on edit actually clears it server-side instead of leaving
+      // the stale stored value in place. Same raw-literal reasoning as
+      // `startAt` above.
+      body.endAt = endAt || null;
     }
 
     // FR-15: Contact Information is shared by every TimelineEntry type,

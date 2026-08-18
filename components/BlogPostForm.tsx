@@ -32,13 +32,17 @@ interface BlogPostFormProps {
 // "no location/expense/booking/contact"), and no `publishedAt` field
 // anywhere on this form -- that's the dedicated Publish/Unpublish action's
 // job alone (AD-10; see components/BlogPostDetailPanel.tsx), never this
-// create/edit path. Same `datetime-local` round-trip convention as
-// EntryForm.tsx.
+// create/edit path.
+//
+// `startAt` is an Entry's own recorded time (see dateTimeField's comment)
+// -- read back with UTC getters, never local ones, so the pre-filled value
+// is always the literal digits originally typed, regardless of which
+// browser/timezone is doing the editing.
 function toDateTimeLocal(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 }
 
 export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPostFormProps) {
@@ -66,7 +70,10 @@ export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPost
     const body: Record<string, unknown> = {
       title,
       description: description || null,
-      startAt: new Date(startAt).toISOString(),
+      // Sent as the raw `YYYY-MM-DDTHH:mm` literal -- see EntryForm.tsx's
+      // matching comment for why `new Date(startAt).toISOString()` would
+      // silently corrupt it via the submitting browser's own timezone.
+      startAt,
       isPrivate,
     };
 

@@ -32,7 +32,7 @@ describe('aggregateBudget / groupByCurrency (I/O matrix: mixed currencies)', () 
       entry({ id: '2', expenseAmount: 2500, expenseCurrency: 'THB' }),
       entry({ id: '3', expenseAmount: 50, expenseCurrency: 'USD' }),
     ];
-    const groups = aggregateBudget(entries, [], 'UTC', {});
+    const groups = aggregateBudget(entries, [], {});
 
     expect(groups).toHaveLength(2);
     const thb = groups.find((g) => g.currency === 'THB');
@@ -54,14 +54,14 @@ describe('aggregateBudget / groupByCurrency (I/O matrix: mixed currencies)', () 
       entry({ id: '2', expenseCurrency: 'EUR' }),
       entry({ id: '3', expenseCurrency: 'THB' }),
     ];
-    const groups = aggregateBudget(entries, [], 'UTC', {});
+    const groups = aggregateBudget(entries, [], {});
     expect(groups.map((g) => g.currency)).toEqual(['EUR', 'THB', 'USD']);
   });
 });
 
 describe('aggregateBudget (I/O matrix: no expenses recorded)', () => {
   it('returns an empty array (not a group with a $0 total) when there are no Expense-carrying Entries', () => {
-    const groups = aggregateBudget([], [], 'UTC', {});
+    const groups = aggregateBudget([], [], {});
     expect(groups).toEqual([]);
   });
 });
@@ -73,7 +73,7 @@ describe('filterLineItems (I/O matrix: filter by Entry Type)', () => {
       entry({ id: '2', entryType: 'ACTIVITY', expenseAmount: 40 }),
       entry({ id: '3', entryType: 'STAY', expenseAmount: 60 }),
     ];
-    const groups = aggregateBudget(entries, [], 'UTC', { entryType: 'STAY' });
+    const groups = aggregateBudget(entries, [], { entryType: 'STAY' });
     expect(groups).toHaveLength(1);
     expect(groups[0].total).toBe(160);
     expect(groups[0].lineItems.map((i) => i.id)).toEqual(['1', '3']);
@@ -97,7 +97,7 @@ describe('deriveLineItems / Section filter (I/O matrix: filter by Section, AD-2)
 
   it("attributes an Entry to the Section containing its own start date", () => {
     const entries = [entry({ id: '1', startAt: new Date('2026-08-03T10:00:00.000Z') })];
-    const [lineItem] = deriveLineItems(entries, sections, 'UTC');
+    const [lineItem] = deriveLineItems(entries, sections);
     expect(lineItem.sectionId).toBe('sec-1');
   });
 
@@ -109,7 +109,7 @@ describe('deriveLineItems / Section filter (I/O matrix: filter by Section, AD-2)
       { id: 'sec-1', startDate: new Date('2026-08-01T00:00:00.000Z'), endDate: new Date('2026-08-02T00:00:00.000Z') },
     ];
     const entries = [entry({ id: '1', startAt: new Date('2026-08-15T10:00:00.000Z') })];
-    const [lineItem] = deriveLineItems(entries, gapSections, 'UTC');
+    const [lineItem] = deriveLineItems(entries, gapSections);
     expect(lineItem.sectionId).toBeNull();
   });
 
@@ -119,7 +119,7 @@ describe('deriveLineItems / Section filter (I/O matrix: filter by Section, AD-2)
     // date (Aug 4) is in sec-1; the fact its title implies a longer stay
     // is irrelevant to lib/budget.ts, which only ever looks at startAt.
     const entries = [entry({ id: '1', startAt: new Date('2026-08-04T22:00:00.000Z') })];
-    const [lineItem] = deriveLineItems(entries, sections, 'UTC');
+    const [lineItem] = deriveLineItems(entries, sections);
     expect(lineItem.sectionId).toBe('sec-1');
   });
 
@@ -128,20 +128,21 @@ describe('deriveLineItems / Section filter (I/O matrix: filter by Section, AD-2)
       entry({ id: '1', startAt: new Date('2026-08-03T10:00:00.000Z'), expenseAmount: 100 }), // sec-1
       entry({ id: '2', startAt: new Date('2026-08-08T10:00:00.000Z'), expenseAmount: 250 }), // sec-2
     ];
-    const groups = aggregateBudget(entries, sections, 'UTC', { sectionId: 'sec-1' });
+    const groups = aggregateBudget(entries, sections, { sectionId: 'sec-1' });
     expect(groups).toHaveLength(1);
     expect(groups[0].lineItems.map((i) => i.id)).toEqual(['1']);
     expect(groups[0].total).toBe(100);
   });
 
-  it("localizes an Entry's date to the Trip's own timezone (AD-8), not raw UTC", () => {
-    // 2026-08-05T20:00:00Z is already 2026-08-06 03:00 in Asia/Bangkok
-    // (UTC+7) -- so this Entry belongs to sec-2 (Aug 6-10) in the Trip's
-    // own timezone, even though its raw UTC date (Aug 5) would put it in
-    // sec-1 (Aug 1-5).
+  // spec-timeline-ux-and-timezone (correction): an Entry's own startAt is
+  // its literal wall-clock digits, never re-localized through the Trip's
+  // declared timezone (see dateTimeField's comment) -- so this Entry
+  // belongs to sec-1 (its own literal Aug 5 date), with no timezone
+  // involved in the attribution at all.
+  it("attributes an Entry to the Section containing its own literal date, with no timezone conversion", () => {
     const entries = [entry({ id: '1', startAt: new Date('2026-08-05T20:00:00.000Z') })];
-    const [lineItem] = deriveLineItems(entries, sections, 'Asia/Bangkok');
-    expect(lineItem.sectionId).toBe('sec-2');
+    const [lineItem] = deriveLineItems(entries, sections);
+    expect(lineItem.sectionId).toBe('sec-1');
   });
 });
 
@@ -153,7 +154,7 @@ describe('Entry with no Expense (I/O matrix)', () => {
     // ever reaches this module. This test just locks down that
     // groupByCurrency itself never synthesizes an extra $0 entry.
     const groups = groupByCurrency(
-      deriveLineItems([entry({ id: '1', expenseAmount: 100 })], [], 'UTC'),
+      deriveLineItems([entry({ id: '1', expenseAmount: 100 })], []),
     );
     expect(groups).toHaveLength(1);
     expect(groups[0].lineItems).toHaveLength(1);

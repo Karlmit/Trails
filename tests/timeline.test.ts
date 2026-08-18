@@ -162,7 +162,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
     const days = buildTimelineDays(trip, []);
     const entries = [entry({ id: 'a1', title: 'Boat tour', startAt: new Date('2026-08-03T09:00:00.000Z') })];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
 
     expect(laneCount).toBe(0);
     const day = laidOut.find((d) => d.dateKey === '2026-08-03')!;
@@ -182,7 +182,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
     expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots).toHaveLength(1);
   });
 
@@ -199,7 +199,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
 
     expect(laneCount).toBe(1);
     const spanned = ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06'];
@@ -236,7 +236,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
 
     const startDay = laidOut.find((d) => d.dateKey === '2026-08-03')!.laneSegments[0]!;
     const middleDay = laidOut.find((d) => d.dateKey === '2026-08-04')!.laneSegments[0]!;
@@ -268,7 +268,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
 
     expect(laneCount).toBe(2);
     const overlapDay = laidOut.find((d) => d.dateKey === '2026-08-04')!;
@@ -296,7 +296,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { laneCount } = layoutTimelineEntries(days, entries);
     expect(laneCount).toBe(1);
   });
 
@@ -323,7 +323,7 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
     expect(laneCount).toBe(1);
     // Days exclusively within each entry's own span still carry that
     // entry's segment.
@@ -353,13 +353,16 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { laneCount } = layoutTimelineEntries(days, entries, 'UTC');
+    const { laneCount } = layoutTimelineEntries(days, entries);
     expect(laneCount).toBe(2);
   });
 
-  it('uses the Trip timezone, not UTC, to decide single-day vs. multi-day', () => {
-    // 23:00 UTC on Aug 3 is already 06:00 on Aug 4 in Asia/Bangkok (+7) --
-    // and this entry's end is 30 minutes later, same Bangkok calendar day.
+  // spec-timeline-ux-and-timezone (correction): an Entry's own startAt/endAt
+  // are the traveler's literal wall-clock digits, never re-localized
+  // through the Trip's declared timezone (see dateTimeField's comment) --
+  // so single-day-vs-multi-day is decided from the literal UTC calendar
+  // date alone, with no Trip timezone involved at all.
+  it("decides single-day vs. multi-day from the entry's own literal date, not any timezone conversion", () => {
     const trip = { startDate: dateOnly('2026-08-01'), endDate: dateOnly('2026-08-10') };
     const days = buildTimelineDays(trip, []);
     const entries = [
@@ -371,10 +374,10 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries, 'Asia/Bangkok');
+    const { days: laidOut, laneCount } = layoutTimelineEntries(days, entries);
 
     expect(laneCount).toBe(0);
-    expect(laidOut.find((d) => d.dateKey === '2026-08-04')!.dots.map((d) => d.id)).toEqual(['a1']);
+    expect(laidOut.find((d) => d.dateKey === '2026-08-03')!.dots.map((d) => d.id)).toEqual(['a1']);
   });
 
   it('drops an entry dated entirely outside the Trip range rather than crashing', () => {
@@ -388,8 +391,8 @@ describe('layoutTimelineEntries (FR-11..FR-15)', () => {
       }),
     ];
 
-    expect(() => layoutTimelineEntries(days, entries, 'UTC')).not.toThrow();
-    const { days: laidOut } = layoutTimelineEntries(days, entries, 'UTC');
+    expect(() => layoutTimelineEntries(days, entries)).not.toThrow();
+    const { days: laidOut } = layoutTimelineEntries(days, entries);
     expect(laidOut.every((d) => d.dots.length === 0)).toBe(true);
   });
 });

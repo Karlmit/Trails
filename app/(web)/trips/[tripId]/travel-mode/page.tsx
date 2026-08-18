@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { computeTripStatus, dateKeyInTimezone } from '@/lib/trip-status';
+import { computeTripStatus, dateKeyInTimezone, dateKeyOfDateColumn } from '@/lib/trip-status';
 import { sectionIndexForDateKey } from '@/lib/timeline';
 import { timelineVisibleEntryWhere, entryDetailHref } from '@/lib/entry-types';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
@@ -23,9 +23,13 @@ interface TravelModeEntryRow {
   locationAddress: string | null;
 }
 
-function formatEntryTime(date: Date, timezone: string): string {
+// An Entry's own recorded startAt is its literal wall-clock digits (see
+// dateTimeField's comment) -- pinned to UTC explicitly here so the
+// formatted time is always exactly what the traveler typed, never
+// re-localized through the Trip's own declared timezone.
+function formatEntryTime(date: Date): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
+    timeZone: 'UTC',
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -97,19 +101,21 @@ export default async function TravelModePage({ params }: PageProps) {
   const currentSectionIndex = sectionIndexForDateKey(todayKey, sections);
   const currentSection = currentSectionIndex === null ? null : sections[currentSectionIndex];
 
-  const currentStay = findCurrentStay<TravelModeEntryRow>(entries, now);
+  const currentStay = findCurrentStay<TravelModeEntryRow>(entries, now, timezone);
   const currentActivity = findCurrentActivity<TravelModeEntryRow>(entries, now, timezone);
 
-  const nextOverall = findNextByType<TravelModeEntryRow>(entries, now);
-  const nextTransport = findNextByType<TravelModeEntryRow>(entries, now, 'TRANSPORT');
-  const nextActivity = findNextByType<TravelModeEntryRow>(entries, now, 'ACTIVITY');
-  const nextStay = findNextByType<TravelModeEntryRow>(entries, now, 'STAY');
+  const nextOverall = findNextByType<TravelModeEntryRow>(entries, now, timezone);
+  const nextTransport = findNextByType<TravelModeEntryRow>(entries, now, timezone, 'TRANSPORT');
+  const nextActivity = findNextByType<TravelModeEntryRow>(entries, now, timezone, 'ACTIVITY');
+  const nextStay = findNextByType<TravelModeEntryRow>(entries, now, timezone, 'STAY');
 
   // Quick-access "today's full itinerary": every visible entry whose own
-  // date (localized to the Trip's timezone, AD-8) equals todayKey, rendered
-  // as a simple list on this page rather than a separate route.
+  // literal calendar date (never re-localized through any timezone -- see
+  // dateTimeField's comment) equals todayKey (real-time-based, correctly
+  // localized to the Trip's own timezone), rendered as a simple list on
+  // this page rather than a separate route.
   const todaysEntries = entries
-    .filter((entry) => dateKeyInTimezone(entry.startAt, timezone) === todayKey)
+    .filter((entry) => dateKeyOfDateColumn(entry.startAt) === todayKey)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
   function EntryRow({ entry }: { entry: TravelModeEntryRow }) {
@@ -121,7 +127,7 @@ export default async function TravelModePage({ params }: PageProps) {
           <span className="text-soft">
             {ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}
             {entry.subtype ? ` · ${subtypeLabel(entry.subtype)}` : ''} ·{' '}
-            {formatEntryTime(entry.startAt, timezone)}
+            {formatEntryTime(entry.startAt)}
           </span>
         </div>
         {mapsUrl && (
