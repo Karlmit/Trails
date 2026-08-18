@@ -1,8 +1,7 @@
 // Trails — foundation schema (User, Session, Trip, Section, TimelineEntry).
-// AD-4's polymorphic Tags/Links tables are still a later spec
-// (spec-timeline-entries explicitly excludes file upload UI). Photos remain
-// deferred too; Attachments landed in spec-documents.md (FR-24/FR-25) --
-// see the Attachment model below.
+// AD-4's polymorphic Tags/Links/Photos tables landed in
+// spec-tags-links-photos.md, alongside Attachments (spec-documents.md,
+// FR-24/FR-25) -- see the Attachment/Tag/Link/Photo models below.
 //
 // AD-2's Section EXCLUDE USING gist constraint (btree_gist) is not
 // representable in the Prisma schema language. It is added as raw SQL in
@@ -91,6 +90,7 @@ model Trip {
   checklists     Checklist[]
   attachments    Attachment[]
   importantInfo  ImportantInfo[]
+  photos         Photo[]
 
   @@map("trips")
 }
@@ -400,17 +400,28 @@ model ImportantInfo {
   @@map("important_info")
 }
 
-// FR-24/FR-25, spec-documents: a file uploaded to some owning row. AD-4's
-// Rule enumerates owner_type as "one of TimelineEntry | Idea | ImportantInfo"
-// -- TIMELINE_ENTRY and IMPORTANT_INFO are real members (Idea deliberately
-// never gets Attachment support per FR-16). IMPORTANT_INFO was added by
-// spec-important-info.md's migration (prisma/migrations/<timestamp>_important_info)
-// via `ALTER TYPE ... ADD VALUE`, additive and touching no existing row.
-enum AttachmentOwnerType {
+// spec-tags-links-photos: originally `AttachmentOwnerType` (TIMELINE_ENTRY |
+// IMPORTANT_INFO only, Idea deliberately excluded from Attachments per
+// FR-16). Tags/Links/Photos need all three owner types
+// (TIMELINE_ENTRY | IDEA | IMPORTANT_INFO per AD-4's literal Rule), and
+// defining three more near-identical enums would recreate the exact "two
+// incompatible owner_type conventions for the same conceptual entity" AD-4's
+// own "Prevents" clause warns against -- so this migration renames the type
+// itself (`ALTER TYPE attachment_owner_type RENAME TO
+// polymorphic_owner_type`, safe/additive/no existing value touched) and adds
+// `IDEA` as a new member, then reuses this one enum as the `owner_type`
+// column type on Attachment, Tag, Link, and Photo alike. Attachment's own
+// allowed subset at the application layer is unchanged (still
+// TIMELINE_ENTRY | IMPORTANT_INFO only, enforced in
+// app/api/v1/attachments/route.ts) -- the shared DB enum doesn't weaken
+// that, it only removes the duplicate-type-definition risk. See
+// prisma/migrations/20260818000000_tags_links_photos/migration.sql.
+enum PolymorphicOwnerType {
   TIMELINE_ENTRY
   IMPORTANT_INFO
+  IDEA
 
-  @@map("attachment_owner_type")
+  @@map("polymorphic_owner_type")
 }
 
 model Attachment {
@@ -427,8 +438,13 @@ model Attachment {
   // delete-attachments-first step in that route's DELETE handler
   // (app/api/v1/timeline-entries/[entryId]/route.ts), documented inline
   // there since Prisma can't express this FK's cascade declaratively.
-  ownerType AttachmentOwnerType @map("owner_type")
-  ownerId   String              @db.Uuid @map("owner_id")
+  // Attachment's own allowed subset (TIMELINE_ENTRY | IMPORTANT_INFO) is
+  // still enforced at the application layer only -- IDEA is a valid enum
+  // value but every Attachment Route Handler still 400s it (spec-tags-
+  // links-photos's "Never" boundary: "No change to Attachment's own
+  // allowed-owner-type subset").
+  ownerType PolymorphicOwnerType @map("owner_type")
+  ownerId   String               @db.Uuid @map("owner_id")
 
   // AD-5: only path + metadata is ever stored here -- file bytes always live
   // on the `uploads` volume at exactly this path, never in Postgres.
@@ -451,4 +467,96 @@ model Attachment {
   @@index([tripId])
   @@index([ownerType, ownerId])
   @@map("attachments")
+}
+
+// FR-15/FR-16/FR-26, spec-tags-links-photos, AD-4: one row per free-text tag
+// label (not a JSON array column) -- distinct from Idea.weatherTags, which
+// stays its own simpler, unrelated mechanism (see Idea's own schema comment
+// above). Same non-FK polymorphic (ownerType, ownerId) pattern as
+// Attachment.ownerId -- cascade-cleanup lives in each owning entity's own
+// DELETE route (app/api/v1/timeline-entries, ideas, important-info), not a
+// DB constraint. No Guest-facing surface (spec's "Never" boundary) and no
+// tag-based filtering/search UI in this pass (spec's "Ask First" boundary,
+// not requested by any FR).
+model Tag {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerType PolymorphicOwnerType @map("owner_type")
+  ownerId   String               @db.Uuid @map("owner_id")
+
+  text String
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerType, ownerId])
+  @@map("tags")
+}
+
+// FR-15/FR-16/FR-26, spec-tags-links-photos, AD-4: a labeled URL attached to
+// a TimelineEntry/Idea/ImportantInfo row. Same polymorphic (ownerType,
+// ownerId) pattern as Tag above -- no Guest-facing surface (spec's "Never"
+// boundary: only Photos are Guest-visible per FR-28's literal text).
+model Link {
+  id String @id @default(uuid()) @db.Uuid
+
+  ownerType PolymorphicOwnerType @map("owner_type")
+  ownerId   String               @db.Uuid @map("owner_id")
+
+  url   String
+  label String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([ownerType, ownerId])
+  @@map("links")
+}
+
+// FR-3/FR-15/FR-16/FR-26/FR-28, spec-tags-links-photos, AD-4: a photo
+// attached to a TimelineEntry/Idea/ImportantInfo row. Same
+// upload-metadata-only shape as Attachment (AD-5: only path + metadata ever
+// stored here, file bytes live on the uploads volume) but image-only
+// (image/jpeg | image/png, enforced by lib/photos.ts -- no PDF, these are
+// Photos not generic Attachments) and, unlike Attachment/Tag/Link, part of
+// the Guest-visible surface (FR-3/FR-28) via `isPrivate` -- the only place
+// that flag is evaluated for read access is `filterForViewer`
+// (lib/viewer.ts, spec-guest-access), reused here, not reinvented.
+//
+// `isPrimary` implements Cover Photo (FR-15's "thumbnail in list views"): at
+// most one `isPrimary = true` row per (owner_type, owner_id), enforced by a
+// partial unique index -- not representable in Prisma's schema language
+// (same documented limitation as AD-2's EXCLUDE constraint on Section
+// above), so it's added as raw SQL in this feature's own migration
+// (prisma/migrations/20260818000000_tags_links_photos/migration.sql) and is
+// authoritative there. This file intentionally does not model it.
+model Photo {
+  id String @id @default(uuid()) @db.Uuid
+
+  // AD-5: "the upload handler resolves trip_id via the owner lookup before
+  // writing" -- denormalized, same as Attachment.tripId, so a genuine DB-level
+  // FK/cascade exists even though ownerId itself can't be a declared relation.
+  tripId String @map("trip_id") @db.Uuid
+
+  ownerType PolymorphicOwnerType @map("owner_type")
+  ownerId   String               @db.Uuid @map("owner_id")
+
+  filePath         String @map("file_path")
+  mimeType         String @map("mime_type")
+  sizeBytes        Int    @map("size_bytes")
+  originalFilename String @map("original_filename")
+
+  // Cover Photo (FR-15) -- at most one true per owner (partial unique index,
+  // raw SQL migration, see model comment above).
+  isPrimary Boolean @default(false) @map("is_primary")
+  // FR-3/FR-28: Guest-visibility flag, evaluated only by
+  // lib/viewer.ts's `filterForViewer` -- same semantics/shape as
+  // TimelineEntry.isPrivate (spec-guest-access).
+  isPrivate Boolean @default(false) @map("is_private")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([ownerType, ownerId])
+  @@map("photos")
 }

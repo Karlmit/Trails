@@ -1,3 +1,4 @@
+import { unlink } from 'node:fs/promises';
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { ZodError } from 'zod';
@@ -102,8 +103,26 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const existing = await prisma.idea.findUnique({ where: { id: ideaId } });
   if (!existing) return Errors.notFound('Idea not found');
 
+  // spec-tags-links-photos, Boundaries: "the existing convert Route Handler
+  // needs this added ... Idea never gets Attachments (Idea never gets
+  // Attachments today) but now needs the same Tag/Link/Photo cleanup
+  // Entry/ImportantInfo already have for Attachments." Idea has no
+  // Attachment rows to clean up (FR-16 still excludes it), but does now
+  // have Tag/Link/Photo -- same non-FK polymorphic cascade pattern as
+  // app/api/v1/timeline-entries/[entryId]/route.ts's DELETE, including the
+  // same "Photo files also removed, best-effort" behavior.
+  const photosToDelete = await prisma.photo.findMany({
+    where: { ownerType: 'IDEA', ownerId: ideaId },
+    select: { filePath: true },
+  });
+
   try {
-    await prisma.idea.delete({ where: { id: ideaId } });
+    await prisma.$transaction([
+      prisma.tag.deleteMany({ where: { ownerType: 'IDEA', ownerId: ideaId } }),
+      prisma.link.deleteMany({ where: { ownerType: 'IDEA', ownerId: ideaId } }),
+      prisma.photo.deleteMany({ where: { ownerType: 'IDEA', ownerId: ideaId } }),
+      prisma.idea.delete({ where: { id: ideaId } }),
+    ]);
   } catch (err) {
     if (isRecordNotFoundError(err)) {
       revalidatePath(`/trips/${existing.tripId}/ideas`);
@@ -111,6 +130,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     throw err;
   }
+
+  await Promise.all(
+    photosToDelete.map((photo) =>
+      unlink(photo.filePath).catch((err: NodeJS.ErrnoException) => {
+        if (err?.code !== 'ENOENT') {
+          console.error(`Failed to delete photo file at ${photo.filePath}:`, err);
+        }
+      }),
+    ),
+  );
 
   revalidatePath(`/trips/${existing.tripId}/ideas`);
 

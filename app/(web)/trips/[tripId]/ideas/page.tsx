@@ -29,7 +29,18 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
   });
   if (!trip) notFound();
 
-  const allIdeas = trip.ideas.map(serializeIdea);
+  // spec-tags-links-photos: FR-15's "thumbnail in list views" -- one query
+  // for every Idea's Cover Photo (if any), attached below by ownerId.
+  const primaryPhotos = await prisma.photo.findMany({
+    where: { ownerType: 'IDEA', ownerId: { in: trip.ideas.map((idea) => idea.id) }, isPrimary: true },
+    select: { id: true, ownerId: true },
+  });
+  const primaryPhotoByIdeaId = new Map(primaryPhotos.map((photo) => [photo.ownerId, photo.id]));
+
+  const allIdeas = trip.ideas.map((idea) => ({
+    ...serializeIdea(idea),
+    primaryPhotoId: primaryPhotoByIdeaId.get(idea.id) ?? null,
+  }));
   const tagOptions = distinctWeatherTags(allIdeas);
   const ideas = filterIdeas(allIdeas, { priority, weatherTag });
 

@@ -1,3 +1,4 @@
+import { unlink } from 'node:fs/promises';
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { ZodError } from 'zod';
@@ -164,6 +165,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return Errors.notFound('Entry not found');
   }
 
+  // spec-tags-links-photos, I/O matrix: "Delete the owning TimelineEntry ...
+  // Owner has Tags, Links, and Photos -- All three types of rows deleted
+  // (Photo files deleted from disk best-effort, matching Attachment's own
+  // delete-file-on-single-item-delete behavior -- NOT the 'orphan on
+  // owner-delete' behavior, since that was specific to bulk owner deletion
+  // cascades)." Unlike Attachment's cascade (rows only, files deliberately
+  // left on disk), Photo's cascade here also removes the files -- fetched
+  // before the transaction so their paths are still known afterward.
+  const photosToDelete = await prisma.photo.findMany({
+    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
+    select: { filePath: true },
+  });
+
   try {
     // spec-documents (FR-24/FR-25), frozen I/O matrix: "Entry delete
     // cascades -- Attachment rows gone too (rows only; files remain on
@@ -173,9 +187,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // atomically in one transaction. The orphaned files this leaves behind
     // are a disclosed, deliberate deferral -- see deferred-work.md -- not an
     // oversight; deleting them too would go beyond what the frozen matrix
-    // calls for.
+    // calls for. Tag/Link/Photo rows are the same non-FK polymorphic
+    // pattern (AD-4), added to this same transaction by spec-tags-links-photos.
     await prisma.$transaction([
       prisma.attachment.deleteMany({ where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId } }),
+      prisma.tag.deleteMany({ where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId } }),
+      prisma.link.deleteMany({ where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId } }),
+      prisma.photo.deleteMany({ where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId } }),
       prisma.timelineEntry.delete({ where: { id: entryId } }),
     ]);
   } catch (err) {
@@ -185,6 +203,18 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     throw err;
   }
+
+  // Best-effort, same as the single-Photo DELETE route -- a file already
+  // missing from disk (ENOENT) never blocks the response.
+  await Promise.all(
+    photosToDelete.map((photo) =>
+      unlink(photo.filePath).catch((err: NodeJS.ErrnoException) => {
+        if (err?.code !== 'ENOENT') {
+          console.error(`Failed to delete photo file at ${photo.filePath}:`, err);
+        }
+      }),
+    ),
+  );
 
   revalidateEntry(existing.tripId, entryId, existing.entryType);
   revalidatePath(`/trips/${existing.tripId}/documents`);

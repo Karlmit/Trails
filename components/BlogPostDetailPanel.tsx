@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
 import { AttachmentList } from '@/components/AttachmentList';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -18,12 +21,18 @@ export function BlogPostDetailPanel({
   tripId,
   post: initialPost,
   readOnly = false,
+  photos,
 }: {
   tripId: string;
   post: BlogPostDTO;
   // spec-guest-access: hides Publish/Unpublish/Edit/Delete (and the
   // AttachmentList's upload/delete affordances) entirely for a Guest.
   readOnly?: boolean;
+  // spec-tags-links-photos: server-fetched, already `filterForViewer`-
+  // filtered Photos (app/(web)/trips/[tripId]/blog/[entryId]/page.tsx) --
+  // see EntryDetailPanel's identical prop for why this is required for a
+  // Guest.
+  photos?: PhotoDTO[];
 }) {
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
@@ -137,6 +146,16 @@ export function BlogPostDetailPanel({
             Published {new Date(post.publishedAt as string).toLocaleString()} · visible on the Timeline
           </p>
         )}
+
+        {!readOnly && <TagList ownerType="TIMELINE_ENTRY" ownerId={post.id} />}
+        {!readOnly && <LinkList ownerType="TIMELINE_ENTRY" ownerId={post.id} />}
+        <PhotoGallery
+          tripId={tripId}
+          ownerType="TIMELINE_ENTRY"
+          ownerId={post.id}
+          readOnly={readOnly}
+          initialPhotos={photos}
+        />
 
         <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} readOnly={readOnly} />
       </div>

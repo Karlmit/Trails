@@ -11,6 +11,11 @@ export interface BlogPostDTO {
   startAt: string;
   publishedAt: string | null;
   isPrivate: boolean;
+  // spec-tags-links-photos: same Cover Photo id shape as IdeaCard's
+  // primaryPhotoId -- app/(web)/trips/[tripId]/blog/page.tsx attaches this.
+  // Optional/absent on the detail page's own DTO (BlogPostDetailPanel
+  // renders the full PhotoGallery instead, via its separate `photos` prop).
+  primaryPhotoId?: string | null;
 }
 
 interface BlogPostFormProps {

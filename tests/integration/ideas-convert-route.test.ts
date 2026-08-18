@@ -3,6 +3,9 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { hasTestDatabase, resetDb, testPrisma } from '../helpers/db';
 import { POST as createIdea } from '@/app/api/v1/ideas/route';
 import { POST as convertIdea } from '@/app/api/v1/ideas/[ideaId]/convert/route';
+import { POST as createTag } from '@/app/api/v1/tags/route';
+import { POST as createLink } from '@/app/api/v1/links/route';
+import { POST as uploadPhoto } from '@/app/api/v1/photos/route';
 import { issueSession } from '@/lib/session';
 
 function jsonRequest(url: string, method: string, body: unknown | undefined, token?: string) {
@@ -212,6 +215,64 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
       ideaParams(UNKNOWN_ID),
     );
     expect(res.status).toBe(404);
+  });
+
+  // AD-4's literal rule, spec-tags-links-photos: "reassigns (not
+  // duplicates) its Tag/Link/Photo rows' ownerType/ownerId to the new
+  // Entry." Acceptance Criteria: "all three appear unchanged on the new
+  // Entry and the Idea itself is gone (not duplicated rows)."
+  it('reassigns Tag/Link/Photo ownership to the new Entry, never duplicating them', async () => {
+    const tagRes = await createTag(
+      jsonRequest('http://localhost/api/v1/tags', 'POST', { ownerType: 'IDEA', ownerId: ideaId, text: 'Foodie' }, token),
+    );
+    const tag = await tagRes.json();
+
+    const linkRes = await createLink(
+      jsonRequest('http://localhost/api/v1/links', 'POST', { ownerType: 'IDEA', ownerId: ideaId, url: 'https://example.com/class' }, token),
+    );
+    const link = await linkRes.json();
+
+    const formData = new FormData();
+    formData.append('ownerType', 'IDEA');
+    formData.append('ownerId', ideaId);
+    formData.append('file', new File([new Uint8Array([1, 2, 3])], 'idea.png', { type: 'image/png' }));
+    const photoRes = await uploadPhoto(
+      new NextRequest('http://localhost/api/v1/photos', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: formData,
+      }),
+    );
+    const photo = await photoRes.json();
+
+    const res = await convertIdea(
+      jsonRequest(
+        `http://localhost/api/v1/ideas/${ideaId}/convert`,
+        'POST',
+        { entryType: 'ACTIVITY', title: 'Cooking class', subtype: 'TOUR', startAt: '2026-08-05T10:00:00.000Z', endAt: '2026-08-05T13:00:00.000Z' },
+        token,
+      ),
+      ideaParams(ideaId),
+    );
+    expect(res.status).toBe(201);
+    const entry = await res.json();
+
+    const storedTag = await testPrisma().tag.findUnique({ where: { id: tag.id } });
+    expect(storedTag?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedTag?.ownerId).toBe(entry.id);
+
+    const storedLink = await testPrisma().link.findUnique({ where: { id: link.id } });
+    expect(storedLink?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedLink?.ownerId).toBe(entry.id);
+
+    const storedPhoto = await testPrisma().photo.findUnique({ where: { id: photo.id } });
+    expect(storedPhoto?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedPhoto?.ownerId).toBe(entry.id);
+
+    // Never duplicated -- exactly one row each, still pointing at the same ids.
+    expect(await testPrisma().tag.count()).toBe(1);
+    expect(await testPrisma().link.count()).toBe(1);
+    expect(await testPrisma().photo.count()).toBe(1);
   });
 
   it('rejects an unauthenticated convert (401)', async () => {

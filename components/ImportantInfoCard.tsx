@@ -1,9 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AttachmentList } from '@/components/AttachmentList';
 import { ImportantInfoForm } from '@/components/ImportantInfoForm';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -19,6 +23,10 @@ export interface ImportantInfoDTO {
   contactPhone: string | null;
   contactEmail: string | null;
   isPrivate: boolean;
+  // spec-tags-links-photos: same Cover Photo id shape as IdeaCard's
+  // primaryPhotoId (see that component's comment) --
+  // app/(web)/trips/[tripId]/important-info/page.tsx attaches this.
+  primaryPhotoId?: string | null;
 }
 
 // FR-26, spec-important-info: view/edit/delete a single ImportantInfo item,
@@ -126,6 +134,18 @@ export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDT
         </div>
       </div>
 
+      {item.primaryPhotoId && (
+        <Image
+          src={`/api/v1/photos/${item.primaryPhotoId}/file`}
+          alt=""
+          width={80}
+          height={80}
+          className="card-cover-photo"
+          // See components/PhotoGallery.tsx's identical comment.
+          unoptimized
+        />
+      )}
+
       {item.content && <p className="text-soft text-multiline" style={{ margin: 0 }}>{item.content}</p>}
 
       {(item.locationName || item.locationAddress) && (
@@ -157,6 +177,10 @@ export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDT
           </dd>
         </div>
       )}
+
+      <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} />
+      <LinkList ownerType="IMPORTANT_INFO" ownerId={item.id} />
+      <PhotoGallery tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
 
       <AttachmentList tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
     </div>

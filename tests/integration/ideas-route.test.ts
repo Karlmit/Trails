@@ -1,8 +1,12 @@
 import { NextRequest } from 'next/server';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { hasTestDatabase, resetDb, testPrisma } from '../helpers/db';
+import { existsSync } from 'node:fs';
 import { GET as listIdeas, POST as createIdea } from '@/app/api/v1/ideas/route';
 import { DELETE as deleteIdea, PATCH as patchIdea } from '@/app/api/v1/ideas/[ideaId]/route';
+import { POST as createTag } from '@/app/api/v1/tags/route';
+import { POST as createLink } from '@/app/api/v1/links/route';
+import { POST as uploadPhoto } from '@/app/api/v1/photos/route';
 import { issueSession } from '@/lib/session';
 
 function jsonRequest(url: string, method: string, body: unknown | undefined, token?: string) {
@@ -250,6 +254,50 @@ describe.skipIf(!hasTestDatabase)('ideas route', () => {
         ideaParams('not-a-uuid'),
       );
       expect(res.status).toBe(404);
+    });
+
+    // spec-tags-links-photos, Boundaries: "Idea's DELETE route ... doesn't
+    // cascade-clean Attachments today (Idea never gets Attachments) but now
+    // needs the same Tag/Link/Photo cleanup Entry/ImportantInfo already
+    // have for Attachments." Photo files are also removed from disk,
+    // best-effort, matching the same behavior as the Entry/ImportantInfo
+    // cascades.
+    it('cascades: deleting an Idea also deletes its Tag/Link/Photo rows (and Photo files)', async () => {
+      const tagRes = await createTag(
+        jsonRequest('http://localhost/api/v1/tags', 'POST', { ownerType: 'IDEA', ownerId: ideaId, text: 'Foodie' }, token),
+      );
+      const linkRes = await createLink(
+        jsonRequest('http://localhost/api/v1/links', 'POST', { ownerType: 'IDEA', ownerId: ideaId, url: 'https://example.com' }, token),
+      );
+
+      const formData = new FormData();
+      formData.append('ownerType', 'IDEA');
+      formData.append('ownerId', ideaId);
+      formData.append('file', new File([new Uint8Array([1, 2, 3])], 'idea.png', { type: 'image/png' }));
+      const photoRes = await uploadPhoto(
+        new NextRequest('http://localhost/api/v1/photos', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+          body: formData,
+        }),
+      );
+      const photo = await photoRes.json();
+      const storedPhoto = await testPrisma().photo.findUnique({ where: { id: photo.id } });
+
+      expect((await tagRes.json()).id).toBeTruthy();
+      expect((await linkRes.json()).id).toBeTruthy();
+      expect(existsSync(storedPhoto!.filePath)).toBe(true);
+
+      const res = await deleteIdea(
+        jsonRequest(`http://localhost/api/v1/ideas/${ideaId}`, 'DELETE', undefined, token),
+        ideaParams(ideaId),
+      );
+      expect(res.status).toBe(204);
+
+      expect(await testPrisma().tag.count({ where: { ownerId: ideaId } })).toBe(0);
+      expect(await testPrisma().link.count({ where: { ownerId: ideaId } })).toBe(0);
+      expect(await testPrisma().photo.count({ where: { ownerId: ideaId } })).toBe(0);
+      expect(existsSync(storedPhoto!.filePath)).toBe(false);
     });
 
     it('rejects an unauthenticated PATCH/DELETE', async () => {

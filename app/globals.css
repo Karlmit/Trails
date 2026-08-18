@@ -795,3 +795,51 @@ p {
 .checklist-item-remove:hover {
   color: var(--color-danger);
 }
+
+/* FR-15/FR-16/FR-26/FR-28, spec-tags-links-photos: PhotoGallery's grid of
+   thumbnails (components/PhotoGallery.tsx). No server-side thumbnailing
+   (AD-5) -- these are next/image-optimized renders of the stored original,
+   just laid out here. */
+.photo-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.photo-thumb-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.photo-thumb {
+  border-radius: var(--radius-input);
+  object-fit: cover;
+  background: var(--color-surface-cool);
+}
+
+.photo-thumb-primary-badge {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  background: var(--color-brand-deep);
+  color: #fff;
+}
+
+.photo-thumb-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+  max-width: 140px;
+}
+
+/* Cover Photo thumbnail on card-shaped list views (IdeaCard, BlogPostCard,
+   ImportantInfoCard) -- spec's "Scope of 'list view thumbnail'". */
+.card-cover-photo {
+  border-radius: var(--radius-input);
+  object-fit: cover;
+  float: right;
+  margin-left: var(--space-3);
+}

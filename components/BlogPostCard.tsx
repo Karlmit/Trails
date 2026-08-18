@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
 
@@ -32,6 +33,17 @@ export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; re
           {isPublished ? 'Published' : 'Draft'}
         </span>
       </div>
+      {post.primaryPhotoId && (
+        <Image
+          src={`/api/v1/photos/${post.primaryPhotoId}/file`}
+          alt=""
+          width={80}
+          height={80}
+          className="card-cover-photo"
+          // See components/PhotoGallery.tsx's identical comment.
+          unoptimized
+        />
+      )}
       <div className="text-soft">{date}</div>
       {post.description && (
         <p className="text-soft text-multiline" style={{ margin: 0 }}>

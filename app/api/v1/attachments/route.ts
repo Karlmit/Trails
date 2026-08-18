@@ -2,7 +2,7 @@ import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import type { AttachmentOwnerType } from '@prisma/client';
+import type { PolymorphicOwnerType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
@@ -29,7 +29,7 @@ const MAX_ORIGINAL_FILENAME_LENGTH = 255;
 // other Attachment code changes.
 const ATTACHMENT_OWNER_TYPES = ['TIMELINE_ENTRY', 'IMPORTANT_INFO'] as const;
 
-function isAttachmentOwnerType(value: string): value is AttachmentOwnerType {
+function isAttachmentOwnerType(value: string): value is PolymorphicOwnerType {
   return (ATTACHMENT_OWNER_TYPES as readonly string[]).includes(value);
 }
 
@@ -42,7 +42,7 @@ function isAttachmentOwnerType(value: string): value is AttachmentOwnerType {
  * than the function growing an owner-type-specific return shape.
  */
 async function resolveOwnerTripId(
-  ownerType: AttachmentOwnerType,
+  ownerType: PolymorphicOwnerType,
   ownerId: string,
 ): Promise<{ tripId: string; entryType?: string } | null> {
   if (ownerType === 'TIMELINE_ENTRY') {
@@ -58,7 +58,7 @@ async function resolveOwnerTripId(
   return null;
 }
 
-function revalidateForOwner(tripId: string, ownerType: AttachmentOwnerType, ownerId: string, entryType?: string) {
+function revalidateForOwner(tripId: string, ownerType: PolymorphicOwnerType, ownerId: string, entryType?: string) {
   revalidatePath(`/trips/${tripId}/documents`);
   if (ownerType === 'TIMELINE_ENTRY' && entryType) {
     revalidatePath(entryDetailHref(tripId, entryType, ownerId));

@@ -22,7 +22,22 @@ export default async function ImportantInfoPage({ params }: PageProps) {
   });
   if (!trip) notFound();
 
-  const items = trip.importantInfo.map(serializeImportantInfo);
+  // spec-tags-links-photos: same "one Cover Photo query per list page" shape
+  // as app/(web)/trips/[tripId]/ideas/page.tsx.
+  const primaryPhotos = await prisma.photo.findMany({
+    where: {
+      ownerType: 'IMPORTANT_INFO',
+      ownerId: { in: trip.importantInfo.map((item) => item.id) },
+      isPrimary: true,
+    },
+    select: { id: true, ownerId: true },
+  });
+  const primaryPhotoByItemId = new Map(primaryPhotos.map((photo) => [photo.ownerId, photo.id]));
+
+  const items = trip.importantInfo.map((item) => ({
+    ...serializeImportantInfo(item),
+    primaryPhotoId: primaryPhotoByItemId.get(item.id) ?? null,
+  }));
 
   return (
     <main className="page">

@@ -44,10 +44,36 @@ export default async function BlogPage({ params }: PageProps) {
   });
   if (!trip || !canViewTrip(trip, viewer)) notFound();
 
+  // spec-tags-links-photos: same "one Cover Photo query per list page" shape
+  // as app/(web)/trips/[tripId]/ideas/page.tsx -- filterForViewer runs first
+  // so a Guest's query never leaks a Draft/Private post's own Cover Photo
+  // via a stray primaryPhotoId either. That first filterForViewer pass only
+  // covers the *post's* own Draft/Private state -- the Photo row has its
+  // own independent isPrivate flag (a post can be public while its cover
+  // photo specifically is marked Private), so a second filterForViewer pass
+  // over the Photo rows themselves is required too (review-caught: this was
+  // previously missing, leaking a Private cover photo's id -- though never
+  // its bytes, since the file-serving route re-derives visibility itself --
+  // to a Guest as a broken-image request).
+  const visiblePosts = filterForViewer(trip.timelineEntries.map(serializeTimelineEntry), viewer);
+  const primaryPhotosRaw = await prisma.photo.findMany({
+    where: {
+      ownerType: 'TIMELINE_ENTRY',
+      ownerId: { in: visiblePosts.map((post) => post.id) },
+      isPrimary: true,
+    },
+    select: { id: true, ownerId: true, isPrivate: true },
+  });
+  const primaryPhotos = filterForViewer(primaryPhotosRaw, viewer);
+  const primaryPhotoByPostId = new Map(primaryPhotos.map((photo) => [photo.ownerId, photo.id]));
+
   // serializeTimelineEntry's return type carries every TimelineEntry field
   // (a strict superset of BlogPostDTO's) -- structurally assignable as-is,
   // no cast needed.
-  const posts: BlogPostDTO[] = filterForViewer(trip.timelineEntries.map(serializeTimelineEntry), viewer);
+  const posts: BlogPostDTO[] = visiblePosts.map((post) => ({
+    ...post,
+    primaryPhotoId: primaryPhotoByPostId.get(post.id) ?? null,
+  }));
 
   return (
     <main className="page">

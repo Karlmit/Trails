@@ -33,9 +33,23 @@ import { prisma } from '@/lib/prisma';
 //     anonymous visitor even allowed to reach this route at all" -- it does
 //     NOT decide whether the underlying Trip is actually Public/Private (a
 //     Private Trip's URL still reaches the page, which 404s it itself via
-//     lib/viewer.ts's canViewTrip/filterForViewer). No /api/v1/** route is
-//     ever added to this allowlist (spec's "Ask First"/"Never": the API
-//     surface's auth model is unchanged by this spec).
+//     lib/viewer.ts's canViewTrip/filterForViewer). spec-guest-access itself
+//     never added an /api/v1/** route to this allowlist -- Attachments/
+//     Tags/Links have no Guest surface at all, so that held with no
+//     exception.
+//   - ONE disclosed exception, added by spec-tags-links-photos (FR-3/FR-28):
+//     `GET /api/v1/photos/{uuid}/file`. Photos, unlike Tags/Links/
+//     Attachments, are genuinely part of the Guest-visible surface (this
+//     spec's Intent: "Guest-facing rendering of the primary/all photos is
+//     ... in scope here"), and a browser's own `<img src>` request for that
+//     file carries no session for an anonymous visitor -- so the bytes
+//     themselves, not just the surrounding page, must be fetchable without
+//     one. Scoped as narrowly as possible: GET only, this one path shape
+//     only (list/upload/delete/mark-primary stay ordinary requireAuth, and
+//     Idea/ImportantInfo-owned Photos are still denied inside the route
+//     handler itself, which re-derives the same Trip/Entry/Photo visibility
+//     the Guest-eligible pages already apply -- see that route's own
+//     comment). No other /api/v1/** route is added here.
 
 const PUBLIC_PAGE_PATHS = new Set(['/login', '/signup']);
 
@@ -68,6 +82,14 @@ function isGuestEligiblePath(pathname: string): boolean {
   return GUEST_ELIGIBLE_PATH.test(pathname);
 }
 
+// spec-tags-links-photos's one disclosed /api/v1/** exception (see the
+// comment block above) -- GET only, this one path shape only.
+const GUEST_ELIGIBLE_API_GET_PATH = new RegExp(`^/api/v1/photos/${UUID_RE}/file$`);
+
+function isGuestEligibleApiGet(pathname: string, method: string): boolean {
+  return method === 'GET' && GUEST_ELIGIBLE_API_GET_PATH.test(pathname);
+}
+
 function bearerToken(request: NextRequest): string | undefined {
   const header = request.headers.get('authorization');
   if (header?.toLowerCase().startsWith('bearer ')) {
@@ -88,6 +110,12 @@ export async function proxy(request: NextRequest) {
 
   if (!result) {
     if (pathname.startsWith('/api/')) {
+      // spec-tags-links-photos, FR-3/FR-28: the one disclosed Guest-eligible
+      // API GET (see the comment block above) -- every other /api/** path
+      // still 401s unauthenticated exactly as before.
+      if (isGuestEligibleApiGet(pathname, request.method)) {
+        return NextResponse.next();
+      }
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 },

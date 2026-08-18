@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { serializeTimelineEntry } from '@/lib/serializers';
+import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import { BlogPostDetailPanel } from '@/components/BlogPostDetailPanel';
@@ -40,12 +40,21 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
 
   const post: BlogPostDTO = serializeTimelineEntry(entry);
 
+  // spec-tags-links-photos: same "query Photos, filterForViewer, pass to
+  // PhotoGallery" shape as entries/[entryId]/page.tsx -- see that page's
+  // identical comment for why this is required for a Guest.
+  const allPhotos = await prisma.photo.findMany({
+    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
+    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+  });
+  const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);
+
   return (
     <main className="page">
       <Link href={`/trips/${tripId}/blog`} className="text-soft">
         Back to Blog
       </Link>
-      <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} />
+      <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
     </main>
   );
 }

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { serializeTimelineEntry } from '@/lib/serializers';
+import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import { EntryDetailPanel } from '@/components/EntryDetailPanel';
@@ -39,12 +39,23 @@ export default async function EntryDetailPage({ params }: PageProps) {
     typeDetails: (entry.typeDetails as Record<string, unknown> | null) ?? {},
   };
 
+  // spec-tags-links-photos, Code Map: "query Photos alongside the existing
+  // Entry query, apply filterForViewer before passing to PhotoGallery" --
+  // this is what actually makes Photos Guest-visible (FR-3/FR-28): a Guest's
+  // browser has no session to self-fetch GET /api/v1/photos with, so the
+  // already-filtered list must come from this Server Component instead.
+  const allPhotos = await prisma.photo.findMany({
+    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
+    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+  });
+  const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);
+
   return (
     <main className="page">
       <Link href={`/trips/${tripId}/timeline`} className="text-soft">
         Back to Timeline
       </Link>
-      <EntryDetailPanel tripId={tripId} entry={dto} readOnly={viewer.type === 'guest'} />
+      <EntryDetailPanel tripId={tripId} entry={dto} readOnly={viewer.type === 'guest'} photos={photos} />
     </main>
   );
 }

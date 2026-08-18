@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { EntryForm, type EntryDTO } from '@/components/EntryForm';
 import { AttachmentList } from '@/components/AttachmentList';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
 import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
 
@@ -17,6 +20,7 @@ export function EntryDetailPanel({
   tripId,
   entry: initialEntry,
   readOnly = false,
+  photos,
 }: {
   tripId: string;
   entry: EntryDTO;
@@ -24,6 +28,11 @@ export function EntryDetailPanel({
   // upload/delete affordances) entirely for a Guest -- not merely disabled,
   // not present in the DOM at all.
   readOnly?: boolean;
+  // spec-tags-links-photos: server-fetched, already `filterForViewer`-
+  // filtered Photos (app/(web)/trips/[tripId]/entries/[entryId]/page.tsx) --
+  // required for a Guest, whose session-less browser can't self-fetch
+  // GET /api/v1/photos. See PhotoGallery's own `initialPhotos` comment.
+  photos?: PhotoDTO[];
 }) {
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
@@ -188,6 +197,16 @@ export function EntryDetailPanel({
             <dd className="text-multiline" style={{ margin: 0 }}>{entry.postTripNotes}</dd>
           </div>
         )}
+
+        {!readOnly && <TagList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />}
+        {!readOnly && <LinkList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />}
+        <PhotoGallery
+          tripId={tripId}
+          ownerType="TIMELINE_ENTRY"
+          ownerId={entry.id}
+          readOnly={readOnly}
+          initialPhotos={photos}
+        />
 
         <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly={readOnly} />
       </div>

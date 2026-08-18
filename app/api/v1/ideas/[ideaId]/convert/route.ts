@@ -99,10 +99,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const created = await tx.timelineEntry.create({
         data: toEntryCreateData(entryType, parsed),
       });
+      // AD-4's literal rule: "Converting an Idea into a TimelineEntry (FR-17)
+      // reassigns its existing Tag/Photo/Link rows' owner_type/owner_id to
+      // the new TimelineEntry -- never duplicates them." Reassigned in the
+      // same transaction as the create+delete below, so a failure here rolls
+      // back the whole conversion (never a half-reassigned state).
+      await tx.tag.updateMany({
+        where: { ownerType: 'IDEA', ownerId: ideaId },
+        data: { ownerType: 'TIMELINE_ENTRY', ownerId: created.id },
+      });
+      await tx.link.updateMany({
+        where: { ownerType: 'IDEA', ownerId: ideaId },
+        data: { ownerType: 'TIMELINE_ENTRY', ownerId: created.id },
+      });
+      // Disclosed drift (review-caught): this rewrites the DB row's
+      // ownerType/ownerId, but a Photo's `filePath` was already baked at
+      // upload time from the *old* owner (AD-5's path shape embeds
+      // owner_type/owner_id in the directory) and is never rewritten here --
+      // rewriting/moving the physical file on every conversion would be
+      // disproportionate for what is otherwise inert drift. The stored
+      // filePath column stays authoritative for serving/deletion regardless
+      // (verified live), so this is permanently a cosmetic mismatch between
+      // AD-5's literal path convention and the DB's ownership record for any
+      // converted Photo -- never a functional or data-integrity issue.
+      await tx.photo.updateMany({
+        where: { ownerType: 'IDEA', ownerId: ideaId },
+        data: { ownerType: 'TIMELINE_ENTRY', ownerId: created.id },
+      });
       // If the Idea was already converted/deleted concurrently (e.g. a
       // double-submit), this throws (Prisma's "record not found") and
-      // rolls back the Entry insert above too -- never leaves a duplicate
-      // Entry behind for an Idea that's already gone.
+      // rolls back the Entry insert (and the reassignments) above too --
+      // never leaves a duplicate Entry behind for an Idea that's already
+      // gone.
       await tx.idea.delete({ where: { id: ideaId } });
       return created;
     });

@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PRIORITY_LABELS, WEATHER_SUITABILITY_LABELS } from '@/lib/ideas';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {
   MUST_DO: 'badge-priority-must-do',
@@ -24,6 +28,11 @@ export interface IdeaDTO {
   locationMapLink: string | null;
   estimatedExpenseAmount: number | null;
   estimatedExpenseCurrency: string | null;
+  // spec-tags-links-photos: the owning Idea's Cover Photo id, if any
+  // (app/(web)/trips/[tripId]/ideas/page.tsx queries Photo directly and
+  // attaches this per Idea) -- FR-15's "thumbnail in list views", rendered
+  // via the same `/api/v1/photos/[id]/file` URL PhotoGallery uses.
+  primaryPhotoId?: string | null;
 }
 
 // FR-16/FR-17, spec-ideas: a single Idea's list-item, with a delete action
@@ -64,6 +73,20 @@ export function IdeaCard({ idea }: { idea: IdeaDTO }) {
           {PRIORITY_LABELS[idea.priority] ?? idea.priority}
         </span>
       </div>
+
+      {idea.primaryPhotoId && (
+        <Image
+          src={`/api/v1/photos/${idea.primaryPhotoId}/file`}
+          alt=""
+          width={80}
+          height={80}
+          className="card-cover-photo"
+          // See components/PhotoGallery.tsx's identical comment: Next's
+          // built-in optimizer can't authenticate against this auth-gated
+          // route (verified live), so this renders a plain <img> instead.
+          unoptimized
+        />
+      )}
 
       <div className="row" style={{ gap: 'var(--space-2)' }}>
         {idea.category && <span className="text-soft">{idea.category}</span>}
@@ -111,6 +134,10 @@ export function IdeaCard({ idea }: { idea: IdeaDTO }) {
           {busy ? 'Deleting…' : 'Delete'}
         </button>
       </div>
+
+      <TagList ownerType="IDEA" ownerId={idea.id} />
+      <LinkList ownerType="IDEA" ownerId={idea.id} />
+      <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
     </div>
   );
 }

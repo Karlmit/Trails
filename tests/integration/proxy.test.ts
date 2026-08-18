@@ -142,4 +142,42 @@ describe.skipIf(!hasTestDatabase)('proxy (AD-6/AD-7 auth gate)', () => {
       expect(res.headers.get('location')).toBe('http://localhost/login');
     });
   });
+
+  // spec-tags-links-photos, FR-3/FR-28: the one disclosed /api/v1/**
+  // exception -- GET /api/v1/photos/{uuid}/file only. Every other Photo
+  // route (and every Attachment/Tag/Link route) stays exactly as strict as
+  // before -- these assertions are "reaches the route handler" vs "401",
+  // never a visibility decision (that's the route's own job, covered by
+  // tests/integration/photos-route.test.ts).
+  describe('Guest-eligible API GET exception (FR-3/FR-28, Photo file only)', () => {
+    const PHOTO_ID = '33333333-3333-4333-8333-333333333333';
+
+    function requestForMethod(pathname: string, method: string) {
+      return new NextRequest(`http://localhost${pathname}`, { method });
+    }
+
+    it('passes through an unauthenticated GET to the Photo file route', async () => {
+      const res = await proxy(requestForMethod(`/api/v1/photos/${PHOTO_ID}/file`, 'GET'));
+      expect(res.headers.get('x-middleware-next')).toBe('1');
+    });
+
+    it('still 401s a non-GET method on the same path (e.g. a hypothetical DELETE)', async () => {
+      const res = await proxy(requestForMethod(`/api/v1/photos/${PHOTO_ID}/file`, 'DELETE'));
+      expect(res.status).toBe(401);
+    });
+
+    it.each([
+      '/api/v1/photos',
+      `/api/v1/photos/${PHOTO_ID}`,
+      `/api/v1/photos/${PHOTO_ID}/primary`,
+      `/api/v1/attachments/${PHOTO_ID}/file`,
+      '/api/v1/tags',
+      '/api/v1/links',
+    ])('still 401s an unauthenticated GET to %s (the exception is scoped to Photo file only)', async (pathname) => {
+      const res = await proxy(requestForMethod(pathname, 'GET'));
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.error.code).toBe('UNAUTHORIZED');
+    });
+  });
 });

@@ -1,3 +1,4 @@
+import { unlink } from 'node:fs/promises';
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { ZodError } from 'zod';
@@ -88,6 +89,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const existing = await prisma.importantInfo.findUnique({ where: { id: itemId } });
   if (!existing) return Errors.notFound('Important Info item not found');
 
+  // spec-tags-links-photos: same non-FK polymorphic cascade pattern as
+  // timeline-entries'/ideas' DELETE -- Photo files are also removed,
+  // best-effort (fetched before the transaction so their paths are still
+  // known afterward).
+  const photosToDelete = await prisma.photo.findMany({
+    where: { ownerType: 'IMPORTANT_INFO', ownerId: itemId },
+    select: { filePath: true },
+  });
+
   try {
     // spec-important-info's frozen I/O matrix: "its Attachment rows are
     // deleted the same way TimelineEntry's are (no DB-level FK possible --
@@ -95,9 +105,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // app/api/v1/timeline-entries/[entryId]/route.ts's DELETE: rows only,
     // done atomically in one transaction with the item delete. Files
     // themselves are deliberately left on disk (same disclosed, deferred
-    // cleanup as TimelineEntry's cascade -- not an oversight).
+    // cleanup as TimelineEntry's cascade -- not an oversight). Tag/Link/
+    // Photo rows added to this same transaction by spec-tags-links-photos.
     await prisma.$transaction([
       prisma.attachment.deleteMany({ where: { ownerType: 'IMPORTANT_INFO', ownerId: itemId } }),
+      prisma.tag.deleteMany({ where: { ownerType: 'IMPORTANT_INFO', ownerId: itemId } }),
+      prisma.link.deleteMany({ where: { ownerType: 'IMPORTANT_INFO', ownerId: itemId } }),
+      prisma.photo.deleteMany({ where: { ownerType: 'IMPORTANT_INFO', ownerId: itemId } }),
       prisma.importantInfo.delete({ where: { id: itemId } }),
     ]);
   } catch (err) {
@@ -107,6 +121,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
     throw err;
   }
+
+  await Promise.all(
+    photosToDelete.map((photo) =>
+      unlink(photo.filePath).catch((err: NodeJS.ErrnoException) => {
+        if (err?.code !== 'ENOENT') {
+          console.error(`Failed to delete photo file at ${photo.filePath}:`, err);
+        }
+      }),
+    ),
+  );
 
   revalidateItem(existing.tripId);
 

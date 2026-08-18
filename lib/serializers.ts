@@ -4,7 +4,10 @@ import type {
   ChecklistItem,
   Idea,
   ImportantInfo,
+  Link,
+  Photo,
   Section,
+  Tag,
   TimelineEntry,
   Trip,
   User,
@@ -176,5 +179,46 @@ export function serializeAttachment(attachment: Attachment) {
     sizeBytes: attachment.sizeBytes,
     originalFilename: attachment.originalFilename,
     createdAt: attachment.createdAt.toISOString(),
+  };
+}
+
+// FR-15/FR-16/FR-26, spec-tags-links-photos: same shape/conventions as
+// serializeSection above.
+export function serializeTag(tag: Tag) {
+  return {
+    id: tag.id,
+    ownerType: tag.ownerType,
+    ownerId: tag.ownerId,
+    text: tag.text,
+    createdAt: tag.createdAt.toISOString(),
+  };
+}
+
+export function serializeLink(link: Link) {
+  return {
+    id: link.id,
+    ownerType: link.ownerType,
+    ownerId: link.ownerId,
+    url: link.url,
+    label: link.label,
+    createdAt: link.createdAt.toISOString(),
+  };
+}
+
+// Same "never expose filePath" convention as serializeAttachment above --
+// the client only ever needs the photo id, to build the
+// `/api/v1/photos/[id]/file` URL.
+export function serializePhoto(photo: Photo) {
+  return {
+    id: photo.id,
+    tripId: photo.tripId,
+    ownerType: photo.ownerType,
+    ownerId: photo.ownerId,
+    mimeType: photo.mimeType,
+    sizeBytes: photo.sizeBytes,
+    originalFilename: photo.originalFilename,
+    isPrimary: photo.isPrimary,
+    isPrivate: photo.isPrivate,
+    createdAt: photo.createdAt.toISOString(),
   };
 }
