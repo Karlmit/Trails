@@ -13,6 +13,7 @@ interface EditTripFormProps {
     endDate: string;
     timezone: string;
     description: string | null;
+    coverImage: string | null;
     visibility: 'PUBLIC' | 'PRIVATE';
   };
   onDone: () => void;
@@ -26,6 +27,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
   const [endDate, setEndDate] = useState(trip.endDate);
   const [timezone, setTimezone] = useState(trip.timezone);
   const [description, setDescription] = useState(trip.description ?? '');
+  const [coverImage, setCoverImage] = useState(trip.coverImage ?? '');
   const [visibility, setVisibility] = useState(trip.visibility);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -55,6 +57,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
           endDate,
           timezone,
           description: description || null,
+          coverImage: coverImage || null,
           visibility,
         }),
       });
@@ -122,6 +125,16 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="edit-cover-image">Cover image URL</label>
+        <input
+          id="edit-cover-image"
+          type="url"
+          value={coverImage}
+          onChange={(e) => setCoverImage(e.target.value)}
+          placeholder="https://…"
         />
       </div>
       <div className="field">

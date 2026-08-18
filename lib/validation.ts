@@ -1,6 +1,36 @@
 import { z } from 'zod';
 import { locationFields } from '@/lib/entry-types/shared-fields.schema';
 
+// FR-1: Trip.coverImage was previously a data-model-only field (no UI ever
+// let a User set it -- logged in deferred-work.md as blocked on the
+// file-upload work landing; Photos (spec-tags-links-photos) shipped since,
+// but a Trip isn't one of AD-4's three Photo owner types, so this stays the
+// "simple URL-string input" fallback that note itself suggested, not a
+// Photo-table wiring -- that would need its own architecture amendment,
+// same as spec-documents' disclosed Trip-owner-type gap). Rendered as a
+// plain `<img src>` (components/TripOverviewPanel.tsx), never a clickable
+// `<a href>`, so this isn't the same stored-XSS shape locationMapLinkField
+// guards against (javascript: doesn't execute from an img src) -- the
+// http(s)-only check here is just the same cheap, consistent defensive
+// practice, not a response to a demonstrated exploit.
+const coverImageField = z
+  .string()
+  .trim()
+  .max(2048)
+  .optional()
+  .nullable()
+  .refine(
+    (value) => {
+      if (!value) return true;
+      try {
+        return ['http:', 'https:'].includes(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Cover image must be a valid http(s) URL' },
+  );
+
 // Shared cross-field helpers used by the Trip/Section Zod schemas (AD-1's
 // "one Zod schema" convention, applied here even though TimelineEntry
 // itself doesn't exist yet in this spec).
@@ -81,7 +111,7 @@ export const tripCreateSchema = z
     endDate: dateOnly,
     timezone: timezoneField,
     description: z.string().max(5000).optional().nullable(),
-    coverImage: z.string().trim().max(2048).optional().nullable(),
+    coverImage: coverImageField,
     visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   })
   .refine((data) => data.endDate.getTime() >= data.startDate.getTime(), {
@@ -97,7 +127,7 @@ export const tripUpdateSchema = z
     endDate: dateOnly.optional(),
     timezone: timezoneField.optional(),
     description: z.string().max(5000).optional().nullable(),
-    coverImage: z.string().trim().max(2048).optional().nullable(),
+    coverImage: coverImageField,
     visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   })
   .refine(

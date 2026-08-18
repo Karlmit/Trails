@@ -66,6 +66,22 @@ describe('tripCreateSchema (FR-1)', () => {
       tripCreateSchema.parse({ ...base, startDate: '2026-08-01', endDate: '2026-08-01' }),
     ).not.toThrow();
   });
+
+  it('accepts a valid http(s) coverImage URL', () => {
+    expect(() =>
+      tripCreateSchema.parse({ ...base, coverImage: 'https://example.com/cover.jpg' }),
+    ).not.toThrow();
+  });
+
+  it('rejects a javascript: coverImage URL', () => {
+    expect(() =>
+      tripCreateSchema.parse({ ...base, coverImage: 'javascript:alert(1)' }),
+    ).toThrow();
+  });
+
+  it('rejects a malformed coverImage URL', () => {
+    expect(() => tripCreateSchema.parse({ ...base, coverImage: 'not a url' })).toThrow();
+  });
 });
 
 describe('tripUpdateSchema', () => {
