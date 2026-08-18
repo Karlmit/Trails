@@ -586,6 +586,76 @@ describe.skipIf(!hasTestDatabase)('timeline-entries route', () => {
       expect(body.title).toBe('Beach Resort (renamed)');
     });
 
+    // spec-guest-access (FR-28): isPrivate persists through create and is
+    // read back via GET, defaulting to false when omitted on create.
+    it('defaults isPrivate to false when omitted on create', async () => {
+      const res = await getEntry(
+        jsonRequest(`http://localhost/api/v1/timeline-entries/${entryId}`, 'GET', undefined, token),
+        entryParams(entryId),
+      );
+      const body = await res.json();
+      expect(body.isPrivate).toBe(false);
+    });
+
+    it('persists isPrivate: true set at create time', async () => {
+      const created = await createEntry(
+        jsonRequest(
+          'http://localhost/api/v1/timeline-entries',
+          'POST',
+          {
+            tripId,
+            entryType: 'NOTE',
+            title: 'A private note',
+            startAt: '2026-08-04T00:00:00.000Z',
+            isPrivate: true,
+          },
+          token,
+        ),
+      );
+      expect((await created.json()).isPrivate).toBe(true);
+    });
+
+    it('sets isPrivate via PATCH', async () => {
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { isPrivate: true },
+          token,
+        ),
+        entryParams(entryId),
+      );
+      expect(res.status).toBe(200);
+      expect((await res.json()).isPrivate).toBe(true);
+    });
+
+    // Matches this codebase's documented "partial-PATCH inversion" bug
+    // class (see toEntryUpdateData's merge-before-validate pattern): a PATCH
+    // that never mentions isPrivate must leave the stored flag untouched,
+    // never silently resetting it to false.
+    it('leaves a stored isPrivate: true untouched by a PATCH that omits the field', async () => {
+      await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { isPrivate: true },
+          token,
+        ),
+        entryParams(entryId),
+      );
+
+      const res = await patchEntry(
+        jsonRequest(
+          `http://localhost/api/v1/timeline-entries/${entryId}`,
+          'PATCH',
+          { title: 'Beach Resort (still private)' },
+          token,
+        ),
+        entryParams(entryId),
+      );
+      expect((await res.json()).isPrivate).toBe(true);
+    });
+
     it('rejects a startAt-only PATCH that would invert the stored endAt (400)', async () => {
       const res = await patchEntry(
         jsonRequest(

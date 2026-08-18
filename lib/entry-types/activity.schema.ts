@@ -6,6 +6,7 @@ import {
   descriptionField,
   expenseFields,
   hasExpensePair,
+  isPrivateField,
   locationFields,
   notesField,
   postTripNotesField,
@@ -47,6 +48,7 @@ const activityFieldsShape = {
   ...contactFields,
   notes: notesField,
   postTripNotes: postTripNotesField,
+  isPrivate: isPrivateField,
   // See stay.schema.ts's comment: no `.default({})` here so a PATCH that
   // omits `typeDetails` doesn't overwrite the stored JSONB with `{}`.
   typeDetails: activityTypeDetailsSchema.optional(),

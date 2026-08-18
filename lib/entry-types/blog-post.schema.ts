@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { dateTimeField } from '@/lib/validation';
-import { descriptionField, titleField } from './shared-fields.schema';
+import { descriptionField, isPrivateField, titleField } from './shared-fields.schema';
 
 // FR-18: "A User can create a Blog Post with title, content, a required
 // associated date ... A new Blog Post starts in Draft state." Per the
@@ -22,6 +22,7 @@ const blogPostFieldsShape = {
   title: titleField,
   description: descriptionField,
   startAt: dateTimeField,
+  isPrivate: isPrivateField,
 };
 
 export const blogPostFieldsSchema = z.object(blogPostFieldsShape).strict();

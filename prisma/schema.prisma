@@ -290,6 +290,16 @@ model TimelineEntry {
   // real column rather than a later migration.
   publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
 
+  // spec-guest-access (FR-28/AD-10): unlike ImportantInfo.isPrivate (still
+  // inert -- no Guest surface exists for Important Info), this flag is read
+  // by lib/viewer.ts's `filterForViewer` on every Guest-eligible read path
+  // (Timeline, Entry detail, Blog list/detail) and has a real, immediate
+  // effect -- a Guest never sees an item with `isPrivate=true`, even on an
+  // otherwise-Public Trip. Covers every entry_type including BlogPost (a
+  // Private Published post is excluded from the Guest-visible Blog list and
+  // 404s directly, same as a Draft).
+  isPrivate Boolean @default(false) @map("is_private")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

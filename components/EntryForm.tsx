@@ -29,6 +29,7 @@ export interface EntryDTO {
   notes: string | null;
   postTripNotes: string | null;
   typeDetails: Record<string, unknown>;
+  isPrivate: boolean;
 }
 
 interface EntryFormProps {
@@ -91,6 +92,9 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
   const [contactEmail, setContactEmail] = useState(seed?.contactEmail ?? '');
   const [notes, setNotes] = useState(seed?.notes ?? '');
   const [postTripNotes, setPostTripNotes] = useState(seed?.postTripNotes ?? '');
+  // spec-guest-access (FR-28): `isPrivate` defaults to `false` for a new
+  // Entry, same as the DB column's own default.
+  const [isPrivate, setIsPrivate] = useState(seed?.isPrivate ?? false);
 
   const typeDetails = seed?.typeDetails ?? {};
   const [roomInfo, setRoomInfo] = useState(str(typeDetails.roomInfo));
@@ -151,6 +155,7 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
     body.contactName = contactName || null;
     body.contactPhone = contactPhone || null;
     body.contactEmail = contactEmail || null;
+    body.isPrivate = isPrivate;
 
     if (entryType !== 'NOTE') {
       body.subtype = subtype;
@@ -463,6 +468,19 @@ export function EntryForm({ tripId, mode, entry, initialValues, apiUrl, onSaved,
           />
         </div>
       )}
+
+      <div className="field">
+        <label htmlFor="entry-is-private" className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+          <input
+            id="entry-is-private"
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            style={{ width: 'auto' }}
+          />
+          Private (hidden from Guests)
+        </label>
+      </div>
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>

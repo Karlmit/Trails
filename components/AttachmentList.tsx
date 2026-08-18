@@ -21,6 +21,16 @@ interface AttachmentListProps {
   tripId: string;
   ownerType: string;
   ownerId: string;
+  // spec-guest-access: not in the original spec-documents Code Map, but
+  // required by this spec's Boundaries ("no mutation UI ... renders for a
+  // Guest -- not merely disabled, not present in the DOM at all") since this
+  // component is mounted on both Guest-eligible detail panels
+  // (EntryDetailPanel, BlogPostDetailPanel) and otherwise offers
+  // Upload/Delete unconditionally. Hides those affordances only -- the
+  // read-only file list itself still renders (GET /api/v1/attachments stays
+  // requireAuth-gated regardless, so a Guest's own fetch 401s and the list
+  // simply renders empty; this prop only controls the UI, not the API call).
+  readOnly?: boolean;
 }
 
 // FR-24, spec-documents: reusable upload form + file list + delete, mounted
@@ -31,7 +41,7 @@ interface AttachmentListProps {
 // fetched data as a prop) -- the Code Map's mount call passes only
 // ownerType/ownerId/tripId, no initial list. Same error-banner + in-flight-
 // request-guarding conventions as ChecklistCard.tsx.
-export function AttachmentList({ tripId, ownerType, ownerId }: AttachmentListProps) {
+export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }: AttachmentListProps) {
   const router = useRouter();
   const [attachments, setAttachments] = useState<AttachmentDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,16 +138,18 @@ export function AttachmentList({ tripId, ownerType, ownerId }: AttachmentListPro
         <span className="text-soft" style={FIELD_LABEL_STYLE}>
           Documents
         </span>
-        <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
-          {uploading ? 'Uploading…' : 'Upload'}
-          <input
-            type="file"
-            accept="application/pdf,image/jpeg,image/png"
-            onChange={handleUpload}
-            disabled={uploading}
-            style={{ display: 'none' }}
-          />
-        </label>
+        {!readOnly && (
+          <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
+            {uploading ? 'Uploading…' : 'Upload'}
+            <input
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={handleUpload}
+              disabled={uploading}
+              style={{ display: 'none' }}
+            />
+          </label>
+        )}
       </div>
 
       {error && <div className="form-error-banner">{error}</div>}
@@ -155,15 +167,17 @@ export function AttachmentList({ tripId, ownerType, ownerId }: AttachmentListPro
               </a>
               <span className="row" style={{ gap: 'var(--space-2)' }}>
                 <span className="text-soft">{formatAttachmentSize(attachment.sizeBytes)}</span>
-                <button
-                  type="button"
-                  className="btn-danger"
-                  style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
-                  onClick={() => handleDelete(attachment)}
-                  disabled={deletingIds.has(attachment.id)}
-                >
-                  {deletingIds.has(attachment.id) ? 'Deleting…' : 'Delete'}
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
+                    onClick={() => handleDelete(attachment)}
+                    disabled={deletingIds.has(attachment.id)}
+                  >
+                    {deletingIds.has(attachment.id) ? 'Deleting…' : 'Delete'}
+                  </button>
+                )}
               </span>
             </div>
           ))}

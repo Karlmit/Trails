@@ -111,6 +111,7 @@ export interface ParsedEntryFields {
   notes?: string | null;
   postTripNotes?: string | null;
   typeDetails?: Record<string, unknown>;
+  isPrivate?: boolean;
 }
 
 /**
@@ -148,6 +149,12 @@ export function toEntryCreateData(entryType: CreatableEntryType, parsed: ParsedE
     // don't `.default({})` this field so the *update* path (below) can tell
     // "omitted" (leave untouched) apart from "explicitly empty".
     typeDetails: (parsed.typeDetails ?? {}) as Prisma.InputJsonValue,
+    // spec-guest-access: defaulted here (create only), same "Route Handler
+    // layer defaults it" convention as every other optional field -- the DB
+    // column also carries `@default(false)` (Boundaries: "defaults to false
+    // on every existing and new TimelineEntry row"), so this is belt-and-
+    // suspenders, not the only place the default is enforced.
+    isPrivate: parsed.isPrivate ?? false,
   };
 }
 
@@ -184,6 +191,11 @@ export function toEntryUpdateData(parsed: ParsedEntryFields) {
     ...(parsed.typeDetails !== undefined && {
       typeDetails: parsed.typeDetails as Prisma.InputJsonValue,
     }),
+    // spec-guest-access: same "only touch what was actually present in the
+    // PATCH body" pattern as every other field here -- an omitted
+    // `isPrivate` leaves the stored flag untouched, never silently resets
+    // it to `false`.
+    ...(parsed.isPrivate !== undefined && { isPrivate: parsed.isPrivate }),
   };
 }
 

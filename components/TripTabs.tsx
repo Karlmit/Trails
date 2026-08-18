@@ -3,10 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export function TripTabs({ tripId }: { tripId: string }) {
+// spec-guest-access: a Guest only ever sees the three tabs whose routes are
+// actually allowlisted in proxy.ts's GUEST_ELIGIBLE_PATH (Overview,
+// Timeline, Blog) -- every other tab links to a page that would redirect
+// them to /login (unchanged behavior, spec's I/O matrix).
+const GUEST_VISIBLE_LABELS = new Set(['Timeline', 'Blog', 'Overview']);
+
+export function TripTabs({ tripId, viewer }: { tripId: string; viewer: 'user' | 'guest' }) {
   const pathname = usePathname();
 
-  const tabs = [
+  const allTabs = [
     { href: `/trips/${tripId}/timeline`, label: 'Timeline' },
     { href: `/trips/${tripId}/sections`, label: 'Sections' },
     { href: `/trips/${tripId}/ideas`, label: 'Ideas' },
@@ -17,6 +23,8 @@ export function TripTabs({ tripId }: { tripId: string }) {
     { href: `/trips/${tripId}/documents`, label: 'Documents' },
     { href: `/trips/${tripId}/overview`, label: 'Overview' },
   ];
+
+  const tabs = viewer === 'guest' ? allTabs.filter((tab) => GUEST_VISIBLE_LABELS.has(tab.label)) : allTabs;
 
   return (
     <nav className="trip-tabs">

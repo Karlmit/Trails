@@ -64,4 +64,82 @@ describe.skipIf(!hasTestDatabase)('proxy (AD-6/AD-7 auth gate)', () => {
     const res = await proxy(requestFor('/trips', { cookie: `trails_session=${token}` }));
     expect(res.headers.get('x-middleware-next')).toBe('1');
   });
+
+  // spec-guest-access, FR-28: proxy.ts's new allowlist. It only decides "is
+  // an anonymous visitor even allowed to reach this route shape at all" --
+  // it never looks up Trip.visibility, so these assertions are deliberately
+  // "the request reaches the page" (NextResponse.next()) vs "redirected to
+  // /login", never a 404 (that decision belongs to lib/viewer.ts, called by
+  // the page itself -- covered by tests/viewer.test.ts and the live
+  // Playwright/curl pass, not here).
+  describe('Guest-eligible page allowlist (FR-28)', () => {
+    const TRIP_ID = '11111111-1111-4111-8111-111111111111';
+    const ENTRY_ID = '22222222-2222-4222-8222-222222222222';
+
+    it.each([
+      `/trips/${TRIP_ID}/overview`,
+      `/trips/${TRIP_ID}/timeline`,
+      `/trips/${TRIP_ID}/entries/${ENTRY_ID}`,
+      `/trips/${TRIP_ID}/blog`,
+      `/trips/${TRIP_ID}/blog/${ENTRY_ID}`,
+    ])('passes through unauthenticated request for allowlisted path %s (Public-Trip-allowed shape)', async (pathname) => {
+      const res = await proxy(requestFor(pathname));
+      expect(res.headers.get('x-middleware-next')).toBe('1');
+    });
+
+    // proxy.ts lets the request through regardless of the Trip's actual
+    // visibility -- a Private Trip's five allowlisted URLs still reach the
+    // page here (which is what 404s them itself, per the spec's Intent).
+    it.each([
+      `/trips/${TRIP_ID}/overview`,
+      `/trips/${TRIP_ID}/timeline`,
+      `/trips/${TRIP_ID}/entries/${ENTRY_ID}`,
+      `/trips/${TRIP_ID}/blog`,
+      `/trips/${TRIP_ID}/blog/${ENTRY_ID}`,
+    ])(
+      'passes through unauthenticated request for allowlisted path %s even for a Private Trip (proxy.ts never looks up visibility)',
+      async (pathname) => {
+        await testPrisma().trip.create({
+          data: {
+            id: TRIP_ID,
+            name: 'Secret Trip',
+            startDate: new Date('2026-08-01T00:00:00.000Z'),
+            endDate: new Date('2026-08-20T00:00:00.000Z'),
+            timezone: 'Asia/Bangkok',
+            visibility: 'PRIVATE',
+          },
+        });
+        const res = await proxy(requestFor(pathname));
+        expect(res.headers.get('x-middleware-next')).toBe('1');
+      },
+    );
+
+    it.each([
+      `/trips/${TRIP_ID}/entries/new`,
+      `/trips/${TRIP_ID}/budget`,
+      `/trips/${TRIP_ID}/sections`,
+      `/trips/${TRIP_ID}/ideas`,
+      `/trips/${TRIP_ID}/checklists`,
+      `/trips/${TRIP_ID}/important-info`,
+      `/trips/${TRIP_ID}/documents`,
+      `/trips/${TRIP_ID}/travel-mode`,
+      `/trips/${TRIP_ID}`,
+    ])('redirects an unauthenticated request for non-allowlisted path %s to /login', async (pathname) => {
+      await testPrisma().user.create({
+        data: { username: 'sara', passwordHash: 'irrelevant', role: 'ADMIN' },
+      });
+      const res = await proxy(requestFor(pathname));
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('http://localhost/login');
+    });
+
+    it('does not treat a non-UUID tripId segment as Guest-eligible', async () => {
+      await testPrisma().user.create({
+        data: { username: 'sara', passwordHash: 'irrelevant', role: 'ADMIN' },
+      });
+      const res = await proxy(requestFor('/trips/not-a-uuid/overview'));
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('http://localhost/login');
+    });
+  });
 });

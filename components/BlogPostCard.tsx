@@ -8,7 +8,14 @@ import type { BlogPostDTO } from '@/components/BlogPostForm';
 // page" shape as TripsPage's trip-card (app/(web)/trips/page.tsx) --
 // view/edit/publish/unpublish/delete all live on the detail page
 // (/trips/[tripId]/blog/[entryId]), not inline here.
-export function BlogPostCard({ post }: { post: BlogPostDTO }) {
+// spec-guest-access: `readOnly` accepted for interface parity with
+// EntryDetailPanel/BlogPostDetailPanel (Code Map) -- currently a no-op
+// since this card has never exposed an edit/delete affordance of its own
+// (view/edit/publish/delete all live on the detail page it links to); kept
+// so a future inline action added here can't accidentally ship without
+// also being Guest-gated.
+export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; readOnly?: boolean }) {
+  void readOnly;
   const isPublished = post.publishedAt !== null;
   const date = new Date(post.startAt).toLocaleDateString(undefined, {
     weekday: 'short',

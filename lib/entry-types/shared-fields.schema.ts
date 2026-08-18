@@ -17,6 +17,16 @@ export const notesField = z.string().trim().max(5000).optional().nullable();
 export const postTripNotesField = z.string().trim().max(5000).optional().nullable();
 export const bookingReferenceField = z.string().trim().max(200).optional().nullable();
 
+// spec-guest-access (FR-28/AD-10): shared across all 5 entry-type schemas
+// (Stay/Transport/Activity/Note/BlogPost) -- unlike most other shared
+// fields, this one is never withheld for Note or BlogPost (both still get a
+// Guest-eligible detail page, so both need a way to be hidden from Guests).
+// Optional, not defaulted here -- same "default at the Route Handler layer"
+// convention as every other optional field (lib/entry-types/index.ts's
+// toEntryCreateData), so a PATCH that omits it leaves the stored value
+// untouched (this field is not nullable, only omittable).
+export const isPrivateField = z.boolean().optional();
+
 // A bare `.url()` still accepts `javascript:`/`data:` URIs -- this field is
 // rendered as a clickable `<a href>` verbatim (components/EntryDetailPanel.tsx),
 // so an unvalidated value here is a stored-XSS-shaped gap. Require both "is a

@@ -17,12 +17,15 @@ interface TripOverviewPanelProps {
     status: string;
     durationDays: number;
   };
+  // spec-guest-access: hides the Edit button/state entirely for a Guest --
+  // not merely disabled, not present in the DOM at all.
+  readOnly?: boolean;
 }
 
-export function TripOverviewPanel({ trip }: TripOverviewPanelProps) {
+export function TripOverviewPanel({ trip, readOnly = false }: TripOverviewPanelProps) {
   const [editing, setEditing] = useState(false);
 
-  if (editing) {
+  if (editing && !readOnly) {
     return <EditTripForm trip={trip} onDone={() => setEditing(false)} />;
   }
 
@@ -38,9 +41,11 @@ export function TripOverviewPanel({ trip }: TripOverviewPanelProps) {
       )}
       <div className="row-between">
         <h2 style={{ margin: 0 }}>{trip.name}</h2>
-        <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-          Edit
-        </button>
+        {!readOnly && (
+          <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
       </div>
       {trip.destination && <p className="text-soft" style={{ margin: 0 }}>{trip.destination}</p>}
       <dl className="row" style={{ gap: 'var(--space-6)' }}>

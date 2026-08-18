@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { computeTripStatus } from '@/lib/trip-status';
 import { isUuid } from '@/lib/uuid';
+import { canViewTrip, getViewer } from '@/lib/viewer';
 import { TripTabs } from '@/components/TripTabs';
 
 interface LayoutProps {
@@ -20,8 +21,14 @@ export default async function TripLayout({ children, params }: LayoutProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
+  // spec-guest-access, defense-in-depth (frozen Intent): resolved and
+  // checked FIRST, before any Trip-specific markup (name, status badge,
+  // tabs) is constructed -- this layout does not rely on a child page's
+  // later notFound() to unwind an already-rendered parent.
+  const viewer = await getViewer();
+
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
-  if (!trip) notFound();
+  if (!trip || !canViewTrip(trip, viewer)) notFound();
 
   const status = computeTripStatus(trip);
 
@@ -35,8 +42,9 @@ export default async function TripLayout({ children, params }: LayoutProps) {
             {/* FR-27, spec-travel-mode: launched from within an Active Trip
                 rather than sitting alongside the tabs -- this is why it's a
                 button next to the status badge here, not a TripTabs entry.
-                ACTIVE-only per the spec's Intent/I-O matrix. */}
-            {status === 'ACTIVE' && (
+                ACTIVE-only per the spec's Intent/I-O matrix. Guest-only
+                Travel Mode is out of scope (spec-guest-access's Never list). */}
+            {viewer.type === 'user' && status === 'ACTIVE' && (
               <Link href={`/trips/${tripId}/travel-mode`} className="btn btn-primary">
                 Travel Mode
               </Link>
@@ -44,7 +52,7 @@ export default async function TripLayout({ children, params }: LayoutProps) {
           </div>
         </div>
       </div>
-      <TripTabs tripId={tripId} />
+      <TripTabs tripId={tripId} viewer={viewer.type} />
       {children}
     </div>
   );

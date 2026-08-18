@@ -14,7 +14,17 @@ const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as co
 // single PUT/DELETE to the dedicated publish route (never through this
 // panel's own PATCH/DELETE calls, and never a field this panel's edit form
 // can touch -- AD-10).
-export function BlogPostDetailPanel({ tripId, post: initialPost }: { tripId: string; post: BlogPostDTO }) {
+export function BlogPostDetailPanel({
+  tripId,
+  post: initialPost,
+  readOnly = false,
+}: {
+  tripId: string;
+  post: BlogPostDTO;
+  // spec-guest-access: hides Publish/Unpublish/Edit/Delete (and the
+  // AttachmentList's upload/delete affordances) entirely for a Guest.
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [editing, setEditing] = useState(false);
@@ -64,7 +74,7 @@ export function BlogPostDetailPanel({ tripId, post: initialPost }: { tripId: str
     }
   }
 
-  if (editing) {
+  if (editing && !readOnly) {
     return (
       <BlogPostForm
         tripId={tripId}
@@ -87,17 +97,19 @@ export function BlogPostDetailPanel({ tripId, post: initialPost }: { tripId: str
           <span className={`badge ${isPublished ? 'badge-published' : 'badge-draft'}`}>
             {isPublished ? 'Published' : 'Draft'}
           </span>
-          <div className="row" style={{ gap: 'var(--space-2)' }}>
-            <button type="button" className="btn btn-primary" onClick={handlePublishToggle} disabled={busy}>
-              {busy ? 'Working…' : isPublished ? 'Unpublish' : 'Publish'}
-            </button>
-            <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-              Edit
-            </button>
-            <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-              {busy ? 'Deleting…' : 'Delete'}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="row" style={{ gap: 'var(--space-2)' }}>
+              <button type="button" className="btn btn-primary" onClick={handlePublishToggle} disabled={busy}>
+                {busy ? 'Working…' : isPublished ? 'Unpublish' : 'Publish'}
+              </button>
+              <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
+                {busy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          )}
         </div>
 
         <h2 style={{ margin: 0 }}>{post.title}</h2>
@@ -126,7 +138,7 @@ export function BlogPostDetailPanel({ tripId, post: initialPost }: { tripId: str
           </p>
         )}
 
-        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} />
+        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={post.id} readOnly={readOnly} />
       </div>
     </div>
   );

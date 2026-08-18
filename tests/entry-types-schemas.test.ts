@@ -97,6 +97,24 @@ describe('lib/entry-types/*.schema.ts', () => {
       });
       expect(result.success).toBe(true);
     });
+
+    // spec-guest-access (FR-28): isPrivateField wired into every type's
+    // schema, Stay included.
+    it('accepts an isPrivate flag', () => {
+      const result = stayCreateSchema.safeParse({
+        ...base,
+        endAt: '2026-08-06T11:00:00.000Z',
+        isPrivate: true,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.isPrivate).toBe(true);
+    });
+
+    it('leaves isPrivate undefined (not defaulted) when omitted from the schema layer', () => {
+      const result = stayCreateSchema.safeParse({ ...base, endAt: '2026-08-06T11:00:00.000Z' });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.isPrivate).toBeUndefined();
+    });
   });
 
   describe('transportCreateSchema (FR-12)', () => {
@@ -271,6 +289,15 @@ describe('lib/entry-types/*.schema.ts', () => {
     it('rejects a subtype field (Blog Post has no Entry Subtype)', () => {
       const result = blogPostCreateSchema.safeParse({ ...base, subtype: 'HOTEL' });
       expect(result.success).toBe(false);
+    });
+
+    // spec-guest-access (FR-28): isPrivateField wired into Blog Post too --
+    // it is not inert here (unlike ImportantInfo.isPrivate), a Private
+    // Published post is excluded from a Guest's Blog list/detail.
+    it('accepts an isPrivate flag', () => {
+      const result = blogPostCreateSchema.safeParse({ ...base, isPrivate: true });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.isPrivate).toBe(true);
     });
 
     // AD-10, Boundaries: "published_at is never client-settable through the

@@ -76,6 +76,7 @@ export function serializeTimelineEntry(entry: TimelineEntry) {
     postTripNotes: entry.postTripNotes,
     typeDetails: entry.typeDetails,
     publishedAt: entry.publishedAt ? entry.publishedAt.toISOString() : null,
+    isPrivate: entry.isPrivate,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
   };

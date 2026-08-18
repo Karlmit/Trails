@@ -3,6 +3,7 @@ import { dateTimeField } from '@/lib/validation';
 import {
   contactFields,
   descriptionField,
+  isPrivateField,
   notesField,
   postTripNotesField,
   titleField,
@@ -28,6 +29,7 @@ const noteFieldsShape = {
   ...contactFields,
   notes: notesField,
   postTripNotes: postTripNotesField,
+  isPrivate: isPrivateField,
   // See stay.schema.ts's comment: no `.default({})` here so a PATCH that
   // omits `typeDetails` doesn't overwrite the stored JSONB with `{}`.
   typeDetails: noteTypeDetailsSchema.optional(),

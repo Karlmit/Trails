@@ -7,6 +7,7 @@ import { entryTypeColor } from '@/lib/entry-types/colors';
 import { subtypeLabel } from '@/lib/entry-types/labels';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 import { isUuid } from '@/lib/uuid';
+import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import Link from 'next/link';
 import { TimelineAutoScroll } from '@/components/TimelineAutoScroll';
 
@@ -41,6 +42,10 @@ export default async function TimelinePage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
+  // spec-guest-access: one of the five Guest-eligible page shapes -- repeats
+  // the layout's own canViewTrip check (defense-in-depth).
+  const viewer = await getViewer();
+
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
@@ -55,7 +60,7 @@ export default async function TimelinePage({ params }: PageProps) {
       },
     },
   });
-  if (!trip) notFound();
+  if (!trip || !canViewTrip(trip, viewer)) notFound();
 
   const now = new Date();
   const status = computeTripStatus(trip, now);
@@ -63,7 +68,12 @@ export default async function TimelinePage({ params }: PageProps) {
   const { hour, minute } = timeOfDayInTimezone(now, trip.timezone);
 
   const days = buildTimelineDays(trip, trip.sections, todayKey);
-  const entriesForLayout: EntryForLayout[] = trip.timelineEntries.map((entry) => ({
+  // spec-guest-access: applied AFTER the Prisma query, before
+  // layoutTimelineEntries -- a Guest never sees a TimelineEntry marked
+  // isPrivate, on top of AD-10's unconditional Draft-Blog-Post exclusion
+  // above (a separate, always-applied rule for every viewer).
+  const visibleEntries = filterForViewer(trip.timelineEntries, viewer);
+  const entriesForLayout: EntryForLayout[] = visibleEntries.map((entry) => ({
     id: entry.id,
     entryType: entry.entryType,
     subtype: entry.subtype,
@@ -170,9 +180,11 @@ export default async function TimelinePage({ params }: PageProps) {
         })}
       </div>
 
-      <Link href={`/trips/${tripId}/entries/new`} className="fab" aria-label="Add Entry">
-        +
-      </Link>
+      {viewer.type === 'user' && (
+        <Link href={`/trips/${tripId}/entries/new`} className="fab" aria-label="Add Entry">
+          +
+        </Link>
+      )}
     </main>
   );
 }

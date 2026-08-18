@@ -13,7 +13,18 @@ const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as co
 // pattern as TripOverviewPanel/EditTripForm, plus an inline delete action
 // (DeleteTripButton's pattern) rather than three separate components, since
 // this panel is only ever mounted on the one Entry detail page.
-export function EntryDetailPanel({ tripId, entry: initialEntry }: { tripId: string; entry: EntryDTO }) {
+export function EntryDetailPanel({
+  tripId,
+  entry: initialEntry,
+  readOnly = false,
+}: {
+  tripId: string;
+  entry: EntryDTO;
+  // spec-guest-access: hides Edit/Delete (and the AttachmentList's
+  // upload/delete affordances) entirely for a Guest -- not merely disabled,
+  // not present in the DOM at all.
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
   const [editing, setEditing] = useState(false);
@@ -40,7 +51,7 @@ export function EntryDetailPanel({ tripId, entry: initialEntry }: { tripId: stri
     }
   }
 
-  if (editing) {
+  if (editing && !readOnly) {
     return (
       <EntryForm
         tripId={tripId}
@@ -73,14 +84,16 @@ export function EntryDetailPanel({ tripId, entry: initialEntry }: { tripId: stri
               </span>
             )}
           </div>
-          <div className="row" style={{ gap: 'var(--space-2)' }}>
-            <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-              Edit
-            </button>
-            <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-              {busy ? 'Deleting…' : 'Delete'}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="row" style={{ gap: 'var(--space-2)' }}>
+              <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
+                {busy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          )}
         </div>
 
         <h2 style={{ margin: 0 }}>{entry.title}</h2>
@@ -176,7 +189,7 @@ export function EntryDetailPanel({ tripId, entry: initialEntry }: { tripId: stri
           </div>
         )}
 
-        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
+        <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly={readOnly} />
       </div>
     </div>
   );

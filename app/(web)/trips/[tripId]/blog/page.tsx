@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
+import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
 import { BlogPostCard } from '@/components/BlogPostCard';
 
@@ -16,25 +17,37 @@ interface PageProps {
 // (Draft and Published, since it's the User-facing management surface)."
 // Same Server-Component-reads-Prisma-directly + client create-form shape as
 // IdeasPage (app/(web)/trips/[tripId]/ideas/page.tsx).
+//
+// spec-guest-access: allowlisted for Guests -- repeats the layout's own
+// canViewTrip check (defense-in-depth), and the query itself is
+// viewer-branched (not "fetch everything and hide it in the UI"): a Guest's
+// query never includes a Draft row at all, and `filterForViewer` strips any
+// Private Published post from the result before it's ever serialized into
+// the response.
 export default async function BlogPage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
+
+  const viewer = await getViewer();
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
       timelineEntries: {
-        where: { entryType: 'BLOG_POST' },
+        where:
+          viewer.type === 'guest'
+            ? { entryType: 'BLOG_POST', publishedAt: { not: null } }
+            : { entryType: 'BLOG_POST' },
         orderBy: { startAt: 'desc' },
       },
     },
   });
-  if (!trip) notFound();
+  if (!trip || !canViewTrip(trip, viewer)) notFound();
 
   // serializeTimelineEntry's return type carries every TimelineEntry field
   // (a strict superset of BlogPostDTO's) -- structurally assignable as-is,
   // no cast needed.
-  const posts: BlogPostDTO[] = trip.timelineEntries.map(serializeTimelineEntry);
+  const posts: BlogPostDTO[] = filterForViewer(trip.timelineEntries.map(serializeTimelineEntry), viewer);
 
   return (
     <main className="page">
@@ -46,16 +59,18 @@ export default async function BlogPage({ params }: PageProps) {
         Publish it. Any User with access to this Trip can see Drafts here, same as everything else on it.
       </p>
 
-      <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
-        <BlogPostForm tripId={tripId} mode="create" />
-      </div>
+      {viewer.type === 'user' && (
+        <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
+          <BlogPostForm tripId={tripId} mode="create" />
+        </div>
+      )}
 
       {posts.length === 0 ? (
         <div className="empty-state">No Blog Posts yet. Add one above.</div>
       ) : (
         <div className="stack">
           {posts.map((post) => (
-            <BlogPostCard key={post.id} post={post} />
+            <BlogPostCard key={post.id} post={post} readOnly={viewer.type === 'guest'} />
           ))}
         </div>
       )}

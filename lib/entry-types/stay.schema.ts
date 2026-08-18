@@ -6,6 +6,7 @@ import {
   descriptionField,
   expenseFields,
   hasExpensePair,
+  isPrivateField,
   locationFields,
   notesField,
   postTripNotesField,
@@ -46,6 +47,7 @@ const stayFieldsShape = {
   ...contactFields,
   notes: notesField,
   postTripNotes: postTripNotesField,
+  isPrivate: isPrivateField,
   // No `.default({})` here deliberately: `stayUpdateSchema` below is this
   // same shape run through `.partial()`, and a PATCH that omits
   // `typeDetails` must leave the stored JSONB untouched, not overwrite it

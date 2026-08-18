@@ -10,6 +10,7 @@ export interface BlogPostDTO {
   description: string | null;
   startAt: string;
   publishedAt: string | null;
+  isPrivate: boolean;
 }
 
 interface BlogPostFormProps {
@@ -40,6 +41,8 @@ export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPost
   const [title, setTitle] = useState(post?.title ?? '');
   const [description, setDescription] = useState(post?.description ?? '');
   const [startAt, setStartAt] = useState(toDateTimeLocal(post?.startAt ?? null));
+  // spec-guest-access (FR-28): defaults to `false`, same as the DB column.
+  const [isPrivate, setIsPrivate] = useState(post?.isPrivate ?? false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,6 +62,7 @@ export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPost
       title,
       description: description || null,
       startAt: new Date(startAt).toISOString(),
+      isPrivate,
     };
 
     if (mode === 'create') {
@@ -125,6 +129,19 @@ export function BlogPostForm({ tripId, mode, post, onSaved, onCancel }: BlogPost
           onChange={(e) => setDescription(e.target.value)}
           rows={8}
         />
+      </div>
+
+      <div className="field">
+        <label htmlFor="blog-is-private" className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+          <input
+            id="blog-is-private"
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            style={{ width: 'auto' }}
+          />
+          Private (hidden from Guests)
+        </label>
       </div>
 
       <div className="row">
