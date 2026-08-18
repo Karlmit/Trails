@@ -8,10 +8,10 @@ permanent personal archive.
 Trails is built for a household or a small group of travelers running their
 own instance — not a multi-tenant SaaS product.
 
-**Status:** early foundation release. Auth, Trips, Sections, and the Timeline
-shell are in place; itinerary content (Stays, Transport, Activities, Notes,
-Blog), Ideas, Checklists, Budget, Documents, Important Info, Travel Mode, and
-Guest/public sharing are still to come.
+**Status:** feature-complete for v1. Auth, Trips, Sections, the Timeline,
+itinerary content (Stays, Transport, Activities, Notes, Blog), Ideas,
+Checklists, Budget, Documents, Important Info, Tags/Links/Photos, Travel
+Mode, Guest/public sharing, and Admin-managed accounts are all in place.
 
 ## Running it (Docker Compose)
 
