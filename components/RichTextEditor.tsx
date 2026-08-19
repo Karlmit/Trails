@@ -46,12 +46,6 @@ const layoutImageBlock = createReactBlockSpec(
       const [uploading, setUploading] = useState(false);
       const [uploadError, setUploadError] = useState<string | null>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
-      // Threaded down from RichTextEditor's own closure via module state is
-      // not safe across multiple editors on one page -- read straight off
-      // the editor instance instead, stashed there by RichTextEditor below
-      // (BlockNote has no first-class "arbitrary app data" slot, but every
-      // block's render function already receives the live `editor`).
-      const postId: string | null = (editor as unknown as { _blogPostId: string | null })._blogPostId;
 
       async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -77,30 +71,29 @@ const layoutImageBlock = createReactBlockSpec(
 
       if (!block.props.url) {
         // RichTextView (the read-only detail-page renderer) shares this
-        // same custom block for display parity -- an empty placeholder
-        // with an "add image"/"save first" prompt would be actively
-        // misleading there, since editing isn't possible at all. Render
-        // nothing instead, the same way a Guest sees no upload affordance
-        // anywhere else in the app.
+        // same custom block for display parity -- an empty upload
+        // placeholder would be misleading there, since editing isn't
+        // possible at all. Render nothing instead, the same way a Guest
+        // sees no upload affordance anywhere else in the app.
         if (!editor.isEditable) return null;
+        // User-reported: "Would it be possible to allow uploading images to
+        // a blog post before its actually saved?" -- the upload button is
+        // always available now; `editor.uploadFile` (see uploadBlogImage's
+        // own comment) lazily creates the Draft on the first upload if one
+        // doesn't exist yet, so there's no "save first" gate to show here
+        // at all any more.
         return (
           <div className="rte-layout-image-placeholder" contentEditable={false}>
-            {postId ? (
-              <>
-                <button
-                  type="button"
-                  className="rte-layout-image-upload-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? 'Uploading…' : '🖼️ Add image'}
-                </button>
-                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
-                {uploadError && <div className="field-error">{uploadError}</div>}
-              </>
-            ) : (
-              <span className="text-soft">Save this post first, then edit it to add images.</span>
-            )}
+            <button
+              type="button"
+              className="rte-layout-image-upload-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? 'Uploading…' : '🖼️ Add image'}
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+            {uploadError && <div className="field-error">{uploadError}</div>}
           </div>
         );
       }
@@ -175,13 +168,17 @@ export function parseBlogContent(raw: string | null | undefined): PartialBlock[]
 // no working upload path at all -- only the custom block did. Shared by
 // both: `layoutImageBlock`'s render calls `editor.uploadFile` directly
 // instead of duplicating this fetch.
-async function uploadBlogImage(file: File, postId: string | null): Promise<string> {
-  if (!postId) {
-    // Mirrors layoutImageBlock's own "Save this post first" message --
-    // BlockNote's built-in File Panel renders whatever this throws via its
-    // own `.bn-error-text` (UploadTab.tsx), so this string is User-facing.
-    throw new Error('Save this post first, then edit it to add images.');
-  }
+//
+// User-reported (later): "Would it be possible to allow uploading images to
+// a blog post before its actually saved? ... feels unnesseary" to require a
+// save first. `ensurePostId` (BlogPostForm.tsx) lazily creates the Draft
+// row on the very first upload attempt if one doesn't exist yet -- using
+// whatever title/date/content the User has entered so far -- and returns
+// its id; every later call (from the same or a different image) just
+// returns the id it already created. This function no longer needs to
+// know or care whether that create-on-demand happened.
+async function uploadBlogImage(file: File, ensurePostId: () => Promise<string>): Promise<string> {
+  const postId = await ensurePostId();
   const formData = new FormData();
   formData.append('ownerType', 'TIMELINE_ENTRY');
   formData.append('ownerId', postId);
@@ -194,20 +191,25 @@ async function uploadBlogImage(file: File, postId: string | null): Promise<strin
   return `/api/v1/photos/${photo.id}/file`;
 }
 
-function useBlogEditor(initialContent: string | null | undefined, postId: string | null) {
-  // BlockNote's own `initialContent`/`uploadFile` are read once at creation
-  // time -- fine here since both Forms that use this only ever mount once
-  // per Blog Post (create page vs. edit page are separate mounts, and
-  // `postId` is invariant for a given mount's whole lifetime -- create mode
-  // never flips to having one without a full page navigation to the detail
-  // page first).
+function useBlogEditor(initialContent: string | null | undefined, ensurePostId: () => Promise<string>) {
+  // A ref, not a value closed over directly by `uploadFile` below --
+  // `useCreateBlockNote`'s own options (including `uploadFile`) are only
+  // ever read once, at creation time (see its own comment), but
+  // `ensurePostId` closes over BlogPostForm's own state, which keeps
+  // changing over the editor's lifetime (most importantly, the post's id
+  // the moment it's lazily created). Always reading through this ref
+  // instead of the `ensurePostId` parameter directly keeps `uploadFile`
+  // correct no matter how much later it actually runs.
+  const ensurePostIdRef = useRef(ensurePostId);
+  ensurePostIdRef.current = ensurePostId;
+
+  // BlockNote's own `initialContent` is read once at creation time -- fine
+  // here since both Forms that use this only ever mount once per Blog Post.
   const editor = useCreateBlockNote({
     schema: blogPostSchema,
     initialContent: useMemo(() => parseBlogContent(initialContent), [initialContent]),
-    uploadFile: (file) => uploadBlogImage(file, postId),
+    uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current()),
   });
-  // Stashed for layoutImageBlock's render function above -- see its comment.
-  (editor as unknown as { _blogPostId: string | null })._blogPostId = postId;
   return editor;
 }
 
@@ -322,7 +324,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
 export function RichTextEditor({
   initialContent,
   contentRef,
-  postId,
+  ensurePostId,
 }: {
   initialContent: string | null | undefined;
   // Deliberately a ref, not React state fed back in as a `value` prop --
@@ -335,14 +337,13 @@ export function RichTextEditor({
   // ref on change instead means the parent never re-renders from typing at
   // all -- BlogPostForm reads `.current` only once, at submit time.
   contentRef: MutableRefObject<string>;
-  // null in create mode (the Blog Post doesn't exist yet, so there's no
-  // owner for an uploaded image to attach to -- same constraint the
-  // existing PhotoGallery already has, see BlogPostForm.tsx). Once the
-  // first save happens and the User re-opens this post to edit it, images
-  // become available.
-  postId: string | null;
+  // Resolves to the Blog Post's own id, creating it as a Draft first (from
+  // whatever title/date/content exists so far) if it doesn't exist yet --
+  // see uploadBlogImage's comment. In edit mode this just returns the
+  // existing id immediately, no network call.
+  ensurePostId: () => Promise<string>;
 }) {
-  const editor = useBlogEditor(initialContent, postId);
+  const editor = useBlogEditor(initialContent, ensurePostId);
 
   return (
     <div className="rich-text-editor">

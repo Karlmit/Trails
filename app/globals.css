@@ -1285,6 +1285,28 @@ p {
   margin-top: var(--space-2);
 }
 
+/* Caught live: a freshly-loaded document whose last block is an image (no
+   text after it to place a normal cursor into) gets ProseMirror's own
+   default initial selection resolved onto that image as a NodeSelection
+   -- BlockNote's own theme highlights that via
+   `.ProseMirror-selectednode > .bn-block-content > :after`, i.e. a
+   generated `::after` on `.bn-block-content`'s own direct child (here,
+   this app's own `.rte-layout-image` div), which stretches to that div's
+   full `max-width: 100%` rather than just the image's own pixels.
+   Confirmed via `getComputedStyle(el, '::after')` -- checking real
+   elements alone (no second `::after` argument) always reports
+   `boxShadow: none`, since a pseudo-element's computed style has to be
+   read separately. Showing "this is selected" is legitimate feedback
+   while actively editing, but this view is read-only -- nothing can be
+   selected here, so the highlight is only ever a confusing stray blue
+   box next to the image. `!important` because BlockNote's own rule (two
+   classes plus the pseudo-element) is more specific than this alone
+   would be. Scoped to this read view; the editing experience (where the
+   highlight is legitimate) is untouched. */
+.rich-text-view .rte-layout-image::after {
+  display: none !important;
+}
+
 /* User-reported: "I would like the blog content editor to be a full page
    experience." blog/new/page.tsx and blog/[entryId]/edit/page.tsx both
    give BlogPostForm.tsx its own dedicated `<main className="page

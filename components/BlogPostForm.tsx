@@ -83,6 +83,57 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // User-reported: "Would it be possible to allow uploading images to a
+  // blog post before its actually saved? ... feels unnesseary" to require
+  // a save first. A ref, not state -- `ensurePostId` (passed to
+  // RichTextEditor) needs to read/write this synchronously, and a second
+  // concurrent call (e.g. two images added in quick succession before any
+  // re-render happens) must see the *in-flight* create, not fire a second
+  // one -- see `creatingRef` below. In edit mode this is just the post's
+  // own id from the start, so `ensurePostId` never has anything to create.
+  const existingIdRef = useRef<string | null>(post?.id ?? null);
+  const creatingRef = useRef<Promise<string> | null>(null);
+
+  async function ensurePostId(): Promise<string> {
+    if (existingIdRef.current) return existingIdRef.current;
+    if (creatingRef.current) return creatingRef.current;
+
+    const promise = (async () => {
+      const body: Record<string, unknown> = {
+        tripId,
+        entryType: 'BLOG_POST',
+        // A blank title can't be saved at all (FR-18) -- but blocking the
+        // very first image on "type a title first" would just trade one
+        // annoyance for another. Same "Untitled" convention as Google
+        // Docs/Notion: silently fills in a placeholder the User can
+        // rename any time before Publishing (nothing here is published
+        // yet -- this is still always a Draft).
+        title: title.trim() || 'Untitled',
+        description: descriptionRef.current || null,
+        startAt: startAt || tripStartDate || toDateOnly(new Date().toISOString()),
+        isPrivate,
+      };
+      const response = await fetch('/api/v1/timeline-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(responseBody?.error?.message ?? 'Could not create this Blog Post.');
+      }
+      existingIdRef.current = responseBody.id;
+      return responseBody.id as string;
+    })();
+
+    creatingRef.current = promise;
+    try {
+      return await promise;
+    } finally {
+      creatingRef.current = null;
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -95,6 +146,10 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       return;
     }
 
+    // An image upload may already have lazily created this Draft (see
+    // ensurePostId above) -- if so, this is an update to that same row,
+    // not a second, duplicate post.
+    const id = existingIdRef.current;
     const body: Record<string, unknown> = {
       title,
       description: descriptionRef.current || null,
@@ -102,17 +157,15 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       startAt,
       isPrivate,
     };
-
-    if (mode === 'create') {
+    if (!id) {
       body.tripId = tripId;
       body.entryType = 'BLOG_POST';
     }
 
     setSubmitting(true);
     try {
-      const url =
-        mode === 'create' ? '/api/v1/timeline-entries' : `/api/v1/timeline-entries/${post!.id}`;
-      const method = mode === 'create' ? 'POST' : 'PATCH';
+      const url = id ? `/api/v1/timeline-entries/${id}` : '/api/v1/timeline-entries';
+      const method = id ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
         method,
@@ -157,11 +210,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         required
       />
 
-      <RichTextEditor
-        initialContent={descriptionRef.current}
-        contentRef={descriptionRef}
-        postId={mode === 'edit' ? post!.id : null}
-      />
+      <RichTextEditor initialContent={descriptionRef.current} contentRef={descriptionRef} ensurePostId={ensurePostId} />
 
       <div className="blog-editor-footer">
         <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
