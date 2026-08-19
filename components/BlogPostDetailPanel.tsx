@@ -1,14 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
-import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
+import type { BlogPostDTO } from '@/components/BlogPostForm';
 import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
-import { entryClockTime, formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-status';
+import { formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-status';
 
 // See BlogPostForm.tsx's identical comment -- BlockNote can't tolerate
 // this Client Component's own server-render pass.
@@ -19,23 +20,15 @@ const RichTextView = dynamic(() => import('@/components/RichTextEditor').then((m
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
-// User-reported: "Check-in/out time should not be mandatory" now applies to
-// a Blog Post's own date too (BlogPostForm's `timeRequired={false}`) --
-// same literal-midnight sentinel every other Entry Type already uses (see
-// EntryDetailPanel's identical helper) to avoid showing a fabricated
-// "00:00" the User never actually entered.
-function hasNoSpecificTime(date: string): boolean {
-  const { hour, minute } = entryClockTime(new Date(date));
-  return hour === 0 && minute === 0;
-}
-
-// FR-18/FR-19: view/edit/publish/unpublish/delete a single Blog Post. Same
-// view<->edit toggle + inline-delete shape as EntryDetailPanel
-// (components/EntryDetailPanel.tsx); Publish/Unpublish are the two
-// additional actions this Entry Type has that no other type does, each a
-// single PUT/DELETE to the dedicated publish route (never through this
-// panel's own PATCH/DELETE calls, and never a field this panel's edit form
-// can touch -- AD-10).
+// FR-18/FR-19: view/publish/unpublish/delete a single Blog Post. Editing is
+// its own dedicated full-page route (app/(web)/trips/[tripId]/blog/
+// [entryId]/edit) -- User-reported: "I would like the blog content editor
+// to be a full page experience" -- so this panel no longer toggles an
+// inline BlogPostForm in place; Edit is a plain Link. Publish/Unpublish are
+// the two additional actions this Entry Type has that no other type does,
+// each a single PUT/DELETE to the dedicated publish route (never through
+// this panel's own DELETE call, and never a field the edit form can touch
+// -- AD-10).
 export function BlogPostDetailPanel({
   tripId,
   post: initialPost,
@@ -55,7 +48,6 @@ export function BlogPostDetailPanel({
 }) {
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
-  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,21 +94,6 @@ export function BlogPostDetailPanel({
     }
   }
 
-  if (editing && !readOnly) {
-    return (
-      <BlogPostForm
-        tripId={tripId}
-        mode="edit"
-        post={post}
-        onSaved={(updated) => {
-          setPost(updated);
-          setEditing(false);
-        }}
-        onCancel={() => setEditing(false)}
-      />
-    );
-  }
-
   return (
     <div className="stack">
       {error && <div className="form-error-banner">{error}</div>}
@@ -130,9 +107,9 @@ export function BlogPostDetailPanel({
               <button type="button" className="btn btn-primary" onClick={handlePublishToggle} disabled={busy}>
                 {busy ? 'Working…' : isPublished ? 'Unpublish' : 'Publish'}
               </button>
-              <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+              <Link href={`/trips/${tripId}/blog/${post.id}/edit`} className="btn btn-outline">
                 Edit
-              </button>
+              </Link>
               <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
                 {busy ? 'Deleting…' : 'Delete'}
               </button>
@@ -146,11 +123,11 @@ export function BlogPostDetailPanel({
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
             Date
           </dt>
-          <dd style={{ margin: 0 }}>
-            {hasNoSpecificTime(post.startAt)
-              ? formatEntryEndpointDateOnly(new Date(post.startAt), null)
-              : formatEntryDateTime(post.startAt)}
-          </dd>
+          {/* User-reported: "we do not need a time for blog posts, only
+              date" -- always date-only now, regardless of what's actually
+              stored (a pre-existing post saved back when this field still
+              carried a time shows just its date too). */}
+          <dd style={{ margin: 0 }}>{formatEntryEndpointDateOnly(new Date(post.startAt), null)}</dd>
         </dl>
 
         {post.description && <RichTextView content={post.description} />}

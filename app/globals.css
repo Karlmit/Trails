@@ -1039,7 +1039,25 @@ p {
 }
 
 .rich-text-editor .bn-container {
-  padding: var(--space-2) 0;
+  padding: var(--space-3) 0;
+}
+
+/* User-reported: "the small box you made for editing the content is
+   laughably small" -- this editor now only ever appears on its own
+   dedicated full-page route (blog/new, blog/[entryId]/edit), never
+   embedded as one field among several in a shorter form, so it can (and
+   should) claim most of the viewport rather than sizing to its own
+   content. Taller still on a phone, where there's nothing else on the
+   page competing for space in the first place. */
+.rich-text-editor .bn-editor {
+  min-height: 55vh;
+  padding: 0 var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .rich-text-editor .bn-editor {
+    min-height: 65vh;
+  }
 }
 
 .rich-text-view .bn-container {
@@ -1053,6 +1071,65 @@ p {
    them -- no extra CSS needed here beyond removing the input-like border. */
 .rich-text-view {
   margin-top: var(--space-2);
+}
+
+/* User-reported: "I would like the blog content editor to be a full page
+   experience." blog/new/page.tsx and blog/[entryId]/edit/page.tsx both
+   give BlogPostForm.tsx its own dedicated `<main className="page
+   blog-editor-page">` (see those files) -- no card/shadow wrapper around
+   the form itself, so it reads as one continuous writing surface on the
+   page canvas rather than a boxed-in panel, with only the content
+   editor's own border (above) marking where the editable area is. */
+.blog-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.blog-editor-title-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: var(--space-2) 0;
+  font-family: inherit;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.blog-editor-title-input::placeholder {
+  color: var(--color-text-soft);
+}
+
+.blog-editor-date-input {
+  align-self: flex-start;
+  border: 1px solid #d6dbde;
+  border-radius: var(--radius-input);
+  padding: 0.6rem 0.9rem;
+  min-height: 40px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+  background: var(--color-surface);
+}
+
+.blog-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  border-top: 1px solid #d6dbde;
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .blog-editor-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .rte-layout-image-placeholder {

@@ -1,10 +1,10 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
-import { dateKeyOfDateColumn } from '@/lib/trip-status';
-import { BlogPostForm, type BlogPostDTO } from '@/components/BlogPostForm';
+import type { BlogPostDTO } from '@/components/BlogPostForm';
 import { BlogPostCard } from '@/components/BlogPostCard';
 
 interface PageProps {
@@ -80,20 +80,24 @@ export default async function BlogPage({ params }: PageProps) {
     <main className="page">
       <div className="row-between">
         <h2 style={{ margin: 0 }}>Blog</h2>
+        {/* User-reported: "I would like the blog content editor to be a
+            full page experience" -- create now launches its own dedicated
+            page (blog/new/page.tsx), same FAB-launched-create-page pattern
+            as Timeline's own "Add Entry", rather than an inline form
+            cramped above this list. */}
+        {viewer.type === 'user' && (
+          <Link href={`/trips/${tripId}/blog/new`} className="btn btn-primary">
+            + New Post
+          </Link>
+        )}
       </div>
       <p className="text-soft">
         This Trip&rsquo;s journal. A new post starts as a Draft and is never shown on the Timeline until you
         Publish it. Any User with access to this Trip can see Drafts here, same as everything else on it.
       </p>
 
-      {viewer.type === 'user' && (
-        <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
-          <BlogPostForm tripId={tripId} mode="create" tripStartDate={dateKeyOfDateColumn(trip.startDate)} />
-        </div>
-      )}
-
       {posts.length === 0 ? (
-        <div className="empty-state">No Blog Posts yet. Add one above.</div>
+        <div className="empty-state">No Blog Posts yet. Add one to get started.</div>
       ) : (
         <div className="stack">
           {posts.map((post) => (

@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
-import { DateTimeInput } from '@/components/DateTimeInput';
 
 // BlockNote (RichTextEditor.tsx) touches `window` during its own render,
 // so it can't tolerate this Client Component's own server-render pass --
@@ -38,8 +38,13 @@ interface BlogPostFormProps {
   // same default -- a create-mode form with no seed opens its date picker
   // on the Trip's own first day, same as everywhere else.
   tripStartDate?: string;
-  onSaved?: (post: BlogPostDTO) => void;
-  onCancel?: () => void;
+  // User-reported: "I would like the blog content editor to be a full page
+  // experience" -- this form now always lives on its own dedicated route
+  // (app/(web)/trips/[tripId]/blog/new and .../[entryId]/edit), never
+  // swapped in inline over an existing panel, so Cancel is a plain
+  // navigation back to wherever launched it rather than a callback that
+  // toggles a parent's local state.
+  cancelHref: string;
 }
 
 // spec-blog, FR-18: create/edit form for a Blog Post -- deliberately minimal
@@ -50,18 +55,20 @@ interface BlogPostFormProps {
 // job alone (AD-10; see components/BlogPostDetailPanel.tsx), never this
 // create/edit path.
 //
-// `startAt` is an Entry's own recorded time (see dateTimeField's comment)
-// -- read back with UTC getters, never local ones, so the pre-filled value
-// is always the literal digits originally typed, regardless of which
-// browser/timezone is doing the editing.
-function toDateTimeLocal(iso: string | null): string {
+// User-reported: "we do not need a time for blog posts, only date" -- unlike
+// every other Entry Type, a Blog Post's own `startAt` is edited as a bare
+// `YYYY-MM-DD` via a native date input, never a time. `dateTimeField`
+// (lib/validation.ts) already accepts a bare date -- parsed as literal UTC
+// midnight, the same "no specific time" sentinel every other type's
+// optional-time fields already use -- so this needed no backend change.
+function toDateOnly(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
-export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCancel }: BlogPostFormProps) {
+export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: BlogPostFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(post?.title ?? '');
   // A ref, not state -- see RichTextEditor's `contentRef` prop comment for
@@ -69,7 +76,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
   // (and back down as RichTextEditor's prop) broke the editor outright.
   const descriptionRef = useRef(post?.description ?? '');
   const [startAt, setStartAt] = useState(
-    post?.startAt ? toDateTimeLocal(post.startAt) : mode === 'create' ? (tripStartDate ?? '') : '',
+    post?.startAt ? toDateOnly(post.startAt) : mode === 'create' ? (tripStartDate ?? '') : '',
   );
   // spec-guest-access (FR-28): defaults to `false`, same as the DB column.
   const [isPrivate, setIsPrivate] = useState(post?.isPrivate ?? false);
@@ -91,9 +98,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
     const body: Record<string, unknown> = {
       title,
       description: descriptionRef.current || null,
-      // Sent as the raw `YYYY-MM-DDTHH:mm` literal -- see EntryForm.tsx's
-      // matching comment for why `new Date(startAt).toISOString()` would
-      // silently corrupt it via the submitting browser's own timezone.
+      // A bare `YYYY-MM-DD` -- see toDateOnly's comment.
       startAt,
       isPrivate,
     };
@@ -121,11 +126,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
         return;
       }
 
-      if (mode === 'create') {
-        router.push(`/trips/${tripId}/blog/${responseBody.id}`);
-      } else {
-        onSaved?.(responseBody);
-      }
+      router.push(`/trips/${tripId}/blog/${responseBody.id}`);
       router.refresh();
     } catch {
       setError('Could not reach the server. Please try again.');
@@ -135,39 +136,36 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card stack">
+    <form onSubmit={handleSubmit} className="blog-editor-form">
       {error && <div className="form-error-banner">{error}</div>}
 
-      <div className="field">
-        <label htmlFor="blog-title">Title</label>
-        <input id="blog-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-      </div>
+      <input
+        className="blog-editor-title-input"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title"
+        aria-label="Title"
+        required
+      />
 
-      <div className="field">
-        <label htmlFor="blog-date">Date</label>
-        {/* User-reported: not using 24-hour clock, and not matching the
-            same date-picker settings as the rest of the app -- swapped
-            from a native `datetime-local` (which formats AM/PM-vs-24h from
-            the browser's OS locale, with no reliable override) to the same
-            DateTimeInput every other Entry Type uses. `timeRequired={false}`
-            matches "Check-in/out time should not be mandatory": a bare
-            date is a complete, valid value here too. */}
-        <DateTimeInput id="blog-date" value={startAt} onChange={setStartAt} required timeRequired={false} />
-      </div>
+      <input
+        className="blog-editor-date-input"
+        type="date"
+        value={startAt}
+        onChange={(e) => setStartAt(e.target.value)}
+        aria-label="Date"
+        required
+      />
 
-      <div className="field">
-        <label>Content</label>
-        <RichTextEditor
-          initialContent={descriptionRef.current}
-          contentRef={descriptionRef}
-          postId={mode === 'edit' ? post!.id : null}
-        />
-      </div>
+      <RichTextEditor
+        initialContent={descriptionRef.current}
+        contentRef={descriptionRef}
+        postId={mode === 'edit' ? post!.id : null}
+      />
 
-      <div className="field">
-        <label htmlFor="blog-is-private" className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+      <div className="blog-editor-footer">
+        <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
           <input
-            id="blog-is-private"
             type="checkbox"
             checked={isPrivate}
             onChange={(e) => setIsPrivate(e.target.checked)}
@@ -175,17 +173,15 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, onSaved, onCan
           />
           Private (hidden from Guests)
         </label>
-      </div>
 
-      <div className="row">
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Saving…' : mode === 'create' ? 'Save Draft' : 'Save changes'}
-        </button>
-        {onCancel && (
-          <button type="button" className="btn btn-dark-outline" onClick={onCancel}>
-            Cancel
+        <div className="row">
+          <button type="submit" className="btn btn-primary" disabled={submitting}>
+            {submitting ? 'Saving…' : mode === 'create' ? 'Save Draft' : 'Save changes'}
           </button>
-        )}
+          <Link href={cancelHref} className="btn btn-dark-outline">
+            Cancel
+          </Link>
+        </div>
       </div>
     </form>
   );
