@@ -1038,8 +1038,62 @@ p {
   overflow: hidden;
 }
 
+/* User-reported: "the notion like editor is probably good on desktop, but
+   on phones it kinda sucks since the menu moves... add a menu on top
+   that is typical for WYSIWYG editors." A plain, always-visible bar --
+   never dependent on hover or text selection to appear, so it works
+   identically with touch -- sitting directly above the editable area. */
+.blog-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid #d6dbde;
+  background: var(--color-surface-cool);
+}
+
+.blog-toolbar button {
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-input);
+  background: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.blog-toolbar button[aria-pressed='true'] {
+  background: var(--color-brand-mint);
+  border-color: var(--color-brand-deep);
+  color: var(--color-brand-deep);
+}
+
+.blog-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-1) 2px;
+  background: #d6dbde;
+}
+
 .rich-text-editor .bn-container {
   padding: var(--space-3) 0;
+}
+
+/* User-reported: "On mobile the plus icon to add an image is outside the
+   screen" -- BlockNote's side menu (the "+"/drag-handle column) positions
+   itself relative to mouse hover (confirmed in its own source) and needs
+   left-margin space this app's narrow phone layout doesn't have. Hidden
+   below this width -- BlogToolbar above and the "/" slash command (both
+   confirmed to work fine on touch) already cover everything the side menu
+   offered for this editor's purposes; only block drag-reordering is lost,
+   which BlockNote's own examples don't consider essential on mobile either. */
+@media (max-width: 640px) {
+  .bn-side-menu {
+    display: none !important;
+  }
 }
 
 /* User-reported: "the small box you made for editing the content is

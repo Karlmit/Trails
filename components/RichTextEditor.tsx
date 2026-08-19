@@ -8,7 +8,9 @@ import {
   createReactBlockSpec,
   SuggestionMenuController,
   getDefaultReactSlashMenuItems,
+  useActiveStyles,
   useCreateBlockNote,
+  useEditorState,
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 
@@ -209,6 +211,114 @@ function useBlogEditor(initialContent: string | null | undefined, postId: string
   return editor;
 }
 
+type BlogEditor = ReturnType<typeof useBlogEditor>;
+
+// User-reported: "On mobile the plus icon to add an image is outside the
+// screen. The notion like editor is probably good on desktop. But on
+// phones it kinda sucks since the menu moves. Its probably better to add
+// a menu on top that is typical for WYSIWYG editors." BlockNote's own
+// side menu (the "+"/drag-handle column to the left of each block) is
+// fundamentally mouse-hover-positioned -- confirmed in its own source,
+// it repositions on `mousemove` -- which has no equivalent on a touch
+// screen and, on a narrow phone viewport with no left margin to render
+// into, the button ends up positioned off-screen. Rather than trying to
+// fix hover-only positioning for touch, this is a plain, always-visible
+// toolbar (no selection or hover needed to appear) sitting above the
+// editable area on every device -- the same "typical WYSIWYG editor"
+// shape as Google Docs/Word's own persistent top toolbar. The one
+// mobile-only affordance the side menu uniquely offered (dividers,
+// quotes, tables, drag-reorder) is still reachable via "/" -- confirmed
+// live that slash commands work fine on a touch screen -- so nothing is
+// lost by hiding the broken side menu there (see `.bn-side-menu`'s own
+// mobile media query in globals.css).
+function BlogToolbar({ editor }: { editor: BlogEditor }) {
+  const activeStyles = useActiveStyles(editor);
+  const currentBlock = useEditorState({
+    editor,
+    selector: ({ editor }) => (editor.getSelection()?.blocks ?? [editor.getTextCursorPosition().block])[0],
+  });
+
+  function toggleStyle(style: 'bold' | 'italic') {
+    editor.focus();
+    editor.toggleStyles({ [style]: true });
+  }
+
+  function toggleBlockType(type: string, props?: Record<string, unknown>) {
+    editor.focus();
+    const props_ = (currentBlock.props ?? {}) as Record<string, unknown>;
+    const isActive =
+      currentBlock.type === type && (!props || Object.entries(props).every(([k, v]) => props_[k] === v));
+    editor.updateBlock(currentBlock, isActive ? { type: 'paragraph', props: {} } : ({ type, props } as never));
+  }
+
+  function insertImage() {
+    editor.focus();
+    insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' } as never);
+  }
+
+  const blockProps = (currentBlock.props ?? {}) as Record<string, unknown>;
+  const isHeading = (level: number) => currentBlock.type === 'heading' && blockProps.level === level;
+
+  return (
+    <div className="blog-toolbar" role="toolbar" aria-label="Formatting">
+      <button
+        type="button"
+        aria-label="Bold"
+        aria-pressed={!!activeStyles.bold}
+        onClick={() => toggleStyle('bold')}
+      >
+        <strong>B</strong>
+      </button>
+      <button
+        type="button"
+        aria-label="Italic"
+        aria-pressed={!!activeStyles.italic}
+        onClick={() => toggleStyle('italic')}
+      >
+        <em>I</em>
+      </button>
+      <span className="blog-toolbar-divider" aria-hidden="true" />
+      <button
+        type="button"
+        aria-label="Heading"
+        aria-pressed={isHeading(2)}
+        onClick={() => toggleBlockType('heading', { level: 2 })}
+      >
+        H2
+      </button>
+      <button
+        type="button"
+        aria-label="Subheading"
+        aria-pressed={isHeading(3)}
+        onClick={() => toggleBlockType('heading', { level: 3 })}
+      >
+        H3
+      </button>
+      <span className="blog-toolbar-divider" aria-hidden="true" />
+      <button
+        type="button"
+        aria-label="Bullet list"
+        aria-pressed={currentBlock.type === 'bulletListItem'}
+        onClick={() => toggleBlockType('bulletListItem')}
+      >
+        ⋮≡
+      </button>
+      <button
+        type="button"
+        aria-label="Numbered list"
+        aria-pressed={currentBlock.type === 'numberedListItem'}
+        onClick={() => toggleBlockType('numberedListItem')}
+      >
+        1.
+      </button>
+      <span className="blog-toolbar-divider" aria-hidden="true" />
+      <button type="button" aria-label="Insert image" onClick={insertImage}>
+        🖼️
+      </button>
+    </div>
+  );
+}
+
 export function RichTextEditor({
   initialContent,
   contentRef,
@@ -236,6 +346,7 @@ export function RichTextEditor({
 
   return (
     <div className="rich-text-editor">
+      <BlogToolbar editor={editor} />
       <BlockNoteView
         editor={editor}
         theme="light"
