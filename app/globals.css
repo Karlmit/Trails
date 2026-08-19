@@ -294,6 +294,24 @@ p {
 }
 
 /* Top nav */
+/* User-reported: "Top banner should always dissappear when scrolling
+   down... guests should not always see login button when scrolling down
+   on phones since it takes unnecessary space." The wrapper, not `.top-nav`
+   itself, carries the sticky position + hide/show transform, so the
+   header and its mobile dropdown panel (when open) always move as one
+   unit -- see TopNav.tsx's own comment for why the actual hiding is
+   gated to phone widths in JS rather than happening here in CSS. */
+.top-nav-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: transform 0.25s ease;
+}
+
+.top-nav-wrap.is-hidden {
+  transform: translateY(-100%);
+}
+
 .top-nav {
   background: var(--color-surface);
   box-shadow: var(--shadow-nav);
@@ -301,9 +319,6 @@ p {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2) var(--space-4);
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 
 .top-nav-brand {
@@ -327,6 +342,61 @@ p {
   gap: var(--space-3);
 }
 
+/* User-reported: "hamburger menus are prefered over side scrolling" --
+   the signed-in action row (Trips / Admin / username / Log out) has no
+   wrap behavior, so on a narrow phone it silently overflowed the
+   viewport (confirmed live: the Log out button rendered ~90px past the
+   right edge, on every page, since this header is global) and forced
+   horizontal scroll site-wide. Both variants below are always in the
+   DOM; only one is ever visible at a given width. */
+.top-nav-menu-btn {
+  display: none;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-input);
+  background: none;
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.top-nav-mobile-panel {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .top-nav-actions-desktop {
+    display: none;
+  }
+
+  .top-nav-menu-btn {
+    display: block;
+  }
+
+  .top-nav-mobile-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-nav);
+  }
+
+  .top-nav-mobile-link {
+    padding: var(--space-2) 0;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .top-nav-mobile-username {
+    padding: var(--space-1) 0;
+    font-size: 0.9rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: var(--space-2);
+  }
+}
+
 /* Trip tab nav */
 .trip-tabs {
   display: flex;
@@ -348,6 +418,65 @@ p {
 .trip-tab.active {
   color: var(--color-brand);
   border-bottom-color: var(--color-brand-accent);
+}
+
+/* User-reported: "Some menues scroll wierdly to the sides... hamburger
+   menus are prefered over side scrolling." Nine tabs never fit a phone
+   width -- `.trip-tabs`'s own `overflow-x: auto` above was exactly that
+   sideways-scrolling menu, with no visual affordance more tabs existed
+   off to the right. Replaced below 640px by a single "current tab ▾"
+   button that opens a dropdown listing every tab; the original
+   horizontal row is untouched above that width. */
+.trip-tabs-menu-btn {
+  display: none;
+}
+
+.trip-tabs-mobile-panel {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .trip-tabs-desktop {
+    display: none;
+  }
+
+  .trip-tabs-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    background: var(--color-surface);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-brand);
+    cursor: pointer;
+  }
+
+  .trip-tabs-mobile-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-nav);
+  }
+
+  .trip-tabs-mobile-link {
+    padding: var(--space-3) var(--space-4);
+    font-weight: 600;
+    color: var(--color-text-soft);
+    border-left: 3px solid transparent;
+  }
+
+  .trip-tabs-mobile-link.active {
+    color: var(--color-brand);
+    border-left-color: var(--color-brand-accent);
+    background: var(--color-brand-mint);
+  }
 }
 
 /* Status badges */
@@ -462,6 +591,18 @@ p {
 
 .fab:active {
   transform: scale(0.95);
+}
+
+/* User-reported: "Some content are overlapping" -- the FAB is `position:
+   fixed`, so it doesn't reserve any space in the page's own flow; on a
+   narrow phone, where the content column runs almost the full viewport
+   width, the last line of a wrapped Timeline entry title can land
+   directly under it (confirmed live: a long Stay name's tail was hidden
+   behind the "+" circle). Reserve enough bottom padding on any page that
+   contains a FAB for the button's own footprint plus breathing room, so
+   real content never has to render behind it. */
+.page:has(.fab) {
+  padding-bottom: calc(56px + var(--space-6));
 }
 
 /* spec-timeline-visual-redesign: a CSS Grid, not stacked flex rows -- the
@@ -1022,6 +1163,23 @@ p {
     display: inline-flex;
     max-width: 100%;
     margin-bottom: var(--space-2);
+  }
+
+  /* User-reported: "Some content are overlapping" -- the "+" FAB is
+     `position: fixed`, so it stays in the same bottom-right spot of the
+     viewport regardless of scroll position. On a narrow phone the content
+     column runs almost edge-to-edge, so any entry title that happens to
+     wrap onto a line landing in that same viewport-relative zone gets its
+     tail hidden behind the button -- confirmed live, at rest (not mid-
+     scroll), with a long Stay name. `.page:has(.fab)`'s own bottom padding
+     (globals.css, near `.fab`) only guarantees the *very end* of the page
+     is reachable past the FAB; it doesn't stop a wrapped line further up
+     from passing behind it. Reserving this gutter for the FAB's own
+     footprint the whole column's height, not just at the bottom, is the
+     only way to guarantee no line ever lands under it at any scroll
+     position. */
+  .timeline-content-cell {
+    padding-right: calc(56px + var(--space-2));
   }
 }
 
