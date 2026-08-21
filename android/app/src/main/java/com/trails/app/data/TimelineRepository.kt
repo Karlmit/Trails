@@ -19,6 +19,8 @@ class TimelineRepository @Inject constructor(
 
     fun observeEntries(tripId: String): Flow<List<TimelineEntryEntity>> = timelineEntryDao.observeForTrip(tripId)
 
+    fun observeEntry(entryId: String): Flow<TimelineEntryEntity?> = timelineEntryDao.observeById(entryId)
+
     /**
      * Full refresh of one Trip's Sections + TimelineEntries. Draft Blog Posts
      * are already excluded server-side (GET /api/v1/timeline-entries, AD-10),

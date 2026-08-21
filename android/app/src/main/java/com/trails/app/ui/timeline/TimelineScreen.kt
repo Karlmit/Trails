@@ -1,70 +1,93 @@
 package com.trails.app.ui.timeline
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.trails.app.data.entity.TimelineEntryEntity
-import com.trails.app.ui.components.TrailsTopBar
 import com.trails.app.ui.theme.TrailsColors
+import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.timeline.graph.TimelineDayWithEntries
+import com.trails.app.ui.timeline.graph.TimelineGraphColumn
+import com.trails.app.ui.timeline.graph.dayLineLabel
+import com.trails.app.ui.timeline.graph.formatDayLabel
+import com.trails.app.ui.timeline.graph.graphWidthFor
+import com.trails.app.ui.timeline.graph.sectionBandColor
+import com.trails.app.ui.timeline.graph.sectionSolidColor
+import com.trails.app.ui.timeline.graph.subtypeLabel
 
-// Phase 1/2 scope: entries grouped by day with the same date-header/dot/
-// entry-chip look as app/(web)'s timeline (globals.css's .timeline-date-*/
-// .entry-chip), reading straight from the local cache -- fully usable
-// offline once synced once. The GitKraken-style branch/merge graph itself
-// (lib/timeline.ts's buildTimelineDays/layoutTimelineEntries, including
-// empty gap days and Section color bands) is Phase 3.
+/**
+ * The GitKraken-style branch/merge graph -- ported 1:1 from
+ * app/(web)/trips/[tripId]/timeline/page.tsx (see ui/timeline/graph/).
+ */
 @Composable
-fun TimelineScreen(viewModel: TimelineViewModel = hiltViewModel()) {
+fun TimelineScreen(
+    padding: PaddingValues,
+    onOpenEntry: (entryType: String, entryId: String) -> Unit = { _, _ -> },
+    viewModel: TimelineViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsState()
-    val entriesByDay = remember(state.entries) {
-        state.entries.groupBy { it.startAt.take(10) }.toSortedMap()
-    }
+    val layout = state.layout
+    val trip = state.trip
 
-    Scaffold(
-        containerColor = TrailsColors.Canvas,
-        topBar = { TrailsTopBar(title = "Timeline") },
-    ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            if (state.entries.isEmpty() && state.isSyncing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = TrailsColors.BrandAccent,
-                )
-            } else if (state.entries.isEmpty()) {
-                Text(
-                    "No timeline entries yet",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = TrailsColors.TextSoft,
-                )
-            } else {
-                LazyColumn(contentPadding = PaddingValues(vertical = 8.dp, horizontal = 16.dp)) {
-                    entriesByDay.forEach { (dayKey, dayEntries) ->
-                        item(key = dayKey) {
-                            DayRow(dayKey, dayEntries)
-                        }
+    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+        if (layout == null && state.isSyncing) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = TrailsColors.BrandAccent,
+            )
+        } else if (trip == null || layout == null) {
+            Text("No trip data yet", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
+        } else {
+            val graphWidth = graphWidthFor(layout.laneCount)
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (state.sections.isEmpty()) {
+                    Text(
+                        "No Sections yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.TextSoft,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    itemsIndexed(layout.days, key = { _, day -> day.day.dateKey }) { index, day ->
+                        val previousSectionIndex = if (index > 0) layout.days[index - 1].day.sectionIndex else null
+                        val section = day.day.sectionIndex?.let { state.sections.getOrNull(it) }
+                        val showSectionLabel = section != null && day.day.sectionIndex != previousSectionIndex
+                        DayRow(
+                            day = day,
+                            graphWidth = graphWidth,
+                            sectionName = section?.name,
+                            sectionEmoji = section?.emoji,
+                            trunkColor = section?.let { sectionSolidColor(day.day.sectionIndex!!, it.color) },
+                            bandColor = section?.let { sectionBandColor(day.day.sectionIndex!!, it.color) },
+                            showSectionLabel = showSectionLabel,
+                            tripTimezone = trip.timezone,
+                            onOpenEntry = onOpenEntry,
+                        )
                     }
                 }
             }
@@ -73,62 +96,88 @@ fun TimelineScreen(viewModel: TimelineViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun DayRow(dayKey: String, entries: List<TimelineEntryEntity>) {
-    Row(modifier = Modifier.padding(vertical = 12.dp)) {
-        Column(modifier = Modifier.padding(end = 16.dp).widthIn(min = 56.dp)) {
-            Text(
-                monthDayLabel(dayKey),
-                style = MaterialTheme.typography.titleMedium,
-                color = TrailsColors.Text,
-            )
-            Text(
-                weekdayLabel(dayKey),
-                style = MaterialTheme.typography.bodySmall,
-                color = TrailsColors.TextSoft,
-            )
+private fun DayRow(
+    day: TimelineDayWithEntries,
+    graphWidth: androidx.compose.ui.unit.Dp,
+    sectionName: String?,
+    sectionEmoji: String?,
+    trunkColor: androidx.compose.ui.graphics.Color?,
+    bandColor: androidx.compose.ui.graphics.Color?,
+    showSectionLabel: Boolean,
+    tripTimezone: String,
+    onOpenEntry: (String, String) -> Unit,
+) {
+    val rowModifier = if (bandColor != null) {
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor).padding(vertical = 4.dp)
+    } else {
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 4.dp)
+    }
+    Row(modifier = rowModifier) {
+        TimelineGraphColumn(
+            day = day,
+            trunkColor = trunkColor,
+            canvasBackground = TrailsColors.Canvas,
+            modifier = Modifier.width(graphWidth).fillMaxHeight(),
+        )
+        Column(modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = 8.dp)) {
+            val label = formatDayLabel(day.day.dateKey)
+            Text(label.monthDay, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+            Text(label.weekday.take(3), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
         }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            entries.forEach { entry -> EntryChip(entry) }
+        Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 8.dp)) {
+            if (showSectionLabel && sectionName != null) {
+                Surface(
+                    color = TrailsColors.Surface,
+                    shape = TrailsShapes.Pill,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                ) {
+                    Text(
+                        text = if (sectionEmoji != null) "$sectionEmoji $sectionName" else sectionName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TrailsColors.Text,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
+            }
+            if (day.day.isToday) {
+                Text(
+                    "TODAY",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TrailsColors.Gold,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            if (day.lines.isEmpty()) {
+                Text(
+                    "No entries yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TrailsColors.TextSoft,
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    day.lines.forEach { line ->
+                        val isBlog = line.entryType == "BLOG_POST"
+                        val (text, showSubtype) = dayLineLabel(line, tripTimezone)
+                        Row(
+                            modifier = Modifier.clickable { onOpenEntry(line.entryType, line.entryId) },
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            if (isBlog) {
+                                Text("📖 ", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Text(
+                                buildString {
+                                    append(text)
+                                    if (showSubtype && line.subtype != null) append(" · ${subtypeLabel(line.subtype)}")
+                                    if (isBlog) append(" Read post →")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
-
-@Composable
-private fun EntryChip(entry: TimelineEntryEntity) {
-    val dotColor = entryTypeColor(entry.entryType)
-    val isBlog = entry.entryType == "BLOG_POST"
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(dotColor, CircleShape),
-        )
-        Text(
-            text = if (isBlog) "📖 ${entry.title}" else entry.title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,
-            modifier = Modifier.padding(start = 10.dp),
-        )
-    }
-}
-
-// Mirrors lib/entry-types/colors.ts::entryTypeColor.
-private fun entryTypeColor(entryType: String): Color = when (entryType) {
-    "STAY" -> TrailsColors.BrandAccent
-    "TRANSPORT" -> TrailsColors.BrandUplift
-    "ACTIVITY" -> TrailsColors.Brand
-    "BLOG_POST" -> TrailsColors.BrandDeep
-    else -> TrailsColors.TextSoft // NOTE
-}
-
-private fun weekdayLabel(dayKey: String): String = runCatching {
-    java.time.LocalDate.parse(dayKey.substring(0, 10))
-        .dayOfWeek
-        .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
-}.getOrDefault("")
-
-private fun monthDayLabel(dayKey: String): String = runCatching {
-    val date = java.time.LocalDate.parse(dayKey.substring(0, 10))
-    val month = date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
-    "$month ${date.dayOfMonth}"
-}.getOrDefault(dayKey)

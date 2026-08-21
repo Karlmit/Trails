@@ -11,6 +11,9 @@ interface TimelineEntryDao {
     @Query("SELECT * FROM timeline_entries WHERE tripId = :tripId ORDER BY startAt ASC")
     fun observeForTrip(tripId: String): Flow<List<TimelineEntryEntity>>
 
+    @Query("SELECT * FROM timeline_entries WHERE id = :entryId")
+    fun observeById(entryId: String): Flow<TimelineEntryEntity?>
+
     @Upsert
     suspend fun upsertAll(entries: List<TimelineEntryEntity>)
 

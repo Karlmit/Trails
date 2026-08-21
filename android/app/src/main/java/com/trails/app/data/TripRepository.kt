@@ -19,6 +19,8 @@ class TripRepository @Inject constructor(
 ) {
     fun observeTrips(): Flow<List<TripEntity>> = tripDao.observeAll()
 
+    fun observeTrip(tripId: String): Flow<TripEntity?> = tripDao.observeById(tripId)
+
     suspend fun syncTrips() {
         val trips = api.listTrips()
         if (trips.isEmpty()) {

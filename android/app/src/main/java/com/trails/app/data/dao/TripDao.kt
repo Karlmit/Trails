@@ -11,6 +11,9 @@ interface TripDao {
     @Query("SELECT * FROM trips ORDER BY startDate ASC")
     fun observeAll(): Flow<List<TripEntity>>
 
+    @Query("SELECT * FROM trips WHERE id = :tripId")
+    fun observeById(tripId: String): Flow<TripEntity?>
+
     @Upsert
     suspend fun upsertAll(trips: List<TripEntity>)
 

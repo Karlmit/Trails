@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.trails.app.data.TimelineRepository
+import com.trails.app.data.TripSyncCoordinator
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -12,13 +12,13 @@ import dagger.assisted.AssistedInject
 class SyncTripWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val timelineRepository: TimelineRepository,
+    private val tripSyncCoordinator: TripSyncCoordinator,
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         val tripId = inputData.getString(KEY_TRIP_ID) ?: return Result.failure()
         return try {
-            timelineRepository.syncTrip(tripId)
+            tripSyncCoordinator.syncTrip(tripId)
             Result.success()
         } catch (e: Exception) {
             // A single attempt per user-triggered sync (pull-to-refresh, or

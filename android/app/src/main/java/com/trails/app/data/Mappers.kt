@@ -1,8 +1,20 @@
 package com.trails.app.data
 
+import com.trails.app.data.entity.AttachmentEntity
+import com.trails.app.data.entity.ChecklistEntity
+import com.trails.app.data.entity.ChecklistItemEntity
+import com.trails.app.data.entity.IdeaEntity
+import com.trails.app.data.entity.ImportantInfoEntity
+import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.SectionEntity
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.data.entity.TripEntity
+import com.trails.app.network.dto.AttachmentDto
+import com.trails.app.network.dto.ChecklistDto
+import com.trails.app.network.dto.ChecklistItemDto
+import com.trails.app.network.dto.IdeaDto
+import com.trails.app.network.dto.ImportantInfoDto
+import com.trails.app.network.dto.PhotoDto
 import com.trails.app.network.dto.SectionDto
 import com.trails.app.network.dto.TimelineEntryDto
 import com.trails.app.network.dto.TripDto
@@ -71,3 +83,88 @@ fun TimelineEntryDto.toEntity() = TimelineEntryEntity(
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
+
+fun ChecklistDto.toEntity() = ChecklistEntity(
+    id = id,
+    tripId = tripId,
+    title = title,
+    description = description,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun ChecklistItemDto.toEntity() = ChecklistItemEntity(
+    id = id,
+    checklistId = checklistId,
+    text = text,
+    checked = checked,
+    note = note,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun ImportantInfoDto.toEntity() = ImportantInfoEntity(
+    id = id,
+    tripId = tripId,
+    title = title,
+    content = content,
+    locationName = locationName,
+    locationAddress = locationAddress,
+    locationLat = locationLat,
+    locationLng = locationLng,
+    locationMapLink = locationMapLink,
+    contactName = contactName,
+    contactPhone = contactPhone,
+    contactEmail = contactEmail,
+    isPrivate = isPrivate,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun IdeaDto.toEntity() = IdeaEntity(
+    id = id,
+    tripId = tripId,
+    title = title,
+    category = category,
+    priority = priority,
+    weatherSuitability = weatherSuitability,
+    weatherTagsCsv = weatherTags.joinToString(","),
+    locationName = locationName,
+    locationAddress = locationAddress,
+    locationLat = locationLat,
+    locationLng = locationLng,
+    locationMapLink = locationMapLink,
+    estimatedExpenseAmount = estimatedExpenseAmount,
+    estimatedExpenseCurrency = estimatedExpenseCurrency,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun AttachmentDto.toEntity(localPath: String? = null) = AttachmentEntity(
+    id = id,
+    tripId = tripId,
+    ownerType = ownerType,
+    ownerId = ownerId,
+    mimeType = mimeType,
+    sizeBytes = sizeBytes,
+    originalFilename = originalFilename,
+    createdAt = createdAt,
+    localPath = localPath,
+)
+
+fun PhotoDto.toEntity(localPath: String? = null) = PhotoEntity(
+    id = id,
+    tripId = tripId,
+    ownerType = ownerType,
+    ownerId = ownerId,
+    mimeType = mimeType,
+    sizeBytes = sizeBytes,
+    originalFilename = originalFilename,
+    isPrimary = isPrimary,
+    isPrivate = isPrivate,
+    createdAt = createdAt,
+    localPath = localPath,
+)
+
+val IdeaEntity.weatherTags: List<String>
+    get() = if (weatherTagsCsv.isBlank()) emptyList() else weatherTagsCsv.split(",")
