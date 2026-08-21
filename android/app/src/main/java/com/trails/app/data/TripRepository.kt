@@ -25,9 +25,17 @@ class TripRepository @Inject constructor(
         val trips = api.listTrips()
         if (trips.isEmpty()) {
             tripDao.deleteAll()
-        } else {
-            tripDao.upsertAll(trips.map { it.toEntity() })
-            tripDao.deleteMissing(trips.map { it.id })
+            return
         }
+        // Preserve each trip's own cachedOffline flag across this refresh --
+        // the flag records "a full TripSyncCoordinator.syncTrip() has run,"
+        // which has nothing to do with this shallow trip-list fetch.
+        val existingFlags = tripDao.getAllCachedOfflineFlags().associate { it.id to it.cachedOffline }
+        tripDao.upsertAll(trips.map { it.toEntity().copy(cachedOffline = existingFlags[it.id] ?: false) })
+        tripDao.deleteMissing(trips.map { it.id })
+    }
+
+    suspend fun setCachedOffline(tripId: String, cachedOffline: Boolean) {
+        tripDao.setCachedOffline(tripId, cachedOffline)
     }
 }

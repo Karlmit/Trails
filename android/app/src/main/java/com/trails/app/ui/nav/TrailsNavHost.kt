@@ -144,7 +144,9 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.TIMELINE, "Entry", navController) { padding -> EntryDetailScreen(padding) }
+            TripDrawerScaffold(tripId, TripTab.TIMELINE, "Entry", navController, showBackButton = true) { padding ->
+                EntryDetailScreen(padding)
+            }
         }
 
         composable(
@@ -155,7 +157,9 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.BLOG, "Blog post", navController) { padding -> BlogDetailScreen(padding) }
+            TripDrawerScaffold(tripId, TripTab.BLOG, "Blog post", navController, showBackButton = true) { padding ->
+                BlogDetailScreen(padding)
+            }
         }
     }
 }

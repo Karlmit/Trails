@@ -112,11 +112,14 @@ private fun LabeledEntry(label: String, entry: TimelineEntryEntity?, onOpenEntry
 
 @Composable
 private fun EntryRow(entry: TimelineEntryEntity, onOpenEntry: (String, String) -> Unit, modifier: Modifier = Modifier) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mapsUrl = com.trails.app.util.entryMapsUrl(entry.locationAddress, entry.locationName)
     Row(
         modifier = modifier.fillMaxWidth().clickable { onOpenEntry(entry.entryType, entry.id) },
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(entry.title, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent)
             Text(
                 buildString {
@@ -125,6 +128,14 @@ private fun EntryRow(entry: TimelineEntryEntity, onOpenEntry: (String, String) -
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = TrailsColors.TextSoft,
+            )
+        }
+        if (mapsUrl != null) {
+            Text(
+                "Map",
+                style = MaterialTheme.typography.labelLarge,
+                color = TrailsColors.BrandAccent,
+                modifier = Modifier.clickable { com.trails.app.util.openExternalUrl(context, mapsUrl) },
             )
         }
     }

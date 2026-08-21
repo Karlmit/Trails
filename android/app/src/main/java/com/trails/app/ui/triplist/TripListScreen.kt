@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CardDefaults
@@ -36,7 +37,7 @@ fun TripListScreen(
     viewModel: TripListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    TripListContent(state = state, onOpenTrip = onOpenTrip)
+    TripListContent(state = state, onOpenTrip = onOpenTrip, onSaveOffline = viewModel::saveOffline)
 }
 
 /**
@@ -47,7 +48,11 @@ fun TripListScreen(
  * app/(web)/trips/page.tsx's `.trip-card-grid`/`.trip-card`.
  */
 @Composable
-fun TripListContent(state: TripListUiState, onOpenTrip: (String) -> Unit) {
+fun TripListContent(
+    state: TripListUiState,
+    onOpenTrip: (String) -> Unit,
+    onSaveOffline: (String) -> Unit = {},
+) {
     Scaffold(
         containerColor = TrailsColors.Canvas,
         topBar = { TrailsTopBar() },
@@ -70,7 +75,12 @@ fun TripListContent(state: TripListUiState, onOpenTrip: (String) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(state.trips, key = { it.id }) { trip: TripEntity ->
-                        TripCard(trip, onClick = { onOpenTrip(trip.id) })
+                        TripCard(
+                            trip = trip,
+                            isSavingOffline = trip.id in state.savingOfflineIds,
+                            onClick = { onOpenTrip(trip.id) },
+                            onSaveOffline = { onSaveOffline(trip.id) },
+                        )
                     }
                 }
             }
@@ -79,7 +89,12 @@ fun TripListContent(state: TripListUiState, onOpenTrip: (String) -> Unit) {
 }
 
 @Composable
-private fun TripCard(trip: TripEntity, onClick: () -> Unit) {
+private fun TripCard(
+    trip: TripEntity,
+    isSavingOffline: Boolean,
+    onClick: () -> Unit,
+    onSaveOffline: () -> Unit,
+) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = TrailsShapes.Card,
@@ -108,6 +123,38 @@ private fun TripCard(trip: TripEntity, onClick: () -> Unit) {
                 color = TrailsColors.TextSoft,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when {
+                    isSavingOffline -> {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
+                        Text(
+                            "Saving offline…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TrailsColors.TextSoft,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                    trip.cachedOffline -> {
+                        Text(
+                            "✓ Available offline",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TrailsColors.BrandAccent,
+                            modifier = Modifier.clickable(onClick = onSaveOffline),
+                        )
+                    }
+                    else -> {
+                        Text(
+                            "⬇ Save offline",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TrailsColors.BrandAccent,
+                            modifier = Modifier.clickable(onClick = onSaveOffline),
+                        )
+                    }
+                }
+            }
         }
     }
 }

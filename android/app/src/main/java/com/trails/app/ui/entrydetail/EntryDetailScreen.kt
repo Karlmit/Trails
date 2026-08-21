@@ -29,7 +29,9 @@ import coil3.compose.AsyncImage
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import com.trails.app.ui.timeline.graph.subtypeLabel
+import com.trails.app.util.entryMapsUrl
 import com.trails.app.util.openCachedFile
+import com.trails.app.util.openExternalUrl
 import java.io.File
 
 /** Mirrors components/EntryDetailPanel.tsx (read-only). */
@@ -58,9 +60,40 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                 )
             }
             item { Field("When", "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}") }
-            entry.locationName?.let { item { Field("Location", listOfNotNull(it, entry.locationAddress).joinToString(" · ")) } }
+            if (entry.locationName != null || entry.locationAddress != null) {
+                item {
+                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                        Text("LOCATION", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        Text(
+                            listOfNotNull(entry.locationName, entry.locationAddress).joinToString(" · "),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TrailsColors.Text,
+                        )
+                        entryMapsUrl(entry.locationAddress, entry.locationName)?.let { url ->
+                            Text(
+                                "Open in Google Maps",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TrailsColors.BrandAccent,
+                                modifier = Modifier.padding(top = 2.dp).clickable { openExternalUrl(context, url) },
+                            )
+                        }
+                    }
+                }
+            }
             entry.bookingReference?.let { item { Field("Booking reference", it) } }
-            entry.website?.let { item { Field("Website", it) } }
+            entry.website?.let { website ->
+                item {
+                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                        Text("WEBSITE", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        Text(
+                            website,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TrailsColors.BrandAccent,
+                            modifier = Modifier.clickable { openExternalUrl(context, website) },
+                        )
+                    }
+                }
+            }
             entry.bookedVia?.let { item { Field("Booked via", it) } }
             if (entry.expenseAmount != null) {
                 item {
@@ -105,14 +138,14 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                 }
                 items(state.attachments) { attachment ->
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(enabled = attachment.localPath != null) {
-                            attachment.localPath?.let { openCachedFile(context, it, attachment.mimeType) }
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable {
+                            viewModel.ensureCached(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
                         },
                     ) {
                         Text(
                             attachment.originalFilename,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (attachment.localPath != null) TrailsColors.BrandAccent else TrailsColors.TextSoft,
+                            color = TrailsColors.BrandAccent,
                         )
                     }
                 }

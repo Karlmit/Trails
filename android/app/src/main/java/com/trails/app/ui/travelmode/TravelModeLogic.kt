@@ -49,9 +49,3 @@ fun findNextByType(entries: List<TimelineEntryEntity>, now: Instant, timezone: S
         .filter { (entryType == null || it.entryType == entryType) && Instant.parse(it.startAt).isAfter(referenceTime(it)) }
         .minByOrNull { Instant.parse(it.startAt) }
 }
-
-/** lib/travel-mode.ts::mapsSearchUrl / entryMapsUrl */
-fun entryMapsUrl(locationAddress: String?, locationName: String?): String? {
-    val address = locationAddress?.takeIf { it.isNotBlank() } ?: locationName?.takeIf { it.isNotBlank() } ?: return null
-    return "https://www.google.com/maps/search/?api=1&query=${java.net.URLEncoder.encode(address, "UTF-8")}"
-}

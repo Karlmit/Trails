@@ -1,7 +1,9 @@
 package com.trails.app.util
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -13,5 +15,9 @@ fun openCachedFile(context: Context, localPath: String, mimeType: String) {
         setDataAndType(uri, mimeType)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    context.startActivity(intent)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No app installed that can open this file", Toast.LENGTH_SHORT).show()
+    }
 }

@@ -29,11 +29,20 @@ import com.trails.app.ui.components.TripStatusBadge
 import com.trails.app.ui.theme.TrailsColors
 import kotlinx.coroutines.launch
 
+private const val ROUTE_TRIPS = "trips"
+
 /**
- * Mirrors TripTabs.tsx's mobile hamburger-drawer collapse (the same
- * "hamburger over horizontal scroll" decision the web app already made,
- * per its own comments) -- one drawer listing all 9 tabs, plus Travel Mode
- * as a standalone item shown only while the Trip is ACTIVE.
+ * Mirrors TripTabs.tsx's mobile hamburger-drawer collapse -- one drawer
+ * listing all 9 tabs, plus Travel Mode as a standalone item shown only
+ * while the Trip is ACTIVE, plus a "Trips" item back to the trip list.
+ *
+ * [showBackButton]: sub-screens reached by tapping something (Entry/Blog
+ * detail), not by picking a tab, get a plain back arrow instead of the
+ * hamburger -- popping one entry is the right action there, not opening
+ * the drawer. Tab navigation itself always collapses the backstack to
+ * [trips, currentTab] (see navigateTo's popUpTo) so switching tabs never
+ * grows an unbounded stack, and the system back button/gesture reliably
+ * returns to the trip list from any tab in exactly one press.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +51,7 @@ fun TripDrawerScaffold(
     currentTab: TripTab?,
     title: String,
     navController: NavHostController,
+    showBackButton: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val shellViewModel: TripShellViewModel = hiltViewModel()
@@ -51,7 +61,10 @@ fun TripDrawerScaffold(
 
     fun navigateTo(route: String) {
         scope.launch { drawerState.close() }
-        navController.navigate("trip/$tripId/$route") { launchSingleTop = true }
+        navController.navigate("trip/$tripId/$route") {
+            popUpTo(ROUTE_TRIPS) { inclusive = false }
+            launchSingleTop = true
+        }
     }
 
     ModalNavigationDrawer(
@@ -73,6 +86,16 @@ fun TripDrawerScaffold(
                     }
                     HorizontalDivider()
                 }
+                NavigationDrawerItem(
+                    label = { Text("← All Trips") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(ROUTE_TRIPS) { popUpTo(ROUTE_TRIPS) { inclusive = true } }
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                )
+                HorizontalDivider()
                 TripTab.entries.forEach { tab ->
                     NavigationDrawerItem(
                         label = { Text(tab.label) },
@@ -99,8 +122,13 @@ fun TripDrawerScaffold(
                 TopAppBar(
                     title = { Text(title, color = TrailsColors.Brand, style = MaterialTheme.typography.titleMedium) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Text("☰", color = TrailsColors.Brand, style = MaterialTheme.typography.titleMedium)
+                        IconButton(
+                            onClick = {
+                                if (showBackButton) navController.popBackStack()
+                                else scope.launch { drawerState.open() }
+                            },
+                        ) {
+                            Text(if (showBackButton) "←" else "☰", color = TrailsColors.Brand, style = MaterialTheme.typography.titleMedium)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),

@@ -107,10 +107,16 @@ private fun DayRow(
     tripTimezone: String,
     onOpenEntry: (String, String) -> Unit,
 ) {
+    // Deliberately NO vertical padding/margin on this outer Row -- the trunk
+    // line (drawn full-bleed top-to-bottom inside TimelineGraphColumn) and
+    // the Section band background must butt up exactly against the next
+    // day's row with zero gap, or the trunk reads as broken into segments
+    // instead of one continuous line (exactly what any vertical inset here
+    // causes). All breathing room lives on the date/content columns only.
     val rowModifier = if (bandColor != null) {
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor).padding(vertical = 4.dp)
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor)
     } else {
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 4.dp)
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min)
     }
     Row(modifier = rowModifier) {
         TimelineGraphColumn(
@@ -119,12 +125,12 @@ private fun DayRow(
             canvasBackground = TrailsColors.Canvas,
             modifier = Modifier.width(graphWidth).fillMaxHeight(),
         )
-        Column(modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = 8.dp)) {
+        Column(modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 8.dp)) {
             val label = formatDayLabel(day.day.dateKey)
             Text(label.monthDay, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
             Text(label.weekday.take(3), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
         }
-        Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 8.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp)) {
             if (showSectionLabel && sectionName != null) {
                 Surface(
                     color = TrailsColors.Surface,

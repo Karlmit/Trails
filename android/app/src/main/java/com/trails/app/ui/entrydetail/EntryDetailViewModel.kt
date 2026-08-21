@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -29,9 +30,20 @@ data class EntryDetailUiState(
 class EntryDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     timelineRepository: TimelineRepository,
-    documentsRepository: DocumentsRepository,
+    private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
+
+    /** Same on-demand retry-download as DocumentsScreen -- if the bulk sync pass missed this file, tapping it tries again before opening. */
+    fun ensureCached(attachment: AttachmentEntity, onReady: (String) -> Unit) {
+        if (attachment.localPath != null) {
+            onReady(attachment.localPath)
+            return
+        }
+        viewModelScope.launch {
+            documentsRepository.ensureAttachmentCached(attachment)?.let(onReady)
+        }
+    }
 
     val uiState: StateFlow<EntryDetailUiState> = combine(
         timelineRepository.observeEntry(entryId),

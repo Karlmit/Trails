@@ -14,8 +14,14 @@ interface TripDao {
     @Query("SELECT * FROM trips WHERE id = :tripId")
     fun observeById(tripId: String): Flow<TripEntity?>
 
+    @Query("SELECT id, cachedOffline FROM trips")
+    suspend fun getAllCachedOfflineFlags(): List<TripCachedOfflineFlag>
+
     @Upsert
     suspend fun upsertAll(trips: List<TripEntity>)
+
+    @Query("UPDATE trips SET cachedOffline = :cachedOffline WHERE id = :tripId")
+    suspend fun setCachedOffline(tripId: String, cachedOffline: Boolean)
 
     @Query("DELETE FROM trips WHERE id NOT IN (:keepIds)")
     suspend fun deleteMissing(keepIds: List<String>)
@@ -23,3 +29,5 @@ interface TripDao {
     @Query("DELETE FROM trips")
     suspend fun deleteAll()
 }
+
+data class TripCachedOfflineFlag(val id: String, val cachedOffline: Boolean)
