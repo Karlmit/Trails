@@ -19,4 +19,7 @@ interface SectionDao {
 
     @Query("DELETE FROM sections WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM sections WHERE id = :sectionId")
+    suspend fun deleteById(sectionId: String)
 }

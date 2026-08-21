@@ -22,4 +22,7 @@ interface TimelineEntryDao {
 
     @Query("DELETE FROM timeline_entries WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM timeline_entries WHERE id = :entryId")
+    suspend fun deleteById(entryId: String)
 }

@@ -6,6 +6,8 @@ import com.trails.app.data.entity.ChecklistEntity
 import com.trails.app.data.entity.ChecklistItemEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.ChecklistItemPatchRequest
+import com.trails.app.network.dto.ChecklistItemRequest
+import com.trails.app.network.dto.ChecklistRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -49,5 +51,36 @@ class ChecklistRepository @Inject constructor(
     suspend fun setChecked(itemId: String, checked: Boolean) {
         val updated = api.patchChecklistItem(itemId, ChecklistItemPatchRequest(checked))
         itemDao.setChecked(updated.id, updated.checked)
+    }
+
+    suspend fun createChecklist(request: ChecklistRequest): ChecklistEntity {
+        val created = api.createChecklist(request)
+        val entity = created.toEntity()
+        checklistDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun updateChecklist(checklistId: String, request: ChecklistRequest): ChecklistEntity {
+        val updated = api.updateChecklist(checklistId, request)
+        val entity = updated.toEntity()
+        checklistDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun deleteChecklist(checklistId: String) {
+        api.deleteChecklist(checklistId)
+        checklistDao.deleteById(checklistId)
+    }
+
+    suspend fun createChecklistItem(request: ChecklistItemRequest): ChecklistItemEntity {
+        val created = api.createChecklistItem(request)
+        val entity = created.toEntity()
+        itemDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun deleteChecklistItem(itemId: String) {
+        api.deleteChecklistItem(itemId)
+        itemDao.deleteById(itemId)
     }
 }

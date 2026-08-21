@@ -1,0 +1,168 @@
+package com.trails.app.ui.entrydetail
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.ui.components.CheckboxRow
+import com.trails.app.ui.components.DateTimePickerField
+import com.trails.app.ui.components.DropdownField
+import com.trails.app.ui.components.ErrorBanner
+import com.trails.app.ui.components.LabeledField
+import com.trails.app.ui.components.LinksEditor
+import com.trails.app.ui.components.MultilineLabeledField
+import com.trails.app.ui.components.PillButton
+import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
+import com.trails.app.ui.timeline.graph.subtypeLabel
+
+@Composable
+fun EntryEditScreen(
+    padding: PaddingValues,
+    onDone: () -> Unit,
+    viewModel: EntryEditViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsState()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
+
+    val isNote = state.entryType == "NOTE"
+    val isActivity = state.entryType == "ACTIVITY"
+    val isTransport = state.entryType == "TRANSPORT"
+    val isStay = state.entryType == "STAY"
+
+    Column(
+        modifier = Modifier
+            .padding(padding)
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        state.error?.let { ErrorBanner(it) }
+
+        if (state.entryId == null) {
+            DropdownField(
+                label = "Type",
+                options = ENTRY_TYPES,
+                selected = state.entryType,
+                onSelected = viewModel::onEntryTypeChange,
+                optionLabel = { ENTRY_TYPE_LABELS[it] ?: it },
+            )
+        }
+        if (!isNote) {
+            DropdownField(
+                label = "Subtype",
+                options = subtypesFor(state.entryType),
+                selected = state.subtype,
+                onSelected = viewModel::onSubtypeChange,
+                optionLabel = { subtypeLabel(it) },
+            )
+        }
+
+        if (isNote) {
+            LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
+        } else {
+            LabeledField(label = "Location name (used as the title)", value = state.locationName, onValueChange = viewModel::onLocationNameChange)
+        }
+        MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+
+        DateTimePickerField(label = if (isTransport) "Departure" else "Start", isoDateTime = state.startAt, onDateTimeChange = viewModel::onStartAtChange)
+        if (!isNote) {
+            DateTimePickerField(
+                label = if (isTransport) "Arrival" else if (isStay) "Check-out" else "End (optional)",
+                isoDateTime = state.endAt.ifBlank { state.startAt },
+                onDateTimeChange = viewModel::onEndAtChange,
+            )
+        }
+        if (isTransport) {
+            LabeledField(label = "Departure timezone (IANA, optional)", value = state.startTimezone, onValueChange = viewModel::onStartTimezoneChange)
+            LabeledField(label = "Arrival timezone (IANA, optional)", value = state.endTimezone, onValueChange = viewModel::onEndTimezoneChange)
+        }
+
+        if (!isNote) {
+            LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
+            LabeledField(label = "Map link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
+            LabeledField(label = "Booking reference", value = state.bookingReference, onValueChange = viewModel::onBookingReferenceChange)
+            LabeledField(label = "Website", value = state.website, onValueChange = viewModel::onWebsiteChange)
+            LabeledField(label = "Booked via", value = state.bookedVia, onValueChange = viewModel::onBookedViaChange)
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LabeledField(
+                    label = "Expense amount",
+                    value = state.expenseAmount,
+                    onValueChange = viewModel::onExpenseAmountChange,
+                    modifier = Modifier.weight(1f),
+                    keyboardType = KeyboardType.Decimal,
+                )
+                LabeledField(label = "Currency", value = state.expenseCurrency, onValueChange = viewModel::onExpenseCurrencyChange, modifier = Modifier.weight(1f))
+            }
+            LabeledField(label = "Payment status", value = state.expensePaymentStatus, onValueChange = viewModel::onExpensePaymentStatusChange)
+            LabeledField(label = "Payment note", value = state.expensePaymentNote, onValueChange = viewModel::onExpensePaymentNoteChange)
+        }
+
+        if (isStay) {
+            LabeledField(label = "Room info", value = state.roomInfo, onValueChange = viewModel::onRoomInfoChange)
+        }
+        if (isTransport) {
+            LabeledField(label = "Terminal", value = state.terminal, onValueChange = viewModel::onTerminalChange)
+            LabeledField(label = "Gate", value = state.gate, onValueChange = viewModel::onGateChange)
+            LabeledField(label = "Platform", value = state.platform, onValueChange = viewModel::onPlatformChange)
+            LabeledField(label = "Service number", value = state.serviceNumber, onValueChange = viewModel::onServiceNumberChange)
+            LabeledField(label = "Seat", value = state.seat, onValueChange = viewModel::onSeatChange)
+            LabeledField(label = "Baggage info", value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
+        }
+
+        LabeledField(label = "Contact name", value = state.contactName, onValueChange = viewModel::onContactNameChange)
+        LabeledField(label = "Contact phone", value = state.contactPhone, onValueChange = viewModel::onContactPhoneChange)
+        LabeledField(label = "Contact email", value = state.contactEmail, onValueChange = viewModel::onContactEmailChange)
+        MultilineLabeledField(label = "Notes", value = state.notes, onValueChange = viewModel::onNotesChange)
+        if (state.entryId != null) {
+            MultilineLabeledField(label = "Post-trip notes", value = state.postTripNotes, onValueChange = viewModel::onPostTripNotesChange)
+        }
+        CheckboxRow(label = "Private (only visible to you)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+        LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
+
+        if (state.saving) {
+            CircularProgressIndicator()
+        } else {
+            PillButton(text = if (state.entryId == null) "Create Entry" else "Save changes", onClick = viewModel::save)
+            if (state.entryId != null) {
+                HorizontalDivider()
+                PillButton(text = "Delete Entry", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
+            }
+        }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete this entry?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+        )
+    }
+}

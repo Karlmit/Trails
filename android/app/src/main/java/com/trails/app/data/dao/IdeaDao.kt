@@ -19,4 +19,7 @@ interface IdeaDao {
 
     @Query("DELETE FROM ideas WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM ideas WHERE id = :ideaId")
+    suspend fun deleteById(ideaId: String)
 }

@@ -1,5 +1,6 @@
 package com.trails.app.ui.checklists
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,9 +29,9 @@ import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
-/** Mirrors app/(web)/trips/[tripId]/checklists/page.tsx -- toggling an item is the one online-only write this app supports offline-first otherwise. */
+/** Mirrors app/(web)/trips/[tripId]/checklists/page.tsx -- toggling an item stays inline; tapping the card opens full edit. */
 @Composable
-fun ChecklistsScreen(padding: PaddingValues, viewModel: ChecklistsViewModel = hiltViewModel()) {
+fun ChecklistsScreen(padding: PaddingValues, onOpenChecklist: (String?) -> Unit = {}, viewModel: ChecklistsViewModel = hiltViewModel()) {
     val checklists by viewModel.checklists.collectAsState(initial = emptyList())
     val error by viewModel.error.collectAsState()
 
@@ -48,7 +49,11 @@ fun ChecklistsScreen(padding: PaddingValues, viewModel: ChecklistsViewModel = hi
                 }
                 LazyColumn(contentPadding = PaddingValues(16.dp)) {
                     items(checklists, key = { it.checklist.id }) { checklistWithItems ->
-                        ChecklistCard(checklistWithItems, onToggle = viewModel::setChecked)
+                        ChecklistCard(
+                            checklistWithItems,
+                            onToggle = viewModel::setChecked,
+                            onOpen = { onOpenChecklist(checklistWithItems.checklist.id) },
+                        )
                     }
                 }
             }
@@ -57,14 +62,19 @@ fun ChecklistsScreen(padding: PaddingValues, viewModel: ChecklistsViewModel = hi
 }
 
 @Composable
-private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onToggle: (String, Boolean) -> Unit) {
+private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onToggle: (String, Boolean) -> Unit, onOpen: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         shape = TrailsShapes.Card,
         colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(checklistWithItems.checklist.title, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+            Text(
+                checklistWithItems.checklist.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = TrailsColors.Text,
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+            )
             checklistWithItems.checklist.description?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
             }

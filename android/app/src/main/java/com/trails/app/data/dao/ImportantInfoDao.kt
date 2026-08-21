@@ -19,4 +19,7 @@ interface ImportantInfoDao {
 
     @Query("DELETE FROM important_info WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM important_info WHERE id = :itemId")
+    suspend fun deleteById(itemId: String)
 }

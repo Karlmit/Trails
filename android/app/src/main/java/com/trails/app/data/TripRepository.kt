@@ -3,6 +3,7 @@ package com.trails.app.data
 import com.trails.app.data.dao.TripDao
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.network.TrailsApiService
+import com.trails.app.network.dto.TripRequest
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,5 +38,26 @@ class TripRepository @Inject constructor(
 
     suspend fun setCachedOffline(tripId: String, cachedOffline: Boolean) {
         tripDao.setCachedOffline(tripId, cachedOffline)
+    }
+
+    /** Online-only write: creates the Trip server-side, then mirrors it locally so it shows up immediately. */
+    suspend fun createTrip(request: TripRequest): TripEntity {
+        val created = api.createTrip(request)
+        val entity = created.toEntity()
+        tripDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun updateTrip(tripId: String, request: TripRequest): TripEntity {
+        val updated = api.updateTrip(tripId, request)
+        val existingFlag = tripDao.getAllCachedOfflineFlags().find { it.id == tripId }?.cachedOffline ?: false
+        val entity = updated.toEntity().copy(cachedOffline = existingFlag)
+        tripDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun deleteTrip(tripId: String) {
+        api.deleteTrip(tripId)
+        tripDao.deleteById(tripId)
     }
 }

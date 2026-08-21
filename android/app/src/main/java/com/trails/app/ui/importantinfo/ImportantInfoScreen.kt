@@ -1,5 +1,6 @@
 package com.trails.app.ui.importantinfo
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,9 +24,9 @@ import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
-/** Mirrors app/(web)/trips/[tripId]/important-info/page.tsx. */
+/** Mirrors app/(web)/trips/[tripId]/important-info/page.tsx, plus create/edit via [onOpenItem]. */
 @Composable
-fun ImportantInfoScreen(padding: PaddingValues, viewModel: ImportantInfoViewModel = hiltViewModel()) {
+fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = {}, viewModel: ImportantInfoViewModel = hiltViewModel()) {
     val items by viewModel.items.collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -37,16 +38,16 @@ fun ImportantInfoScreen(padding: PaddingValues, viewModel: ImportantInfoViewMode
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
-                items(items, key = { it.id }) { item -> ImportantInfoCard(item) }
+                items(items, key = { it.id }) { item -> ImportantInfoCard(item, onClick = { onOpenItem(item.id) }) }
             }
         }
     }
 }
 
 @Composable
-private fun ImportantInfoCard(item: ImportantInfoEntity) {
+private fun ImportantInfoCard(item: ImportantInfoEntity, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable(onClick = onClick),
         shape = TrailsShapes.Card,
         colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
     ) {

@@ -1,5 +1,6 @@
 package com.trails.app.ui.entrydetail
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +34,19 @@ class EntryDetailViewModel @Inject constructor(
     private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
+
+    fun uploadPhoto(uri: Uri, filename: String) {
+        viewModelScope.launch {
+            runCatching { documentsRepository.uploadPhoto("TIMELINE_ENTRY", entryId, uri, filename) }
+        }
+    }
+
+    fun uploadAttachment(uri: Uri, filename: String) {
+        viewModelScope.launch {
+            val tripId = uiState.value.entry?.tripId ?: return@launch
+            runCatching { documentsRepository.uploadAttachment(tripId, "TIMELINE_ENTRY", entryId, uri, filename) }
+        }
+    }
 
     /** Same on-demand retry-download as DocumentsScreen -- if the bulk sync pass missed this file, tapping it tries again before opening. */
     fun ensureCached(attachment: AttachmentEntity, onReady: (String) -> Unit) {

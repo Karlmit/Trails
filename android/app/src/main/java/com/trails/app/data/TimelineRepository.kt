@@ -5,6 +5,9 @@ import com.trails.app.data.dao.TimelineEntryDao
 import com.trails.app.data.entity.SectionEntity
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.network.TrailsApiService
+import com.trails.app.network.dto.BlogPostRequest
+import com.trails.app.network.dto.SectionRequest
+import com.trails.app.network.dto.TimelineEntryRequest
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -43,5 +46,69 @@ class TimelineRepository @Inject constructor(
             timelineEntryDao.upsertAll(entries.map { it.toEntity() })
             timelineEntryDao.deleteMissing(tripId, entries.map { it.id })
         }
+    }
+
+    suspend fun createSection(request: SectionRequest): SectionEntity {
+        val created = api.createSection(request)
+        val entity = created.toEntity()
+        sectionDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun updateSection(sectionId: String, request: SectionRequest): SectionEntity {
+        val updated = api.updateSection(sectionId, request)
+        val entity = updated.toEntity()
+        sectionDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun deleteSection(sectionId: String) {
+        api.deleteSection(sectionId)
+        sectionDao.deleteById(sectionId)
+    }
+
+    suspend fun createTimelineEntry(request: TimelineEntryRequest): TimelineEntryEntity {
+        val created = api.createTimelineEntry(request)
+        val entity = created.toEntity()
+        timelineEntryDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun updateTimelineEntry(entryId: String, request: TimelineEntryRequest): TimelineEntryEntity {
+        val updated = api.updateTimelineEntry(entryId, request)
+        val entity = updated.toEntity()
+        timelineEntryDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun deleteTimelineEntry(entryId: String) {
+        api.deleteTimelineEntry(entryId)
+        timelineEntryDao.deleteById(entryId)
+    }
+
+    suspend fun createBlogPost(request: BlogPostRequest): TimelineEntryEntity {
+        val created = api.createBlogPost(request)
+        val entity = created.toEntity()
+        timelineEntryDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun updateBlogPost(entryId: String, request: BlogPostRequest): TimelineEntryEntity {
+        val updated = api.updateBlogPost(entryId, request)
+        val entity = updated.toEntity()
+        timelineEntryDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun publishBlogPost(entryId: String): TimelineEntryEntity {
+        val updated = api.publishBlogPost(entryId)
+        val entity = updated.toEntity()
+        timelineEntryDao.upsertAll(listOf(entity))
+        return entity
+    }
+
+    suspend fun unpublishBlogPost(entryId: String) {
+        api.unpublishBlogPost(entryId)
+        timelineEntryDao.deleteById(entryId)
     }
 }

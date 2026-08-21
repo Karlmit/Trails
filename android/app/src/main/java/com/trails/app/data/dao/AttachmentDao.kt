@@ -29,6 +29,9 @@ interface AttachmentDao {
 
     @Query("DELETE FROM attachments WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM attachments WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao
@@ -53,4 +56,7 @@ interface PhotoDao {
 
     @Query("DELETE FROM photos WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM photos WHERE id = :id")
+    suspend fun deleteById(id: String)
 }

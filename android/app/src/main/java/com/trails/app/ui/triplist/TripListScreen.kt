@@ -1,6 +1,8 @@
 package com.trails.app.ui.triplist
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,10 +36,11 @@ import com.trails.app.ui.theme.TrailsShapes
 @Composable
 fun TripListScreen(
     onOpenTrip: (String) -> Unit,
+    onAddTrip: () -> Unit = {},
     viewModel: TripListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    TripListContent(state = state, onOpenTrip = onOpenTrip, onSaveOffline = viewModel::saveOffline)
+    TripListContent(state = state, onOpenTrip = onOpenTrip, onAddTrip = onAddTrip, onSaveOffline = viewModel::saveOffline)
 }
 
 /**
@@ -51,11 +54,17 @@ fun TripListScreen(
 fun TripListContent(
     state: TripListUiState,
     onOpenTrip: (String) -> Unit,
+    onAddTrip: () -> Unit = {},
     onSaveOffline: (String) -> Unit = {},
 ) {
     Scaffold(
         containerColor = TrailsColors.Canvas,
         topBar = { TrailsTopBar() },
+        floatingActionButton = {
+            androidx.compose.material3.FloatingActionButton(onClick = onAddTrip) {
+                androidx.compose.material3.Icon(Icons.Filled.Add, contentDescription = "New Trip")
+            }
+        },
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             if (state.trips.isEmpty() && state.isSyncing) {

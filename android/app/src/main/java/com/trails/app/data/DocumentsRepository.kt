@@ -1,13 +1,18 @@
 package com.trails.app.data
 
+import android.net.Uri
 import com.trails.app.data.dao.AttachmentDao
 import com.trails.app.data.dao.PhotoDao
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.TrailsApiService
 import kotlinx.coroutines.flow.Flow
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private fun String.toPlainRequestBody() = toRequestBody("text/plain".toMediaTypeOrNull())
 
 @Singleton
 class DocumentsRepository @Inject constructor(
@@ -39,6 +44,56 @@ class DocumentsRepository @Inject constructor(
         return runCatching { fileCacheManager.downloadPhoto(photo) }
             .onSuccess { photoDao.setLocalPath(photo.id, it) }
             .getOrNull()
+    }
+
+    /** Uploads a picked file as an Attachment, then caches its metadata (and the just-uploaded bytes) locally. */
+    suspend fun uploadAttachment(tripId: String, ownerType: String, ownerId: String, uri: Uri, filename: String): AttachmentEntity {
+        val part = fileCacheManager.prepareUploadPart(uri, "file", filename)
+        val created = api.uploadAttachment(ownerType.toPlainRequestBody(), ownerId.toPlainRequestBody(), part)
+        val entity = created.toEntity()
+        attachmentDao.upsertAll(listOf(entity))
+        val localPath = runCatching { fileCacheManager.downloadAttachment(entity) }.getOrNull()
+        if (localPath != null) attachmentDao.setLocalPath(entity.id, localPath)
+        return entity
+    }
+
+    suspend fun deleteAttachment(attachmentId: String) {
+        api.deleteAttachment(attachmentId)
+        attachmentDao.deleteById(attachmentId)
+    }
+
+    suspend fun uploadPhoto(
+        ownerType: String,
+        ownerId: String,
+        uri: Uri,
+        filename: String,
+        isPrivate: Boolean = false,
+    ): PhotoEntity {
+        val part = fileCacheManager.prepareUploadPart(uri, "file", filename)
+        val created = api.uploadPhoto(
+            ownerType.toPlainRequestBody(),
+            ownerId.toPlainRequestBody(),
+            part,
+            isPrivate.toString().toPlainRequestBody(),
+        )
+        val entity = created.toEntity()
+        photoDao.upsertAll(listOf(entity))
+        val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()
+        if (localPath != null) photoDao.setLocalPath(entity.id, localPath)
+        return entity
+    }
+
+    suspend fun deletePhoto(photoId: String) {
+        api.deletePhoto(photoId)
+        photoDao.deleteById(photoId)
+    }
+
+    suspend fun markPhotoPrimary(photoId: String): PhotoEntity {
+        val updated = api.markPhotoPrimary(photoId)
+        val existingPath = photoDao.getAllForTrip(updated.tripId).find { it.id == photoId }?.localPath
+        val entity = updated.toEntity(localPath = existingPath)
+        photoDao.upsertAll(listOf(entity))
+        return entity
     }
 
     /** Syncs Attachment/Photo metadata for a trip, then downloads any bytes not already cached. */

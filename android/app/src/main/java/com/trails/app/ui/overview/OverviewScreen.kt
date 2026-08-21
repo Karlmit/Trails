@@ -1,5 +1,6 @@
 package com.trails.app.ui.overview
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,9 +34,9 @@ class OverviewViewModel @Inject constructor(
     val trip: Flow<TripEntity?> = tripRepository.observeTrip(tripId)
 }
 
-/** Mirrors app/(web)/trips/[tripId]/overview/page.tsx + components/TripOverviewPanel.tsx (read-only; editing requires connectivity, not built yet). */
+/** Mirrors app/(web)/trips/[tripId]/overview/page.tsx + components/TripOverviewPanel.tsx, plus an Edit entry point via [onEdit]. */
 @Composable
-fun OverviewScreen(padding: PaddingValues, viewModel: OverviewViewModel = hiltViewModel()) {
+fun OverviewScreen(padding: PaddingValues, onEdit: () -> Unit = {}, viewModel: OverviewViewModel = hiltViewModel()) {
     val trip by viewModel.trip.collectAsState(initial = null)
 
     Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -45,6 +46,12 @@ fun OverviewScreen(padding: PaddingValues, viewModel: OverviewViewModel = hiltVi
         } else {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(t.name, style = MaterialTheme.typography.titleLarge, color = TrailsColors.Brand)
+                Text(
+                    "Edit Trip",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TrailsColors.BrandAccent,
+                    modifier = Modifier.padding(top = 4.dp).clickable { onEdit() },
+                )
                 TripStatusBadge(t.status)
                 t.destination?.let {
                     Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text, modifier = Modifier.padding(top = 10.dp))

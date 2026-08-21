@@ -1,5 +1,7 @@
 package com.trails.app.ui.entrydetail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,14 +34,22 @@ import com.trails.app.ui.timeline.graph.subtypeLabel
 import com.trails.app.util.entryMapsUrl
 import com.trails.app.util.openCachedFile
 import com.trails.app.util.openExternalUrl
+import com.trails.app.util.queryDisplayName
 import java.io.File
 
-/** Mirrors components/EntryDetailPanel.tsx (read-only). */
+/** Mirrors components/EntryDetailPanel.tsx, plus Photo/Attachment upload (not in the web's read-only panel, but the whole point of an on-device Documents cache). */
 @Composable
 fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
     val context = LocalContext.current
+
+    val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.uploadPhoto(uri, queryDisplayName(context, uri))
+    }
+    val pickAttachment = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.uploadAttachment(uri, queryDisplayName(context, uri))
+    }
 
     Box(modifier = Modifier.padding(padding).fillMaxSize()) {
         if (entry == null) {
@@ -113,6 +123,25 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
             }
             entry.notes?.let { item { Field("Notes", it) } }
             entry.postTripNotes?.let { item { Field("Post-trip notes", it) } }
+
+            item {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                    Text(
+                        "+ Add photo",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.padding(end = 20.dp).clickable {
+                            pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                    )
+                    Text(
+                        "+ Add attachment",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },
+                    )
+                }
+            }
 
             if (state.photos.isNotEmpty()) {
                 item {

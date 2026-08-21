@@ -26,6 +26,9 @@ interface TripDao {
     @Query("DELETE FROM trips WHERE id NOT IN (:keepIds)")
     suspend fun deleteMissing(keepIds: List<String>)
 
+    @Query("DELETE FROM trips WHERE id = :tripId")
+    suspend fun deleteById(tripId: String)
+
     @Query("DELETE FROM trips")
     suspend fun deleteAll()
 }

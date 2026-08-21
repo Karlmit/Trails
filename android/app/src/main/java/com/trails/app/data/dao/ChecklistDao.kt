@@ -20,6 +20,9 @@ interface ChecklistDao {
 
     @Query("DELETE FROM checklists WHERE tripId = :tripId")
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM checklists WHERE id = :checklistId")
+    suspend fun deleteById(checklistId: String)
 }
 
 @Dao
@@ -47,4 +50,7 @@ interface ChecklistItemDao {
             "(SELECT id FROM checklists WHERE tripId = :tripId)",
     )
     suspend fun deleteAllForTrip(tripId: String)
+
+    @Query("DELETE FROM checklist_items WHERE id = :itemId")
+    suspend fun deleteById(itemId: String)
 }

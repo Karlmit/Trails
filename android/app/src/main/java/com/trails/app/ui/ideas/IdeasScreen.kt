@@ -1,5 +1,6 @@
 package com.trails.app.ui.ideas
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,9 +29,9 @@ import com.trails.app.ui.theme.TrailsShapes
 
 private val PRIORITY_LABELS = mapOf("MUST_DO" to "Must do", "WOULD_LIKE" to "Would like", "MAYBE" to "Maybe")
 
-/** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx (filters not built -- full list only). */
+/** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx (filters not built -- full list only), plus create/edit via [onOpenIdea]. */
 @Composable
-fun IdeasScreen(padding: PaddingValues, viewModel: IdeasViewModel = hiltViewModel()) {
+fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, viewModel: IdeasViewModel = hiltViewModel()) {
     val ideas by viewModel.ideas.collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -38,21 +39,21 @@ fun IdeasScreen(padding: PaddingValues, viewModel: IdeasViewModel = hiltViewMode
             Text("No Ideas yet.", modifier = Modifier.align(Alignment.Center).padding(24.dp), color = TrailsColors.TextSoft)
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
-                items(ideas, key = { it.id }) { idea -> IdeaCard(idea) }
+                items(ideas, key = { it.id }) { idea -> IdeaCard(idea, onClick = { onOpenIdea(idea.id) }) }
             }
         }
     }
 }
 
 @Composable
-private fun IdeaCard(idea: IdeaEntity) {
+private fun IdeaCard(idea: IdeaEntity, onClick: () -> Unit) {
     val (badgeBg, badgeFg) = when (idea.priority) {
         "MUST_DO" -> TrailsColors.BrandAccent to TrailsColors.TextOnDark
         "WOULD_LIKE" -> TrailsColors.BrandMint to TrailsColors.BrandDeep
         else -> TrailsColors.SurfaceCool to TrailsColors.TextSoft
     }
     Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable(onClick = onClick),
         shape = TrailsShapes.Card,
         colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
     ) {
