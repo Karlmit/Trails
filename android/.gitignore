@@ -1,0 +1,23 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/build
+/app/release
+
+# Built APKs handed to the user for manual install -- not source, not tracked.
+/dist
+
+# Signing keystore + passwords -- both debug and release build types sign
+# with this same key (see app/build.gradle.kts) so an in-app update always
+# installs cleanly over whatever's already on the device. Never commit this;
+# back it up somewhere safe -- losing it means future updates can't install
+# over previously-installed builds.
+/keystore/*.jks
+/keystore/*.properties

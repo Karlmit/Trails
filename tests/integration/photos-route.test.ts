@@ -245,6 +245,75 @@ describe.skipIf(!hasTestDatabase)('photos route', () => {
     });
   });
 
+  describe('Trip-wide aggregation (?tripId=, mirrors Attachments\' FR-25 shape for the mobile client)', () => {
+    it('returns an empty list when the Trip has no Photos', async () => {
+      const res = await listPhotos(
+        jsonRequest(`http://localhost/api/v1/photos?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('aggregates Photos across an Entry and an Idea into one flat list', async () => {
+      const ideaRes = await createIdea(
+        jsonRequest('http://localhost/api/v1/ideas', 'POST', { tripId, title: 'Snorkeling', priority: 'MAYBE', weatherSuitability: 'OUTDOOR' }, token),
+      );
+      const ideaId = (await ideaRes.json()).id;
+
+      await uploadPhoto(
+        uploadRequest('http://localhost/api/v1/photos', { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, file: pngFile('beach.png') }, token),
+      );
+      await uploadPhoto(
+        uploadRequest('http://localhost/api/v1/photos', { ownerType: 'IDEA', ownerId: ideaId, file: pngFile('snorkel.png') }, token),
+      );
+
+      const res = await listPhotos(
+        jsonRequest(`http://localhost/api/v1/photos?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      const list = await res.json();
+      expect(list).toHaveLength(2);
+      expect(list.map((p: { originalFilename: string }) => p.originalFilename).sort()).toEqual([
+        'beach.png',
+        'snorkel.png',
+      ]);
+    });
+
+    it('excludes Photos owned by a Draft Blog Post (AD-10), but includes them once Published', async () => {
+      const postRes = await createEntry(
+        jsonRequest(
+          'http://localhost/api/v1/timeline-entries',
+          'POST',
+          { tripId, entryType: 'BLOG_POST', title: 'Draft post', startAt: '2026-08-05T10:00:00.000Z' },
+          token,
+        ),
+      );
+      const postId = (await postRes.json()).id;
+      await uploadPhoto(
+        uploadRequest('http://localhost/api/v1/photos', { ownerType: 'TIMELINE_ENTRY', ownerId: postId, file: pngFile('draft.png') }, token),
+      );
+
+      const draftRes = await listPhotos(
+        jsonRequest(`http://localhost/api/v1/photos?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      expect(await draftRes.json()).toEqual([]);
+
+      await publishEntry(jsonRequest(`http://localhost/api/v1/timeline-entries/${postId}/publish`, 'PUT', undefined, token), entryParams(postId));
+
+      const publishedRes = await listPhotos(
+        jsonRequest(`http://localhost/api/v1/photos?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      const publishedList = await publishedRes.json();
+      expect(publishedList.map((p: { originalFilename: string }) => p.originalFilename)).toEqual(['draft.png']);
+    });
+
+    it('400s on an invalid tripId', async () => {
+      const res = await listPhotos(
+        jsonRequest('http://localhost/api/v1/photos?tripId=not-a-uuid', 'GET', undefined, token),
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
   // FR-3/FR-28, Acceptance Criteria: "Given a Public Trip's Entry has one
   // Private Photo among several, when a Guest views that Entry's detail
   // page, then exactly the non-Private Photos render." Exercised here as a

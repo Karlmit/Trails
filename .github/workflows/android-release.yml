@@ -1,0 +1,86 @@
+name: Build and release Android app
+
+# Deliberately not the web app's "v*.*.*" tag pattern (docker-publish.yml) --
+# this creates its own "android-v<versionName>" tags so the two release
+# flows never collide. Bump versionCode/versionName in android/app/build.gradle.kts
+# and push to main (or run manually) to cut a new Android release; the
+# in-app updater (com.trails.app.update.UpdateChecker) polls this repo's
+# latest release for a newer version.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/app/build.gradle.kts'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: android
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Read version from build.gradle.kts
+        id: version
+        run: |
+          NAME=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=android-v$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if this version was already released
+        id: exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode signing keystore
+        if: steps.exists.outputs.exists == 'false'
+        run: |
+          mkdir -p keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > keystore/trails-release.jks
+          cat > keystore/keystore.properties <<EOF
+          storeFile=trails-release.jks
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Build signed release APK
+        if: steps.exists.outputs.exists == 'false'
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --console=plain
+
+      - name: Rename APK
+        if: steps.exists.outputs.exists == 'false'
+        run: cp app/build/outputs/apk/release/app-release.apk "trails-android-${{ steps.version.outputs.name }}.apk"
+
+      - name: Create GitHub release
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "trails-android-${{ steps.version.outputs.name }}.apk" \
+            --repo "${{ github.repository }}" \
+            --title "Trails Android v${{ steps.version.outputs.name }}" \
+            --notes "Automated build from commit ${{ github.sha }}."

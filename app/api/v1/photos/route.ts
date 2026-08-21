@@ -17,7 +17,7 @@ import {
 import { serializePhoto } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
-import { entryDetailHref } from '@/lib/entry-types';
+import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 
 // Same generous cap on the stored, unsanitized original filename as
 // app/api/v1/attachments/route.ts.
@@ -86,10 +86,45 @@ export async function GET(request: NextRequest) {
   const user = await getUserFromApiRequest(request);
   if (!user) return Errors.unauthorized();
 
+  const tripId = request.nextUrl.searchParams.get('tripId');
   const ownerType = request.nextUrl.searchParams.get('ownerType');
   const ownerId = request.nextUrl.searchParams.get('ownerId');
+
+  // Two supported query shapes, mirroring app/api/v1/attachments/route.ts:
+  // `?tripId=` (a Trip-wide aggregate -- the mobile client's offline-caching
+  // enumeration path) or `?ownerType=&ownerId=` (a single owner's Photo list,
+  // deliberately unfiltered so a Draft Blog Post's own editing surface can
+  // still see and manage its Photos before publishing).
+  if (tripId) {
+    if (!isUuid(tripId)) return Errors.validation('tripId query parameter must be a valid UUID');
+    // Same AD-10 stable-API-surface reasoning as Attachments' tripId branch:
+    // never leak a Draft Blog Post's Photos through this aggregate. Only
+    // TIMELINE_ENTRY-owned Photos can belong to a Blog Post -- IDEA/
+    // IMPORTANT_INFO-owned Photos have no draft/publish state and pass
+    // through untouched.
+    const visibleEntryIds = (
+      await prisma.timelineEntry.findMany({
+        where: { tripId, ...timelineVisibleEntryWhere() },
+        select: { id: true },
+      })
+    ).map((entry) => entry.id);
+    const photos = await prisma.photo.findMany({
+      where: {
+        tripId,
+        OR: [
+          { ownerType: { not: 'TIMELINE_ENTRY' } },
+          { ownerType: 'TIMELINE_ENTRY', ownerId: { in: visibleEntryIds } },
+        ],
+      },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+    });
+    return NextResponse.json(photos.map(serializePhoto));
+  }
+
   if (!ownerType || !ownerId) {
-    return Errors.validation('Both ownerType and ownerId query parameters are required');
+    return Errors.validation(
+      'Either a tripId query parameter, or both ownerType and ownerId query parameters, are required',
+    );
   }
   if (!isPhotoOwnerType(ownerType)) {
     return Errors.validation(`ownerType must be one of: ${PHOTO_OWNER_TYPES.join(', ')}`);
