@@ -8,5 +8,5 @@ dist/
 *.log
 npm-debug.log*
 .DS_Store
-data/
+/data/
 tsconfig.tsbuildinfo
