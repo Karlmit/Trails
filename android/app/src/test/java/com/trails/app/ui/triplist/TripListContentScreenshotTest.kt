@@ -1,9 +1,9 @@
 package com.trails.app.ui.triplist
 
-import androidx.compose.material3.MaterialTheme
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.trails.app.data.entity.TripEntity
+import com.trails.app.ui.theme.TrailsTheme
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
@@ -24,7 +24,10 @@ import org.junit.Test
  * without success; revisit once a Paparazzi release catches up to a Compose
  * UI version this new. The Robolectric data-layer test
  * (TripRepositoryOfflineReadTest) and the actual debug APK build both work
- * and are the real verification for this phase.
+ * and are the real verification for this phase. Re-confirmed still broken
+ * after the visual-design pass (same NoSuchMethodError) -- wrapped in
+ * TrailsTheme now instead of plain MaterialTheme so it's ready to record
+ * the real look the moment this becomes unblocked.
  */
 @Ignore("Paparazzi 1.3.5 / this Compose UI version are incompatible -- see class doc")
 class TripListContentScreenshotTest {
@@ -68,7 +71,7 @@ class TripListContentScreenshotTest {
     @Test
     fun `trip list with cached trips`() {
         paparazzi.snapshot {
-            MaterialTheme {
+            TrailsTheme {
                 TripListContent(
                     state = TripListUiState(trips = sampleTrips, isSyncing = false),
                     onOpenTrip = {},
@@ -80,7 +83,7 @@ class TripListContentScreenshotTest {
     @Test
     fun `empty state while offline with nothing cached yet`() {
         paparazzi.snapshot {
-            MaterialTheme {
+            TrailsTheme {
                 TripListContent(
                     state = TripListUiState(trips = emptyList(), isSyncing = false, syncError = "Could not reach the server"),
                     onOpenTrip = {},
