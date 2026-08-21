@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from .planning/Logos/Trails.png's flat background, the
+         cream field the pin logo sits on. -->
+    <color name="ic_launcher_background">#FEF6E9</color>
+</resources>
