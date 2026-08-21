@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
+import { commitStagedLinks, LinkStagingList, type StagedLink } from '@/components/LinkStagingList';
 import { DateTimeInput, combineDateTime, splitDateTime } from '@/components/DateTimeInput';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
 import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
@@ -185,6 +186,12 @@ export function EntryForm({
   // spec-guest-access (FR-28): `isPrivate` defaults to `false` for a new
   // Entry, same as the DB column's own default.
   const [isPrivate, setIsPrivate] = useState(seed?.isPrivate ?? false);
+  // spec-tags-links-photos: create-mode-only staging (see
+  // LinkStagingList.tsx's own comment) -- edit mode already has Links on
+  // its own separate, already-existing detail view (EntryDetailPanel's
+  // LinkList), so this stays unmounted there rather than offering two
+  // different Links UIs on the same Entry at once.
+  const [stagedLinks, setStagedLinks] = useState<StagedLink[]>([]);
 
   const typeDetails = seed?.typeDetails ?? {};
   const [roomInfo, setRoomInfo] = useState(str(typeDetails.roomInfo));
@@ -354,6 +361,9 @@ export function EntryForm({
       }
 
       if (mode === 'create') {
+        if (stagedLinks.length > 0) {
+          await commitStagedLinks('TIMELINE_ENTRY', responseBody.id, stagedLinks);
+        }
         router.push(`/trips/${tripId}/entries/${responseBody.id}`);
       } else {
         onSaved?.(responseBody);
@@ -729,6 +739,8 @@ export function EntryForm({
           Private (hidden from Guests)
         </label>
       </div>
+
+      {mode === 'create' && <LinkStagingList links={stagedLinks} onChange={setStagedLinks} />}
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>

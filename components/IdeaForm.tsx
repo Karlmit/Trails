@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { commitStagedLinks, LinkStagingList, type StagedLink } from '@/components/LinkStagingList';
 
 const PRIORITIES = [
   { value: 'MUST_DO', label: 'Must do' },
@@ -32,10 +33,12 @@ export function IdeaForm({ tripId }: { tripId: string }) {
   const [locationMapLink, setLocationMapLink] = useState('');
   const [estimatedExpenseAmount, setEstimatedExpenseAmount] = useState('');
   const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState('');
+  const [stagedLinks, setStagedLinks] = useState<StagedLink[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
+    setStagedLinks([]);
     setTitle('');
     setCategory('');
     setPriority('WOULD_LIKE');
@@ -86,6 +89,10 @@ export function IdeaForm({ tripId }: { tripId: string }) {
       if (!response.ok) {
         setError(responseBody?.error?.message ?? 'Could not create this Idea.');
         return;
+      }
+
+      if (stagedLinks.length > 0) {
+        await commitStagedLinks('IDEA', responseBody.id, stagedLinks);
       }
 
       reset();
@@ -214,6 +221,8 @@ export function IdeaForm({ tripId }: { tripId: string }) {
           />
         </div>
       </div>
+
+      <LinkStagingList links={stagedLinks} onChange={setStagedLinks} />
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
