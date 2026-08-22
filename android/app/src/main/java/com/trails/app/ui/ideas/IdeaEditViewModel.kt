@@ -15,6 +15,7 @@ import com.trails.app.network.dto.IdeaRequest
 import com.trails.app.ui.components.LinkFieldItem
 import com.trails.app.ui.components.TagFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +75,12 @@ class IdeaEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId))
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
+
+    // Same "in-flight create, don't fire a second one" guard as
+    // BlogEditViewModel's own ensurePostId -- two photos added in quick
+    // succession before the first upload's create call returns must share
+    // that one create, not each lazily create their own Idea.
+    private var creatingIdeaId: CompletableDeferred<String>? = null
 
     /** Every category any Idea on this Trip already uses, plus this device's own added-but-unused suggestions. */
     val categoryOptions: StateFlow<List<String>> = combine(
@@ -183,11 +190,34 @@ class IdeaEditViewModel @Inject constructor(
         }
     }
 
+    /** Lazily creates the Idea on the very first cover photo -- same convention as BlogEditViewModel's own ensurePostId. */
+    private suspend fun ensureIdeaId(): String {
+        _state.value.ideaId?.let { return it }
+        creatingIdeaId?.let { return it.await() }
+
+        val deferred = CompletableDeferred<String>()
+        creatingIdeaId = deferred
+        try {
+            val current = _state.value
+            val request = toRequest(current).copy(title = current.title.trim().ifEmpty { "Untitled" })
+            val created = repository.create(request)
+            _state.value = _state.value.copy(ideaId = created.id, title = _state.value.title.ifBlank { request.title })
+            deferred.complete(created.id)
+            return created.id
+        } catch (e: Exception) {
+            deferred.completeExceptionally(e)
+            throw e
+        } finally {
+            creatingIdeaId = null
+        }
+    }
+
     fun uploadPhoto(uri: Uri, filename: String) {
-        val ownerId = _state.value.ideaId ?: return
         viewModelScope.launch {
-            runCatching { documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to upload photo.") }
+            runCatching {
+                val ownerId = ensureIdeaId()
+                documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename)
+            }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to upload photo.") }
         }
     }
 

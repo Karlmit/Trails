@@ -80,7 +80,7 @@ fun BlogEditScreen(
         state.error?.let { ErrorBanner(it) }
         if (state.lostFormattingWarning) {
             Text(
-                "This post has formatting (headings, lists, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text and images are otherwise kept.",
+                "This post has formatting (lists, tables, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, bold/italic/underline, and images are otherwise kept.",
                 color = TrailsColors.TextSoft,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -91,16 +91,39 @@ fun BlogEditScreen(
         CheckboxRow(label = "Private (only visible to you)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
 
         HorizontalDivider()
+        Text(
+            "Type **bold**, _italic_, or __underline__ around a phrase. Use ¶/H1/H2/H3 below to change a block's heading level.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TrailsColors.TextSoft,
+        )
 
         state.blocks.forEach { block ->
             when (block) {
-                is EditableBlock.Paragraph -> Column(modifier = Modifier.fillMaxWidth()) {
+                is EditableBlock.Text -> Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                        listOf(null to "¶", 1 to "H1", 2 to "H2", 3 to "H3").forEach { (level, label) ->
+                            val selected = block.level == level
+                            TextButton(onClick = { viewModel.setBlockLevel(block.id, level) }) {
+                                Text(
+                                    label,
+                                    color = if (selected) TrailsColors.BrandAccent else TrailsColors.TextSoft,
+                                    style = if (selected) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        }
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                         OutlinedTextField(
                             value = block.text,
-                            onValueChange = { viewModel.updateParagraph(block.id, it) },
+                            onValueChange = { viewModel.updateText(block.id, it) },
                             modifier = Modifier.weight(1f),
-                            minLines = 3,
+                            minLines = if (block.level == null) 3 else 1,
+                            textStyle = when (block.level) {
+                                1 -> MaterialTheme.typography.headlineMedium
+                                2 -> MaterialTheme.typography.headlineSmall
+                                3 -> MaterialTheme.typography.titleLarge
+                                else -> MaterialTheme.typography.bodyLarge
+                            },
                             shape = TrailsShapes.Input,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = TrailsColors.BrandAccent,
@@ -110,10 +133,10 @@ fun BlogEditScreen(
                             ),
                         )
                         IconButton(onClick = { viewModel.removeBlock(block.id) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove paragraph")
+                            Icon(Icons.Filled.Close, contentDescription = "Remove block")
                         }
                     }
-                    TextButton(onClick = { viewModel.addParagraphAfter(block.id) }) { Text("+ Paragraph") }
+                    TextButton(onClick = { viewModel.addTextBlockAfter(block.id) }) { Text("+ Paragraph") }
                 }
                 is EditableBlock.Image -> {
                     val photo = photosById[block.photoId]

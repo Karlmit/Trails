@@ -142,6 +142,31 @@ fun IdeaEditScreen(
             )
         }
 
+        HorizontalDivider()
+        Text("Cover photo", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+        LazyRow {
+            items(photos, key = { it.id }) { photo ->
+                Row(modifier = Modifier.padding(end = 8.dp)) {
+                    if (photo.localPath != null) {
+                        AsyncImage(
+                            model = File(photo.localPath),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.markPhotoPrimary(photo.id) },
+                        )
+                    }
+                }
+            }
+            item {
+                TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                    Text("+ Add photo")
+                }
+            }
+        }
+
         if (state.saving) {
             CircularProgressIndicator()
         } else {
@@ -149,31 +174,6 @@ fun IdeaEditScreen(
         }
 
         if (state.ideaId != null) {
-            HorizontalDivider()
-            Text("Photos", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
-            LazyRow {
-                items(photos, key = { it.id }) { photo ->
-                    Row(modifier = Modifier.padding(end = 8.dp)) {
-                        if (photo.localPath != null) {
-                            AsyncImage(
-                                model = File(photo.localPath),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .size(88.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { viewModel.markPhotoPrimary(photo.id) },
-                            )
-                        }
-                    }
-                }
-                item {
-                    TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                        Text("+ Add photo")
-                    }
-                }
-            }
-
             HorizontalDivider()
             TagsEditor(tags = state.tags, onAdd = viewModel::addTag, onRemove = viewModel::removeTag)
             LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)

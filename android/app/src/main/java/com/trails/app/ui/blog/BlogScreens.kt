@@ -21,12 +21,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.io.File
+
+private fun runsToAnnotatedString(runs: List<InlineRun>) = buildAnnotatedString {
+    runs.forEach { run ->
+        withStyle(
+            SpanStyle(
+                fontWeight = if (run.bold) FontWeight.Bold else FontWeight.Normal,
+                fontStyle = if (run.italic) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+                textDecoration = if (run.underline) TextDecoration.Underline else TextDecoration.None,
+            ),
+        ) { append(run.text) }
+    }
+}
 
 @Composable
 fun BlogListScreen(
@@ -83,8 +100,13 @@ fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hi
                 items(state.blocks) { block ->
                     when (block) {
                         is BlogBlock.TextBlock -> Text(
-                            block.text,
-                            style = MaterialTheme.typography.bodyLarge,
+                            runsToAnnotatedString(block.runs),
+                            style = when (block.level) {
+                                1 -> MaterialTheme.typography.headlineMedium
+                                2 -> MaterialTheme.typography.headlineSmall
+                                3 -> MaterialTheme.typography.titleLarge
+                                else -> MaterialTheme.typography.bodyLarge
+                            },
                             color = TrailsColors.Text,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )

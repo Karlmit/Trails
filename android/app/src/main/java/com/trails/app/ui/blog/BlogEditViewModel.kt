@@ -32,7 +32,7 @@ data class BlogEditState(
     val entryId: String? = null,
     val title: String = "",
     val startAt: String = "",
-    val blocks: List<EditableBlock> = listOf(EditableBlock.Paragraph(UUID.randomUUID().toString(), "")),
+    val blocks: List<EditableBlock> = listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, "")),
     val lostFormattingWarning: Boolean = false,
     val isPrivate: Boolean = false,
     val saving: Boolean = false,
@@ -43,12 +43,13 @@ data class BlogEditState(
 )
 
 /**
- * A block-based editor -- paragraphs you can edit inline, images you can
- * insert via the system photo picker -- rather than the previous single
- * plain-text field, which had no way to add an image at all. Mirrors the
- * web's own BlockNote-backed editor closely enough to round-trip: see
- * EditableBlocks.kt's own comment for exactly what's preserved
- * (paragraphs + images) versus flattened (headings, lists, any other
+ * A block-based editor -- paragraphs/headings you can edit inline (with
+ * markdown-shorthand bold/italic/underline), images you can insert via the
+ * system photo picker -- rather than the previous single plain-text field,
+ * which had no way to add an image at all. Mirrors the web's own
+ * BlockNote-backed editor closely enough to round-trip: see
+ * EditableBlocks.kt's own comment for exactly what's preserved (text
+ * formatting, headings, images) versus flattened (lists, tables, any other
  * BlockNote block type -- [BlogEditState.lostFormattingWarning] surfaces
  * that once rather than silently discarding it).
  */
@@ -88,7 +89,7 @@ class BlogEditViewModel @Inject constructor(
                         title = existing.title,
                         startAt = existing.startAt,
                         isPrivate = existing.isPrivate,
-                        blocks = parsed.blocks.ifEmpty { listOf(EditableBlock.Paragraph(UUID.randomUUID().toString(), "")) },
+                        blocks = parsed.blocks.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, "")) },
                         lostFormattingWarning = parsed.lostFormatting,
                     )
                 }
@@ -100,27 +101,34 @@ class BlogEditViewModel @Inject constructor(
     fun onStartAtChange(v: String) { _state.value = _state.value.copy(startAt = v) }
     fun onIsPrivateChange(v: Boolean) { _state.value = _state.value.copy(isPrivate = v) }
 
-    fun updateParagraph(id: String, text: String) {
+    fun updateText(id: String, text: String) {
         _state.value = _state.value.copy(
-            blocks = _state.value.blocks.map { if (it is EditableBlock.Paragraph && it.id == id) it.copy(text = text) else it },
+            blocks = _state.value.blocks.map { if (it is EditableBlock.Text && it.id == id) it.copy(text = text) else it },
         )
     }
 
-    fun addParagraphAfter(id: String) {
+    /** null = paragraph, 1/2/3 = heading. */
+    fun setBlockLevel(id: String, level: Int?) {
+        _state.value = _state.value.copy(
+            blocks = _state.value.blocks.map { if (it is EditableBlock.Text && it.id == id) it.copy(level = level) else it },
+        )
+    }
+
+    fun addTextBlockAfter(id: String) {
         val current = _state.value
         val index = current.blocks.indexOfFirst { blockId(it) == id }
-        val newBlock = EditableBlock.Paragraph(UUID.randomUUID().toString(), "")
+        val newBlock = EditableBlock.Text(UUID.randomUUID().toString(), null, "")
         val updated = current.blocks.toMutableList().apply { add(if (index >= 0) index + 1 else size, newBlock) }
         _state.value = current.copy(blocks = updated)
     }
 
     fun removeBlock(id: String) {
         val updated = _state.value.blocks.filterNot { blockId(it) == id }
-        _state.value = _state.value.copy(blocks = updated.ifEmpty { listOf(EditableBlock.Paragraph(UUID.randomUUID().toString(), "")) })
+        _state.value = _state.value.copy(blocks = updated.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, "")) })
     }
 
     private fun blockId(block: EditableBlock): String = when (block) {
-        is EditableBlock.Paragraph -> block.id
+        is EditableBlock.Text -> block.id
         is EditableBlock.Image -> block.id
     }
 
