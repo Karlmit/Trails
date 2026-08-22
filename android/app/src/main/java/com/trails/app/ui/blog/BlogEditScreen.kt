@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,22 +53,6 @@ import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.queryDisplayName
 import java.io.File
-
-/** Wraps the current selection (or inserts a placeholder at the cursor) in [marker] on both sides, matching markdown-shorthand's own delimiters. */
-private fun wrapSelection(value: TextFieldValue, marker: String): TextFieldValue {
-    val start = value.selection.min
-    val end = value.selection.max
-    val text = value.text
-    return if (start == end) {
-        val placeholder = "text"
-        val newText = text.substring(0, start) + marker + placeholder + marker + text.substring(start)
-        TextFieldValue(newText, selection = TextRange(start + marker.length, start + marker.length + placeholder.length))
-    } else {
-        val selected = text.substring(start, end)
-        val newText = text.substring(0, start) + marker + selected + marker + text.substring(end)
-        TextFieldValue(newText, selection = TextRange(start + marker.length, start + marker.length + selected.length))
-    }
-}
 
 @Composable
 fun BlogEditScreen(
@@ -111,7 +94,7 @@ fun BlogEditScreen(
 
         HorizontalDivider()
         Text(
-            "Select text and tap B/I/U to format it (or type **bold**/_italic_/__underline__ yourself). Use ¶/H1/H2/H3 to change a block's heading level.",
+            "Select text and tap B/I/U to format it, or place your cursor and tap one before typing. Use ¶/H1/H2/H3 to change a block's heading level.",
             style = MaterialTheme.typography.bodySmall,
             color = TrailsColors.TextSoft,
         )
@@ -121,7 +104,7 @@ fun BlogEditScreen(
                 is EditableBlock.Text -> key(block.id) {
                     TextBlockEditor(
                         block = block,
-                        onTextChange = { viewModel.updateText(block.id, it) },
+                        onRunsChange = { viewModel.updateRuns(block.id, it) },
                         onLevelChange = { viewModel.setBlockLevel(block.id, it) },
                         onRemove = { viewModel.removeBlock(block.id) },
                         onAddAfter = { viewModel.addTextBlockAfter(block.id) },
@@ -190,31 +173,51 @@ fun BlogEditScreen(
 }
 
 /**
- * A per-block text field with a real B/I/U toolbar -- the buttons don't
- * live-render bold/italic/underline as you type (see EditableBlocks.kt's
- * class comment for why), they just wrap the current selection (or insert
- * a placeholder at the cursor) in the matching markdown-shorthand
- * delimiter, so you never have to type `**`/`_`/`__` by hand. Keeps its own
- * local `TextFieldValue` (for selection tracking) in sync with the
- * ViewModel's plain-text source of truth.
+ * A per-block rich text field with a real B/I/U toolbar -- selected text
+ * (or newly typed text, if you tap a button with just a cursor placed)
+ * actually renders bold/italic/underline live, via RichTextField.kt's
+ * AnnotatedString plumbing. Keeps its own local `TextFieldValue` (styling +
+ * selection) in sync with the ViewModel's `List<InlineRun>` source of
+ * truth, which is what's actually saved.
  */
 @Composable
 private fun TextBlockEditor(
     block: EditableBlock.Text,
-    onTextChange: (String) -> Unit,
+    onRunsChange: (List<InlineRun>) -> Unit,
     onLevelChange: (Int?) -> Unit,
     onRemove: () -> Unit,
     onAddAfter: () -> Unit,
 ) {
-    var fieldValue by remember(block.id) { mutableStateOf(TextFieldValue(block.text)) }
-    if (fieldValue.text != block.text) {
-        fieldValue = fieldValue.copy(text = block.text)
+    var fieldValue by remember(block.id) { mutableStateOf(TextFieldValue(block.runs.toAnnotatedString())) }
+    val blockPlainText = remember(block.runs) { block.runs.joinToString("") { it.text } }
+    if (fieldValue.text != blockPlainText) {
+        fieldValue = TextFieldValue(block.runs.toAnnotatedString(), fieldValue.selection)
+    }
+    // Which style(s) the NEXT typed character will get when the cursor has
+    // no selection -- toggled by the B/I/U buttons, and re-synced to
+    // whatever's already at the cursor whenever the selection moves so
+    // typing continues in the surrounding style by default (matches every
+    // other rich text editor's behavior).
+    var activeStyle by remember(block.id) { mutableStateOf(CharStyle()) }
+
+    fun styleAtCursor(value: TextFieldValue): CharStyle {
+        val pos = value.selection.start
+        val styles = value.annotatedString.toCharStyles()
+        return styles.getOrNull((pos - 1).coerceAtLeast(0))?.takeIf { pos > 0 } ?: CharStyle()
     }
 
-    fun applyMarker(marker: String) {
-        val wrapped = wrapSelection(fieldValue, marker)
-        fieldValue = wrapped
-        onTextChange(wrapped.text)
+    fun toggle(bold: Boolean? = null, italic: Boolean? = null, underline: Boolean? = null) {
+        if (fieldValue.selection.collapsed) {
+            activeStyle = activeStyle.copy(
+                bold = if (bold != null) !activeStyle.bold else activeStyle.bold,
+                italic = if (italic != null) !activeStyle.italic else activeStyle.italic,
+                underline = if (underline != null) !activeStyle.underline else activeStyle.underline,
+            )
+        } else {
+            val toggled = toggleStyleOnSelection(fieldValue, bold, italic, underline)
+            fieldValue = toggled
+            onRunsChange(toggled.annotatedString.toInlineRuns())
+        }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -231,22 +234,36 @@ private fun TextBlockEditor(
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-            TextButton(onClick = { applyMarker("**") }) {
-                Text("B", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TrailsColors.TextSoft)
+            TextButton(onClick = { toggle(bold = true) }) {
+                Text(
+                    "B",
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = if (activeStyle.bold) TrailsColors.BrandAccent else TrailsColors.TextSoft,
+                )
             }
-            TextButton(onClick = { applyMarker("_") }) {
-                Text("I", fontStyle = androidx.compose.ui.text.font.FontStyle.Italic, color = TrailsColors.TextSoft)
+            TextButton(onClick = { toggle(italic = true) }) {
+                Text(
+                    "I",
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = if (activeStyle.italic) TrailsColors.BrandAccent else TrailsColors.TextSoft,
+                )
             }
-            TextButton(onClick = { applyMarker("__") }) {
-                Text("U", textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline, color = TrailsColors.TextSoft)
+            TextButton(onClick = { toggle(underline = true) }) {
+                Text(
+                    "U",
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                    color = if (activeStyle.underline) TrailsColors.BrandAccent else TrailsColors.TextSoft,
+                )
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             OutlinedTextField(
                 value = fieldValue,
                 onValueChange = { newValue ->
-                    fieldValue = newValue
-                    onTextChange(newValue.text)
+                    val merged = mergeTypingEdit(fieldValue, newValue, activeStyle)
+                    fieldValue = merged
+                    activeStyle = styleAtCursor(merged)
+                    onRunsChange(merged.annotatedString.toInlineRuns())
                 },
                 modifier = Modifier.weight(1f),
                 minLines = if (block.level == null) 3 else 1,
