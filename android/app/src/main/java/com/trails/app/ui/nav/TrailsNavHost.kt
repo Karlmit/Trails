@@ -66,15 +66,16 @@ private fun AddFab(onClick: () -> Unit) {
     FloatingActionButton(onClick = onClick) { Icon(Icons.Filled.Add, contentDescription = "Add") }
 }
 
-/** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet, so it doesn't belong as a Timeline Entry until converted. */
+/** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet (so it doesn't belong as a Timeline Entry until converted), and a Blog Post goes through its own editor, not the generic Entry one. */
 @Composable
-private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit) {
+private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onAddBlogPost: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     androidx.compose.foundation.layout.Box {
         FloatingActionButton(onClick = { expanded = true }) { Icon(Icons.Filled.Add, contentDescription = "Add") }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("Entry") }, onClick = { expanded = false; onAddEntry() })
             DropdownMenuItem(text = { Text("Idea") }, onClick = { expanded = false; onAddIdea() })
+            DropdownMenuItem(text = { Text("Blog Post") }, onClick = { expanded = false; onAddBlogPost() })
         }
     }
 }
@@ -118,6 +119,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
                     AddEntryOrIdeaFab(
                         onAddEntry = { navController.navigate(entryEditRoute(tripId, null)) },
                         onAddIdea = { navController.navigate(ideaEditRoute(tripId, null)) },
+                        onAddBlogPost = { navController.navigate(blogEditRoute(tripId, null)) },
                     )
                 },
             ) { padding ->

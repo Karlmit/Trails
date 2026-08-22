@@ -35,6 +35,7 @@ data class BlogEditState(
     val blocks: List<EditableBlock> = listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, "")),
     val lostFormattingWarning: Boolean = false,
     val isPrivate: Boolean = false,
+    val isPublished: Boolean = false,
     val saving: Boolean = false,
     val uploadingImage: Boolean = false,
     val error: String? = null,
@@ -89,6 +90,7 @@ class BlogEditViewModel @Inject constructor(
                         title = existing.title,
                         startAt = existing.startAt,
                         isPrivate = existing.isPrivate,
+                        isPublished = existing.publishedAt != null,
                         blocks = parsed.blocks.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, "")) },
                         lostFormattingWarning = parsed.lostFormatting,
                     )
