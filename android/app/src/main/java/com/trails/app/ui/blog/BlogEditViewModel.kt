@@ -32,7 +32,7 @@ data class BlogEditState(
     val entryId: String? = null,
     val title: String = "",
     val startAt: String = "",
-    val blocks: List<EditableBlock> = listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, listOf(InlineRun("")))),
+    val blocks: List<EditableBlock> = listOf(EditableBlock.Text(UUID.randomUUID().toString(), TextBlockKind.PARAGRAPH, listOf(InlineRun("")))),
     val lostFormattingWarning: Boolean = false,
     val isPrivate: Boolean = false,
     val isPublished: Boolean = false,
@@ -91,7 +91,7 @@ class BlogEditViewModel @Inject constructor(
                         startAt = existing.startAt,
                         isPrivate = existing.isPrivate,
                         isPublished = existing.publishedAt != null,
-                        blocks = parsed.blocks.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, listOf(InlineRun("")))) },
+                        blocks = parsed.blocks.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), TextBlockKind.PARAGRAPH, listOf(InlineRun("")))) },
                         lostFormattingWarning = parsed.lostFormatting,
                     )
                 }
@@ -109,24 +109,26 @@ class BlogEditViewModel @Inject constructor(
         )
     }
 
-    /** null = paragraph, 1/2/3 = heading. */
-    fun setBlockLevel(id: String, level: Int?) {
+    fun setBlockKind(id: String, kind: TextBlockKind) {
         _state.value = _state.value.copy(
-            blocks = _state.value.blocks.map { if (it is EditableBlock.Text && it.id == id) it.copy(level = level) else it },
+            blocks = _state.value.blocks.map { if (it is EditableBlock.Text && it.id == id) it.copy(kind = kind) else it },
         )
     }
 
+    /** Continues a bullet/numbered list on Enter (matches every other list editor); any other kind gets a fresh plain paragraph. */
     fun addTextBlockAfter(id: String) {
         val current = _state.value
         val index = current.blocks.indexOfFirst { blockId(it) == id }
-        val newBlock = EditableBlock.Text(UUID.randomUUID().toString(), null, listOf(InlineRun("")))
+        val previous = current.blocks.getOrNull(index) as? EditableBlock.Text
+        val kind = previous?.kind?.takeIf { it == TextBlockKind.BULLET_LIST || it == TextBlockKind.NUMBERED_LIST } ?: TextBlockKind.PARAGRAPH
+        val newBlock = EditableBlock.Text(UUID.randomUUID().toString(), kind, listOf(InlineRun("")))
         val updated = current.blocks.toMutableList().apply { add(if (index >= 0) index + 1 else size, newBlock) }
         _state.value = current.copy(blocks = updated)
     }
 
     fun removeBlock(id: String) {
         val updated = _state.value.blocks.filterNot { blockId(it) == id }
-        _state.value = _state.value.copy(blocks = updated.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), null, listOf(InlineRun("")))) })
+        _state.value = _state.value.copy(blocks = updated.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), TextBlockKind.PARAGRAPH, listOf(InlineRun("")))) })
     }
 
     private fun blockId(block: EditableBlock): String = when (block) {

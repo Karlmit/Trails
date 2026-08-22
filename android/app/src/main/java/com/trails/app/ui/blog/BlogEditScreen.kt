@@ -82,7 +82,7 @@ fun BlogEditScreen(
         state.error?.let { ErrorBanner(it) }
         if (state.lostFormattingWarning) {
             Text(
-                "This post has formatting (lists, tables, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, bold/italic/underline, and images are otherwise kept.",
+                "This post has formatting (tables, code blocks, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.",
                 color = TrailsColors.TextSoft,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -94,18 +94,36 @@ fun BlogEditScreen(
 
         HorizontalDivider()
         Text(
-            "Select text and tap B/I/U to format it, or place your cursor and tap one before typing. Use ¶/H1/H2/H3 to change a block's heading level.",
+            "Select text and tap B/I/U to format it, or place your cursor and tap one before typing. Use ¶/H1/H2/H3/•/1. to change a block's type.",
             style = MaterialTheme.typography.bodySmall,
             color = TrailsColors.TextSoft,
         )
+
+        // Numbering restarts at 1 whenever a non-numbered block breaks a
+        // run of consecutive NUMBERED_LIST blocks -- same as an HTML <ol>,
+        // and the same computation BlogScreens.kt's read-only view does.
+        val listNumberByBlockId = remember(state.blocks) {
+            val map = mutableMapOf<String, Int>()
+            var counter = 0
+            state.blocks.forEach { b ->
+                if (b is EditableBlock.Text && b.kind == TextBlockKind.NUMBERED_LIST) {
+                    counter += 1
+                    map[b.id] = counter
+                } else {
+                    counter = 0
+                }
+            }
+            map
+        }
 
         state.blocks.forEach { block ->
             when (block) {
                 is EditableBlock.Text -> key(block.id) {
                     TextBlockEditor(
                         block = block,
+                        listNumber = listNumberByBlockId[block.id],
                         onRunsChange = { viewModel.updateRuns(block.id, it) },
-                        onLevelChange = { viewModel.setBlockLevel(block.id, it) },
+                        onKindChange = { viewModel.setBlockKind(block.id, it) },
                         onRemove = { viewModel.removeBlock(block.id) },
                         onAddAfter = { viewModel.addTextBlockAfter(block.id) },
                     )
@@ -183,8 +201,9 @@ fun BlogEditScreen(
 @Composable
 private fun TextBlockEditor(
     block: EditableBlock.Text,
+    listNumber: Int?,
     onRunsChange: (List<InlineRun>) -> Unit,
-    onLevelChange: (Int?) -> Unit,
+    onKindChange: (TextBlockKind) -> Unit,
     onRemove: () -> Unit,
     onAddAfter: () -> Unit,
 ) {
@@ -222,9 +241,16 @@ private fun TextBlockEditor(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-            listOf(null to "¶", 1 to "H1", 2 to "H2", 3 to "H3").forEach { (level, label) ->
-                val selected = block.level == level
-                TextButton(onClick = { onLevelChange(level) }) {
+            listOf(
+                TextBlockKind.PARAGRAPH to "¶",
+                TextBlockKind.HEADING_1 to "H1",
+                TextBlockKind.HEADING_2 to "H2",
+                TextBlockKind.HEADING_3 to "H3",
+                TextBlockKind.BULLET_LIST to "•",
+                TextBlockKind.NUMBERED_LIST to "1.",
+            ).forEach { (kind, label) ->
+                val selected = block.kind == kind
+                TextButton(onClick = { onKindChange(kind) }) {
                     Text(
                         label,
                         color = if (selected) TrailsColors.BrandAccent else TrailsColors.TextSoft,
@@ -257,6 +283,21 @@ private fun TextBlockEditor(
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            when (block.kind) {
+                TextBlockKind.BULLET_LIST -> Text(
+                    "•",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TrailsColors.Text,
+                    modifier = Modifier.padding(top = 16.dp, end = 8.dp),
+                )
+                TextBlockKind.NUMBERED_LIST -> Text(
+                    "${listNumber ?: 1}.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TrailsColors.Text,
+                    modifier = Modifier.padding(top = 16.dp, end = 8.dp),
+                )
+                else -> Unit
+            }
             OutlinedTextField(
                 value = fieldValue,
                 onValueChange = { newValue ->
@@ -266,11 +307,11 @@ private fun TextBlockEditor(
                     onRunsChange(merged.annotatedString.toInlineRuns())
                 },
                 modifier = Modifier.weight(1f),
-                minLines = if (block.level == null) 3 else 1,
-                textStyle = when (block.level) {
-                    1 -> MaterialTheme.typography.headlineMedium
-                    2 -> MaterialTheme.typography.headlineSmall
-                    3 -> MaterialTheme.typography.titleLarge
+                minLines = if (block.kind == TextBlockKind.PARAGRAPH) 3 else 1,
+                textStyle = when (block.kind) {
+                    TextBlockKind.HEADING_1 -> MaterialTheme.typography.headlineMedium
+                    TextBlockKind.HEADING_2 -> MaterialTheme.typography.headlineSmall
+                    TextBlockKind.HEADING_3 -> MaterialTheme.typography.titleLarge
                     else -> MaterialTheme.typography.bodyLarge
                 },
                 shape = TrailsShapes.Input,
@@ -285,6 +326,11 @@ private fun TextBlockEditor(
                 Icon(Icons.Filled.Close, contentDescription = "Remove block")
             }
         }
-        TextButton(onClick = onAddAfter) { Text("+ Paragraph") }
+        val addLabel = when (block.kind) {
+            TextBlockKind.BULLET_LIST -> "+ Bullet"
+            TextBlockKind.NUMBERED_LIST -> "+ Number"
+            else -> "+ Paragraph"
+        }
+        TextButton(onClick = onAddAfter) { Text(addLabel) }
     }
 }

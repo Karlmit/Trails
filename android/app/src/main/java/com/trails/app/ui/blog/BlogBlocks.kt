@@ -8,19 +8,19 @@ import kotlinx.serialization.json.intOrNull
 
 /**
  * A minimal reader for BlogPost `description`'s BlockNote Block[] JSON --
- * enough to render paragraphs/headings (with real bold/italic/underline,
- * see [InlineRun]) and the app's custom `layoutImage` block
- * (components/RichTextEditor.tsx) as an actual image, without a full
- * BlockNote-equivalent editor/renderer (lists/tables/etc. still just render
- * as their plain text). `layoutImage` stores only `props.url`, a server-
- * relative path shaped `/api/v1/photos/{photoId}/file`
- * (RichTextEditor.tsx's uploadBlogImage) -- the photo id is pulled out of
- * that path and matched against this Blog Post's own already-synced/cached
- * Photos (BlogDetailViewModel), so this works fully offline once the trip
- * has been synced once.
+ * enough to render paragraphs/headings/bullet+numbered lists (with real
+ * bold/italic/underline, see [InlineRun]) and the app's custom
+ * `layoutImage` block (components/RichTextEditor.tsx) as an actual image,
+ * without a full BlockNote-equivalent renderer (tables/code blocks/etc.
+ * still just render as their plain text). `layoutImage` stores only
+ * `props.url`, a server-relative path shaped
+ * `/api/v1/photos/{photoId}/file` (RichTextEditor.tsx's uploadBlogImage)
+ * -- the photo id is pulled out of that path and matched against this
+ * Blog Post's own already-synced/cached Photos (BlogDetailViewModel), so
+ * this works fully offline once the trip has been synced once.
  */
 sealed class BlogBlock {
-    data class TextBlock(val runs: List<InlineRun>, val level: Int? = null) : BlogBlock()
+    data class TextBlock(val runs: List<InlineRun>, val kind: TextBlockKind = TextBlockKind.PARAGRAPH) : BlogBlock()
     data class ImageBlock(val photoId: String) : BlogBlock()
 }
 
@@ -43,12 +43,17 @@ fun parseBlogBlocks(raw: String?): List<BlogBlock> {
             } else {
                 val runs = contentToInlineRuns(block["content"])
                 if (runs.any { it.text.isNotBlank() }) {
-                    val level = if (type == "heading") {
-                        ((block["props"] as? JsonObject)?.get("level") as? JsonPrimitive)?.intOrNull ?: 1
-                    } else {
-                        null
+                    val kind = when (type) {
+                        "heading" -> when (((block["props"] as? JsonObject)?.get("level") as? JsonPrimitive)?.intOrNull ?: 1) {
+                            2 -> TextBlockKind.HEADING_2
+                            3 -> TextBlockKind.HEADING_3
+                            else -> TextBlockKind.HEADING_1
+                        }
+                        "bulletListItem" -> TextBlockKind.BULLET_LIST
+                        "numberedListItem" -> TextBlockKind.NUMBERED_LIST
+                        else -> TextBlockKind.PARAGRAPH
                     }
-                    result.add(BlogBlock.TextBlock(runs, level))
+                    result.add(BlogBlock.TextBlock(runs, kind))
                 }
             }
             (block["children"] as? JsonArray)?.let { if (it.isNotEmpty()) walk(it) }

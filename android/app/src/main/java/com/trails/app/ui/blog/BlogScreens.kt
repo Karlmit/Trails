@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -97,19 +99,44 @@ fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hi
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                     )
                 }
-                items(state.blocks) { block ->
+                // Numbering restarts at 1 whenever a non-numbered block breaks a
+                // run of consecutive NUMBERED_LIST blocks -- same as an HTML <ol>.
+                val listNumbers = run {
+                    val numbers = IntArray(state.blocks.size)
+                    var counter = 0
+                    state.blocks.forEachIndexed { i, b ->
+                        counter = if (b is BlogBlock.TextBlock && b.kind == TextBlockKind.NUMBERED_LIST) counter + 1 else 0
+                        numbers[i] = counter
+                    }
+                    numbers
+                }
+                itemsIndexed(state.blocks) { index, block ->
                     when (block) {
-                        is BlogBlock.TextBlock -> Text(
-                            runsToAnnotatedString(block.runs),
-                            style = when (block.level) {
-                                1 -> MaterialTheme.typography.headlineMedium
-                                2 -> MaterialTheme.typography.headlineSmall
-                                3 -> MaterialTheme.typography.titleLarge
+                        is BlogBlock.TextBlock -> {
+                            val textStyle = when (block.kind) {
+                                TextBlockKind.HEADING_1 -> MaterialTheme.typography.headlineMedium
+                                TextBlockKind.HEADING_2 -> MaterialTheme.typography.headlineSmall
+                                TextBlockKind.HEADING_3 -> MaterialTheme.typography.titleLarge
                                 else -> MaterialTheme.typography.bodyLarge
-                            },
-                            color = TrailsColors.Text,
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
+                            }
+                            when (block.kind) {
+                                TextBlockKind.BULLET_LIST, TextBlockKind.NUMBERED_LIST -> Row(modifier = Modifier.padding(bottom = 4.dp)) {
+                                    Text(
+                                        if (block.kind == TextBlockKind.BULLET_LIST) "•" else "${listNumbers[index]}.",
+                                        style = textStyle,
+                                        color = TrailsColors.Text,
+                                        modifier = Modifier.padding(end = 8.dp),
+                                    )
+                                    Text(runsToAnnotatedString(block.runs), style = textStyle, color = TrailsColors.Text)
+                                }
+                                else -> Text(
+                                    runsToAnnotatedString(block.runs),
+                                    style = textStyle,
+                                    color = TrailsColors.Text,
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                )
+                            }
+                        }
                         is BlogBlock.ImageBlock -> {
                             val photo = state.photosById[block.photoId]
                             if (photo?.localPath != null) {
