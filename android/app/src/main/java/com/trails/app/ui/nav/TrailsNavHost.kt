@@ -3,9 +3,16 @@ package com.trails.app.ui.nav
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -59,6 +66,19 @@ private fun AddFab(onClick: () -> Unit) {
     FloatingActionButton(onClick = onClick) { Icon(Icons.Filled.Add, contentDescription = "Add") }
 }
 
+/** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet, so it doesn't belong as a Timeline Entry until converted. */
+@Composable
+private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
+        FloatingActionButton(onClick = { expanded = true }) { Icon(Icons.Filled.Add, contentDescription = "Add") }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text("Entry") }, onClick = { expanded = false; onAddEntry() })
+            DropdownMenuItem(text = { Text("Idea") }, onClick = { expanded = false; onAddIdea() })
+        }
+    }
+}
+
 @Composable
 fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = ROUTE_LOGIN) {
@@ -94,7 +114,12 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
                 tripId, TripTab.TIMELINE, "Timeline", navController,
-                floatingActionButton = { AddFab(onClick = { navController.navigate(entryEditRoute(tripId, null)) }) },
+                floatingActionButton = {
+                    AddEntryOrIdeaFab(
+                        onAddEntry = { navController.navigate(entryEditRoute(tripId, null)) },
+                        onAddIdea = { navController.navigate(ideaEditRoute(tripId, null)) },
+                    )
+                },
             ) { padding ->
                 TimelineScreen(padding, onOpenEntry = { entryType, entryId ->
                     val route = if (entryType == "BLOG_POST") blogDetailRoute(tripId, entryId) else entryDetailRoute(tripId, entryId)

@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trails.app.data.DocumentsRepository
+import com.trails.app.data.IdeaCategoryStore
 import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.IdeaEntity
@@ -18,11 +19,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val OWNER_TYPE = "IDEA"
+private const val DEFAULT_CURRENCY = "SEK"
 
 val IDEA_PRIORITIES = listOf("MUST_DO", "WOULD_LIKE", "MAYBE")
 val IDEA_PRIORITY_LABELS = mapOf("MUST_DO" to "Must do", "WOULD_LIKE" to "Would like", "MAYBE" to "Maybe")
@@ -33,14 +40,18 @@ data class IdeaEditState(
     val ideaId: String? = null,
     val sectionId: String? = null,
     val title: String = "",
-    val category: String = "",
+    val category: String? = null,
     val priority: String = "WOULD_LIKE",
     val weatherSuitability: String = "EITHER",
+    // No UI edits this any more (redundant with weatherSuitability, per
+    // user feedback) -- loaded from the existing Idea and resent unchanged
+    // on save so an old Idea's tags aren't silently wiped by an update that
+    // never meant to touch them.
     val weatherTags: List<String> = emptyList(),
-    val locationName: String = "",
     val locationAddress: String = "",
+    val locationMapLink: String = "",
     val estimatedExpenseAmount: String = "",
-    val estimatedExpenseCurrency: String = "",
+    val estimatedExpenseCurrency: String = DEFAULT_CURRENCY,
     val links: List<LinkFieldItem> = emptyList(),
     val tags: List<TagFieldItem> = emptyList(),
     val saving: Boolean = false,
@@ -56,6 +67,7 @@ class IdeaEditViewModel @Inject constructor(
     private val repository: IdeaRepository,
     private val linksTagsRepository: LinksTagsRepository,
     private val documentsRepository: DocumentsRepository,
+    private val categoryStore: IdeaCategoryStore,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val ideaId: String? = savedStateHandle.get<String>("ideaId")?.takeUnless { it == "new" }
@@ -63,11 +75,25 @@ class IdeaEditViewModel @Inject constructor(
     private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId))
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
 
-    /** Empty (and never populated) until the Idea actually exists -- Photos, like Links/Tags, are add-after-creation only. */
-    val photos: StateFlow<List<PhotoEntity>> = ideaId
-        ?.let { documentsRepository.observePhotosForOwner(OWNER_TYPE, it) }
-        ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        ?: MutableStateFlow(emptyList())
+    /** Every category any Idea on this Trip already uses, plus this device's own added-but-unused suggestions. */
+    val categoryOptions: StateFlow<List<String>> = combine(
+        repository.observeForTrip(tripId).map { ideas -> ideas.mapNotNull { it.category }.toSet() },
+        categoryStore.observe(tripId),
+    ) { used, stored -> (used + stored).sorted() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Reactive to the CURRENT idea id, not just the constructor-time one --
+     * creating an Idea keeps this same screen open (see [save]'s comment),
+     * so a StateFlow bound once to the original (null) id would never pick
+     * up the newly-created Idea's Photos, making "upload a cover photo"
+     * look broken immediately after creating one.
+     */
+    val photos: StateFlow<List<PhotoEntity>> = _state
+        .map { it.ideaId }
+        .distinctUntilChanged()
+        .flatMapLatest { id -> if (id != null) documentsRepository.observePhotosForOwner(OWNER_TYPE, id) else flowOf(emptyList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         // Links/Tags only ever load (and are only ever addable) once the
@@ -92,12 +118,12 @@ class IdeaEditViewModel @Inject constructor(
         _state.value = _state.value.copy(
             sectionId = existing.sectionId,
             title = existing.title,
-            category = existing.category.orEmpty(),
+            category = existing.category,
             priority = existing.priority,
             weatherSuitability = existing.weatherSuitability,
             weatherTags = existing.weatherTags,
-            locationName = existing.locationName.orEmpty(),
             locationAddress = existing.locationAddress.orEmpty(),
+            locationMapLink = existing.locationMapLink.orEmpty(),
             estimatedExpenseAmount = existing.estimatedExpenseAmount?.toString().orEmpty(),
             estimatedExpenseCurrency = existing.estimatedExpenseCurrency.orEmpty(),
         )
@@ -105,16 +131,22 @@ class IdeaEditViewModel @Inject constructor(
 
     fun onSectionChange(v: String?) { _state.value = _state.value.copy(sectionId = v) }
     fun onTitleChange(v: String) { _state.value = _state.value.copy(title = v) }
-    fun onCategoryChange(v: String) { _state.value = _state.value.copy(category = v) }
+    fun onCategoryChange(v: String?) { _state.value = _state.value.copy(category = v) }
     fun onPriorityChange(v: String) { _state.value = _state.value.copy(priority = v) }
     fun onWeatherSuitabilityChange(v: String) { _state.value = _state.value.copy(weatherSuitability = v) }
-    fun onLocationNameChange(v: String) { _state.value = _state.value.copy(locationName = v) }
     fun onLocationAddressChange(v: String) { _state.value = _state.value.copy(locationAddress = v) }
+    fun onLocationMapLinkChange(v: String) { _state.value = _state.value.copy(locationMapLink = v) }
     fun onExpenseAmountChange(v: String) { _state.value = _state.value.copy(estimatedExpenseAmount = v) }
     fun onExpenseCurrencyChange(v: String) { _state.value = _state.value.copy(estimatedExpenseCurrency = v) }
 
-    fun addWeatherTag(tag: String) { _state.value = _state.value.copy(weatherTags = _state.value.weatherTags + tag) }
-    fun removeWeatherTag(tag: String) { _state.value = _state.value.copy(weatherTags = _state.value.weatherTags - tag) }
+    fun addCategoryOption(category: String) {
+        viewModelScope.launch { categoryStore.add(tripId, category) }
+    }
+
+    fun removeCategoryOption(category: String) {
+        viewModelScope.launch { categoryStore.remove(tripId, category) }
+        if (_state.value.category == category) _state.value = _state.value.copy(category = null)
+    }
 
     fun addLink(url: String, label: String?) {
         val ownerId = _state.value.ideaId ?: return
@@ -177,12 +209,17 @@ class IdeaEditViewModel @Inject constructor(
         tripId = tripId,
         sectionId = current.sectionId,
         title = current.title.trim(),
-        category = current.category.trim().takeIf { it.isNotEmpty() },
+        category = current.category,
         priority = current.priority,
         weatherSuitability = current.weatherSuitability,
         weatherTags = current.weatherTags,
-        locationName = current.locationName.trim().takeIf { it.isNotEmpty() },
+        // locationName removed from the form (redundant with Title, per
+        // feedback) -- kept populated server-side from Title so anything
+        // that reads Idea.locationName (e.g. a future Maps-link fallback)
+        // still has a sensible value.
+        locationName = current.title.trim(),
         locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+        locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
         estimatedExpenseAmount = current.estimatedExpenseAmount.toDoubleOrNull(),
         estimatedExpenseCurrency = current.estimatedExpenseCurrency.trim().takeIf { it.isNotEmpty() },
     )
@@ -202,6 +239,10 @@ class IdeaEditViewModel @Inject constructor(
             runCatching {
                 if (current.ideaId == null) repository.create(toRequest(current)) else repository.update(current.ideaId, toRequest(current))
             }.onSuccess { result ->
+                // Deliberately NOT navigating away here (state.saved isn't
+                // watched by the screen) -- creating an Idea must stay on
+                // this screen so Photos/Tags/Links become reachable right
+                // away, same choice ChecklistEditScreen makes for items.
                 _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id)
             }.onFailure { e ->
                 _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Idea.")

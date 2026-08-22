@@ -40,7 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
-import com.trails.app.ui.components.ChipInputField
+import com.trails.app.ui.components.CreatableDropdownField
 import com.trails.app.ui.components.DropdownField
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
@@ -65,6 +65,7 @@ fun IdeaEditScreen(
     val ideas by ideasViewModel.ideas.collectAsState(initial = emptyList())
     val sections by sectionsViewModel.sections.collectAsState(initial = emptyList())
     val photos by viewModel.photos.collectAsState()
+    val categoryOptions by viewModel.categoryOptions.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showConvertConfirm by remember { mutableStateOf(false) }
@@ -90,7 +91,7 @@ fun IdeaEditScreen(
     ) {
         state.error?.let { ErrorBanner(it) }
 
-        LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
+        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
 
         val sectionOptions = listOf<String?>(null) + sections.map { it.id }
         DropdownField(
@@ -101,7 +102,14 @@ fun IdeaEditScreen(
             optionLabel = { id -> sections.find { it.id == id }?.let { "${it.emoji.orEmpty()} ${it.name}".trim() } ?: "No Section" },
         )
 
-        LabeledField(label = "Category (optional)", value = state.category, onValueChange = viewModel::onCategoryChange)
+        CreatableDropdownField(
+            label = "Category",
+            options = categoryOptions,
+            selected = state.category,
+            onSelected = viewModel::onCategoryChange,
+            onAddOption = viewModel::addCategoryOption,
+            onRemoveOption = viewModel::removeCategoryOption,
+        )
         DropdownField(
             label = "Priority",
             options = IDEA_PRIORITIES,
@@ -116,14 +124,8 @@ fun IdeaEditScreen(
             onSelected = viewModel::onWeatherSuitabilityChange,
             optionLabel = { IDEA_WEATHER_LABELS[it] ?: it },
         )
-        ChipInputField(
-            label = "Weather tags",
-            tags = state.weatherTags,
-            onRemove = viewModel::removeWeatherTag,
-            onAdd = viewModel::addWeatherTag,
-        )
-        LabeledField(label = "Location name", value = state.locationName, onValueChange = viewModel::onLocationNameChange)
         LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
+        LabeledField(label = "Google Maps link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LabeledField(
                 label = "Est. expense",

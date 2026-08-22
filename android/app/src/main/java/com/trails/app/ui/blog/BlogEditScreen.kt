@@ -1,15 +1,29 @@
 package com.trails.app.ui.blog
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,17 +33,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
 import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
-import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.theme.TrailsColors
+import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.util.queryDisplayName
+import java.io.File
 
 @Composable
 fun BlogEditScreen(
@@ -38,7 +59,13 @@ fun BlogEditScreen(
     viewModel: BlogEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val photosById by viewModel.photosById.collectAsState()
+    val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.insertImage(uri, queryDisplayName(context, uri))
+    }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
@@ -51,27 +78,85 @@ fun BlogEditScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
-
-        if (state.hasRichContent) {
+        if (state.lostFormattingWarning) {
             Text(
-                "This post has formatting or images from the web editor -- editing here would replace it with plain text, so the body is left blank. Title, date, and privacy can still be changed safely.",
+                "This post has formatting (headings, lists, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text and images are otherwise kept.",
                 color = TrailsColors.TextSoft,
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
 
-        LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
+        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
         DatePickerField(label = "Date", isoDate = state.startAt.take(10), onDateChange = { viewModel.onStartAtChange("${it}T00:00:00.000Z") })
         CheckboxRow(label = "Private (only visible to you)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
-        MultilineLabeledField(label = "Body (separate paragraphs with a blank line)", value = state.body, onValueChange = viewModel::onBodyChange, minLines = 8)
+
+        HorizontalDivider()
+
+        state.blocks.forEach { block ->
+            when (block) {
+                is EditableBlock.Paragraph -> Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                        OutlinedTextField(
+                            value = block.text,
+                            onValueChange = { viewModel.updateParagraph(block.id, it) },
+                            modifier = Modifier.weight(1f),
+                            minLines = 3,
+                            shape = TrailsShapes.Input,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = TrailsColors.BrandAccent,
+                                unfocusedBorderColor = TrailsColors.InputBorder,
+                                focusedContainerColor = TrailsColors.Surface,
+                                unfocusedContainerColor = TrailsColors.Surface,
+                            ),
+                        )
+                        IconButton(onClick = { viewModel.removeBlock(block.id) }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove paragraph")
+                        }
+                    }
+                    TextButton(onClick = { viewModel.addParagraphAfter(block.id) }) { Text("+ Paragraph") }
+                }
+                is EditableBlock.Image -> {
+                    val photo = photosById[block.photoId]
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (photo?.localPath != null) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                AsyncImage(
+                                    model = File(photo.localPath),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillWidth,
+                                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)),
+                                )
+                                IconButton(onClick = { viewModel.removeBlock(block.id) }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Remove image")
+                                }
+                            }
+                        } else {
+                            Surface(color = TrailsColors.SurfaceCool, shape = TrailsShapes.Input) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                                    Text("Uploading image…", color = TrailsColors.TextSoft)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage) {
+                Text(if (state.uploadingImage) "Uploading…" else "+ Add image")
+            }
+        }
+
+        HorizontalDivider()
 
         if (state.saving) {
             CircularProgressIndicator()
         } else {
-            PillButton(text = if (state.entryId == null) "Save Draft" else "Save changes", onClick = viewModel::save)
+            PillButton(text = "Save", onClick = viewModel::save)
             if (state.entryId != null) {
                 PillButton(text = "Publish", variant = PillButtonVariant.Outline, onClick = viewModel::publish)
-                HorizontalDivider()
                 PillButton(text = "Delete Post", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
             }
         }

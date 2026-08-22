@@ -111,7 +111,7 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                 }
             }
 
-            val hasMore = idea.category != null || idea.locationName != null || idea.weatherTags.isNotEmpty()
+            val hasMore = idea.category != null || idea.locationAddress != null || idea.locationMapLink != null || idea.weatherTags.isNotEmpty()
             if (hasMore) {
                 Text(
                     if (expanded) "Show less" else "Read more",
@@ -125,8 +125,17 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                     idea.category?.let {
                         Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
                     }
-                    idea.locationName?.let {
+                    idea.locationAddress?.let {
                         Text("📍 $it", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
+                    }
+                    idea.locationMapLink?.let { link ->
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        Text(
+                            "Open in Google Maps",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TrailsColors.BrandAccent,
+                            modifier = Modifier.padding(top = 4.dp).clickable { com.trails.app.util.openExternalUrl(context, link) },
+                        )
                     }
                     if (idea.weatherTags.isNotEmpty()) {
                         Row(modifier = Modifier.padding(top = 6.dp)) {
