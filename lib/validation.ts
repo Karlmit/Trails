@@ -257,6 +257,12 @@ export function hasEstimatedExpensePair(data: {
 
 const ideaFieldsShape = {
   title: z.string().trim().min(1, 'Title is required').max(200),
+  // Optional link to a Section (the one deliberate exception to AD-2 --
+  // see the Section/Idea Prisma model comments). The Route Handler, not
+  // this schema, checks the referenced Section actually belongs to the
+  // same Trip -- a cross-trip id is a 400 there, not a DB constraint
+  // violation.
+  sectionId: z.string().uuid('sectionId must be a valid UUID').optional().nullable(),
   category: z.string().trim().max(200).optional().nullable(),
   priority: z.enum(IDEA_PRIORITIES, {
     message: `priority must be one of: ${IDEA_PRIORITIES.join(', ')}`,

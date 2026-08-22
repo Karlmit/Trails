@@ -25,9 +25,15 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    include: { ideas: { orderBy: { createdAt: 'asc' } } },
+    include: {
+      ideas: { orderBy: { createdAt: 'asc' } },
+      sections: { orderBy: { startDate: 'asc' } },
+    },
   });
   if (!trip) notFound();
+
+  const sectionIndexById = new Map(trip.sections.map((section, index) => [section.id, index]));
+  const UNSECTIONED_INDEX = trip.sections.length;
 
   // spec-tags-links-photos: FR-15's "thumbnail in list views" -- one query
   // for every Idea's Cover Photo (if any), attached below by ownerId.
@@ -42,7 +48,14 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
     primaryPhotoId: primaryPhotoByIdeaId.get(idea.id) ?? null,
   }));
   const tagOptions = distinctWeatherTags(allIdeas);
-  const ideas = filterIdeas(allIdeas, { priority, weatherTag });
+  // Default sort: grouped by the Trip's own Section order, unsectioned
+  // Ideas last -- same "no-section-is-a-real-group, not scattered" choice
+  // the Android app's Ideas list makes (see its own IdeasScreen comment).
+  const ideas = filterIdeas(allIdeas, { priority, weatherTag }).slice().sort((a, b) => {
+    const aIndex = a.sectionId ? sectionIndexById.get(a.sectionId) ?? UNSECTIONED_INDEX : UNSECTIONED_INDEX;
+    const bIndex = b.sectionId ? sectionIndexById.get(b.sectionId) ?? UNSECTIONED_INDEX : UNSECTIONED_INDEX;
+    return aIndex - bIndex;
+  });
 
   return (
     <main className="page">
@@ -87,7 +100,7 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
       </form>
 
       <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
-        <IdeaForm tripId={tripId} />
+        <IdeaForm tripId={tripId} sections={trip.sections.map((s) => ({ id: s.id, name: s.name }))} />
       </div>
 
       {ideas.length === 0 ? (
@@ -99,7 +112,11 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
       ) : (
         <div className="stack">
           {ideas.map((idea) => (
-            <IdeaCard key={idea.id} idea={idea} />
+            <IdeaCard
+              key={idea.id}
+              idea={idea}
+              sections={trip.sections.map((s) => ({ id: s.id, name: s.name }))}
+            />
           ))}
         </div>
       )}

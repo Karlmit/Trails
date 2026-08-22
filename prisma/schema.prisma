@@ -117,9 +117,16 @@ model Section {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // No FK from anything else to Section (AD-2) — Trip -> Section is the
-  // only relation involving this model.
-  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  // AD-2 ("no FK from anything else to Section") governs TimelineEntry
+  // specifically -- its date-anchored rows compute Section membership from
+  // timezone-localized dates, never a stored pointer, to avoid a stored
+  // value drifting from the entry's own actual date. Idea rows carry no
+  // date at all, so that computed-membership approach has nothing to
+  // compute from; `ideas` below is a real, explicit, optional FK, the one
+  // deliberate exception to AD-2's literal statement. onDelete: SetNull so
+  // deleting a Section un-links its Ideas rather than deleting them.
+  trip  Trip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  ideas Idea[]
 
   @@index([tripId])
   @@map("sections")
@@ -153,6 +160,12 @@ enum WeatherSuitability {
 model Idea {
   id     String @id @default(uuid()) @db.Uuid
   tripId String @map("trip_id") @db.Uuid
+  // Optional -- see Section model's own comment for why this is the one
+  // deliberate exception to AD-2's "no FK from anything else to Section."
+  // Deliberately not required to belong to the same tripId at the DB
+  // level (no composite FK) -- the Route Handler checks that itself so the
+  // error is a clean 400 rather than a Postgres constraint violation.
+  sectionId String? @map("section_id") @db.Uuid
 
   title              String
   category           String?
@@ -184,9 +197,11 @@ model Idea {
 
   // Converting an Idea deletes it (FR-17) -- no stored link survives to a
   // TimelineEntry it became; Cascade here only covers Trip deletion.
-  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip    Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  section Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([tripId])
+  @@index([sectionId])
   @@map("ideas")
 }
 

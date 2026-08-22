@@ -6,7 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.TimelineEntryEntity
-import com.trails.app.network.dto.TimelineEntryRequest
+import com.trails.app.network.dto.ActivityEntryRequest
+import com.trails.app.network.dto.NoteEntryRequest
+import com.trails.app.network.dto.StayEntryRequest
+import com.trails.app.network.dto.TimelineEntryWriteRequest
+import com.trails.app.network.dto.TransportEntryRequest
 import com.trails.app.ui.components.LinkFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -219,34 +223,105 @@ class EntryEditViewModel @Inject constructor(
         else -> emptyMap()
     }
 
-    private fun toRequest(current: EntryEditState) = TimelineEntryRequest(
-        tripId = tripId,
-        entryType = current.entryType,
-        subtype = current.subtype.takeIf { current.entryType != "NOTE" && it.isNotBlank() },
-        title = if (current.entryType == "NOTE") current.title.trim() else current.locationName.trim(),
-        description = current.description.trim().takeIf { it.isNotEmpty() },
-        startAt = current.startAt,
-        endAt = current.endAt.takeIf { current.entryType != "NOTE" && it.isNotBlank() },
-        startTimezone = current.startTimezone.takeIf { current.entryType == "TRANSPORT" && it.isNotBlank() },
-        endTimezone = current.endTimezone.takeIf { current.entryType == "TRANSPORT" && it.isNotBlank() },
-        locationName = current.locationName.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        locationAddress = current.locationAddress.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        locationMapLink = current.locationMapLink.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        bookingReference = current.bookingReference.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        website = current.website.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        bookedVia = current.bookedVia.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        expenseAmount = current.expenseAmount.toDoubleOrNull().takeIf { current.entryType != "NOTE" },
-        expenseCurrency = current.expenseCurrency.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        expensePaymentNote = current.expensePaymentNote.trim().takeIf { current.entryType != "NOTE" && it.isNotEmpty() },
-        contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
-        contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
-        contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
-        notes = current.notes.trim().takeIf { it.isNotEmpty() },
-        postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
-        typeDetails = typeDetailsFor(current),
-        isPrivate = current.isPrivate,
-    )
+    private fun toRequest(current: EntryEditState): TimelineEntryWriteRequest = when (current.entryType) {
+        "NOTE" -> TimelineEntryWriteRequest.Note(
+            NoteEntryRequest(
+                tripId = tripId,
+                title = current.title.trim(),
+                description = current.description.trim().takeIf { it.isNotEmpty() },
+                startAt = current.startAt,
+                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
+                isPrivate = current.isPrivate,
+            ),
+        )
+        "STAY" -> TimelineEntryWriteRequest.Stay(
+            StayEntryRequest(
+                tripId = tripId,
+                subtype = current.subtype,
+                title = current.locationName.trim(),
+                description = current.description.trim().takeIf { it.isNotEmpty() },
+                startAt = current.startAt,
+                endAt = current.endAt,
+                locationName = current.locationName.trim(),
+                locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+                locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+                bookingReference = current.bookingReference.trim().takeIf { it.isNotEmpty() },
+                website = current.website.trim().takeIf { it.isNotEmpty() },
+                bookedVia = current.bookedVia.trim().takeIf { it.isNotEmpty() },
+                expenseAmount = current.expenseAmount.toDoubleOrNull(),
+                expenseCurrency = current.expenseCurrency.trim().takeIf { it.isNotEmpty() },
+                expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { it.isNotEmpty() },
+                expensePaymentNote = current.expensePaymentNote.trim().takeIf { it.isNotEmpty() },
+                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
+                isPrivate = current.isPrivate,
+                typeDetails = typeDetailsFor(current),
+            ),
+        )
+        "TRANSPORT" -> TimelineEntryWriteRequest.Transport(
+            TransportEntryRequest(
+                tripId = tripId,
+                subtype = current.subtype,
+                title = current.locationName.trim(),
+                description = current.description.trim().takeIf { it.isNotEmpty() },
+                startAt = current.startAt,
+                endAt = current.endAt,
+                startTimezone = current.startTimezone.trim().takeIf { it.isNotEmpty() },
+                endTimezone = current.endTimezone.trim().takeIf { it.isNotEmpty() },
+                locationName = current.locationName.trim(),
+                locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+                locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+                bookingReference = current.bookingReference.trim().takeIf { it.isNotEmpty() },
+                website = current.website.trim().takeIf { it.isNotEmpty() },
+                bookedVia = current.bookedVia.trim().takeIf { it.isNotEmpty() },
+                expenseAmount = current.expenseAmount.toDoubleOrNull(),
+                expenseCurrency = current.expenseCurrency.trim().takeIf { it.isNotEmpty() },
+                expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { it.isNotEmpty() },
+                expensePaymentNote = current.expensePaymentNote.trim().takeIf { it.isNotEmpty() },
+                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
+                isPrivate = current.isPrivate,
+                typeDetails = typeDetailsFor(current),
+            ),
+        )
+        else -> TimelineEntryWriteRequest.Activity(
+            ActivityEntryRequest(
+                tripId = tripId,
+                subtype = current.subtype,
+                title = current.locationName.trim(),
+                description = current.description.trim().takeIf { it.isNotEmpty() },
+                startAt = current.startAt,
+                endAt = current.endAt.takeIf { it.isNotBlank() },
+                locationName = current.locationName.trim(),
+                locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+                locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+                bookingReference = current.bookingReference.trim().takeIf { it.isNotEmpty() },
+                website = current.website.trim().takeIf { it.isNotEmpty() },
+                bookedVia = current.bookedVia.trim().takeIf { it.isNotEmpty() },
+                expenseAmount = current.expenseAmount.toDoubleOrNull(),
+                expenseCurrency = current.expenseCurrency.trim().takeIf { it.isNotEmpty() },
+                expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { it.isNotEmpty() },
+                expensePaymentNote = current.expensePaymentNote.trim().takeIf { it.isNotEmpty() },
+                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
+                isPrivate = current.isPrivate,
+                typeDetails = typeDetailsFor(current),
+            ),
+        )
+    }
 
     fun save() {
         val current = _state.value
@@ -257,6 +332,10 @@ class EntryEditViewModel @Inject constructor(
         }
         if (current.entryType != "NOTE" && current.entryType != "ACTIVITY" && current.endAt.isBlank()) {
             _state.value = current.copy(error = "An end date & time is required for ${current.entryType}.")
+            return
+        }
+        if (current.entryType != "NOTE" && current.expenseAmount.isNotBlank() != current.expenseCurrency.isNotBlank()) {
+            _state.value = current.copy(error = "Expense requires both an amount and a currency, or neither.")
             return
         }
         _state.value = current.copy(saving = true, error = null)

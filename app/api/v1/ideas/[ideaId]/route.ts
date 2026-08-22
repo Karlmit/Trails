@@ -59,10 +59,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return Errors.validation('Estimated expense requires both an amount and a currency');
   }
 
+  if (parsed.sectionId) {
+    const section = await prisma.section.findUnique({ where: { id: parsed.sectionId } });
+    if (!section || section.tripId !== existing.tripId) {
+      return Errors.validation('sectionId must reference a Section on this Trip');
+    }
+  }
+
   try {
     const idea = await prisma.idea.update({
       where: { id: ideaId },
       data: {
+        ...(parsed.sectionId !== undefined && { sectionId: parsed.sectionId }),
         ...(parsed.title !== undefined && { title: parsed.title }),
         ...(parsed.category !== undefined && { category: parsed.category }),
         ...(parsed.priority !== undefined && { priority: parsed.priority }),

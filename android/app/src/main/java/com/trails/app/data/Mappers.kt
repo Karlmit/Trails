@@ -124,6 +124,7 @@ fun ImportantInfoDto.toEntity() = ImportantInfoEntity(
 fun IdeaDto.toEntity() = IdeaEntity(
     id = id,
     tripId = tripId,
+    sectionId = sectionId,
     title = title,
     category = category,
     priority = priority,

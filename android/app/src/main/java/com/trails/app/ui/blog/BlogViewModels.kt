@@ -11,8 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class BlogListItem(val entry: TimelineEntryEntity, val excerpt: String)
@@ -45,10 +47,11 @@ data class BlogDetailUiState(
 @HiltViewModel
 class BlogDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    timelineRepository: TimelineRepository,
-    documentsRepository: DocumentsRepository,
+    private val timelineRepository: TimelineRepository,
+    private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
+    private val tripId: String? = savedStateHandle["tripId"]
 
     val uiState: StateFlow<BlogDetailUiState> = combine(
         timelineRepository.observeEntry(entryId),
@@ -60,4 +63,32 @@ class BlogDetailViewModel @Inject constructor(
             photosById = photos.associateBy { it.id },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BlogDetailUiState())
+
+    init {
+        // A blog image's Photo can be missing here for two different reasons --
+        // its metadata was never synced at all (this trip's last full sync
+        // predates the image being added/uploaded), or the metadata synced but
+        // the bytes download failed. Cover both: re-sync Photo metadata for the
+        // whole trip once if any referenced photoId isn't known locally yet
+        // (cheap -- Photo rows only, no file bytes), then always try to
+        // download bytes for whatever's referenced and still missing a
+        // localPath. Runs once per distinct set of missing ids, not on every
+        // recomposition.
+        viewModelScope.launch {
+            var resyncedMetadata = false
+            uiState.distinctUntilChanged { old, new -> old.blocks == new.blocks && old.photosById.keys == new.photosById.keys }
+                .collect { state ->
+                    val referencedIds = state.blocks.filterIsInstance<BlogBlock.ImageBlock>().map { it.photoId }.toSet()
+                    if (referencedIds.isEmpty()) return@collect
+                    val knownIds = state.photosById.keys
+                    if (!resyncedMetadata && (referencedIds - knownIds).isNotEmpty() && tripId != null) {
+                        resyncedMetadata = true
+                        runCatching { documentsRepository.syncTrip(tripId) }
+                    }
+                    referencedIds.mapNotNull { state.photosById[it] }
+                        .filter { it.localPath == null }
+                        .forEach { photo -> runCatching { documentsRepository.ensurePhotoCached(photo) } }
+                }
+        }
+    }
 }

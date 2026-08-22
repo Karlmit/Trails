@@ -4,10 +4,11 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "ideas", indices = [Index("tripId")])
+@Entity(tableName = "ideas", indices = [Index("tripId"), Index("sectionId")])
 data class IdeaEntity(
     @PrimaryKey val id: String,
     val tripId: String,
+    val sectionId: String?,
     val title: String,
     val category: String?,
     val priority: String,

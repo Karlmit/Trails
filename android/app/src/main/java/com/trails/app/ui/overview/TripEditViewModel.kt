@@ -23,6 +23,7 @@ data class TripEditState(
     val endDate: String = "",
     val timezone: String = ZoneId.systemDefault().id,
     val description: String = "",
+    val visibility: String = "PRIVATE",
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -56,6 +57,7 @@ class TripEditViewModel @Inject constructor(
             endDate = existing.endDate,
             timezone = existing.timezone,
             description = existing.description.orEmpty(),
+            visibility = existing.visibility,
         )
     }
 
@@ -85,6 +87,7 @@ class TripEditViewModel @Inject constructor(
                 endDate = current.endDate,
                 timezone = current.timezone,
                 description = current.description.trim().takeIf { it.isNotEmpty() },
+                visibility = current.visibility,
             )
             runCatching {
                 if (current.tripId == null) repository.createTrip(request) else repository.updateTrip(current.tripId, request)

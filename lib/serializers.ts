@@ -108,6 +108,7 @@ export function serializeIdea(idea: Idea) {
   return {
     id: idea.id,
     tripId: idea.tripId,
+    sectionId: idea.sectionId,
     title: idea.title,
     category: idea.category,
     priority: idea.priority,

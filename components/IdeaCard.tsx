@@ -18,6 +18,7 @@ const PRIORITY_BADGE_CLASS: Record<string, string> = {
 export interface IdeaDTO {
   id: string;
   tripId: string;
+  sectionId?: string | null;
   title: string;
   category: string | null;
   priority: string;
@@ -39,10 +40,32 @@ export interface IdeaDTO {
 // (same fetch+confirm+router.refresh pattern as SectionManager's per-item
 // delete) and the "Convert to Entry" entry point into
 // /trips/[tripId]/ideas/[ideaId]/convert.
-export function IdeaCard({ idea }: { idea: IdeaDTO }) {
+export function IdeaCard({ idea, sections }: { idea: IdeaDTO; sections: { id: string; name: string }[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function handleSectionChange(nextSectionId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/v1/ideas/${idea.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionId: nextSectionId || null }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error?.message ?? 'Could not update this Idea.');
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleDelete() {
     if (!confirm(`Delete "${idea.title}"? This cannot be undone.`)) return;
@@ -93,6 +116,23 @@ export function IdeaCard({ idea }: { idea: IdeaDTO }) {
         <span className="text-soft">
           {WEATHER_SUITABILITY_LABELS[idea.weatherSuitability] ?? idea.weatherSuitability}
         </span>
+      </div>
+
+      <div className="field" style={{ marginBottom: 0 }}>
+        <label htmlFor={`idea-section-${idea.id}`}>Section</label>
+        <select
+          id={`idea-section-${idea.id}`}
+          value={idea.sectionId ?? ''}
+          onChange={(e) => handleSectionChange(e.target.value)}
+          disabled={busy}
+        >
+          <option value="">No Section</option>
+          {sections.map((section) => (
+            <option key={section.id} value={section.id}>
+              {section.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {(idea.locationName || idea.locationAddress) && (

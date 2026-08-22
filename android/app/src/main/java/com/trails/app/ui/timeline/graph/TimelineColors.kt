@@ -27,6 +27,19 @@ private val CUSTOM_SWATCHES = listOf(
     CustomSwatch("#5f6b75", Color(0xFF5F6B75), 0.16f),
 )
 
+/** The exact curated set lib/section-colors.ts's SECTION_COLOR_VALUES allows -- lib/validation.ts rejects anything else on create/update. */
+val SECTION_COLOR_OPTIONS: List<String> = CUSTOM_SWATCHES.map { it.value }
+
+fun sectionSwatchColor(value: String): Color = CUSTOM_SWATCHES.find { it.value == value }?.solid ?: Color.Gray
+
+// lib/section-colors.ts's SECTION_EMOJI_OPTIONS -- curated, not free text; lib/validation.ts rejects anything else.
+val SECTION_EMOJI_OPTIONS: List<String> = listOf(
+    "✈️", "🏖️", "🏔️", "🏙️", "🚗", "🚢", "⛺", "🎉",
+    "📍", "🗺️", "🍜", "🥾", "🏛️", "🌴", "❄️", "🏝️",
+    "🚆", "🚌", "🛶", "🎿", "🏕️", "🛥️", "🚁", "🧳",
+    "🍽️", "🌅", "🎭", "🛍️",
+)
+
 fun sectionSolidColor(index: Int, customColor: String?): Color {
     if (customColor != null) {
         CUSTOM_SWATCHES.find { it.value == customColor }?.let { return it.solid }

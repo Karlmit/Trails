@@ -61,10 +61,18 @@ export async function POST(request: NextRequest) {
   const trip = await prisma.trip.findUnique({ where: { id: parsed.tripId } });
   if (!trip) return Errors.notFound('Trip not found');
 
+  if (parsed.sectionId) {
+    const section = await prisma.section.findUnique({ where: { id: parsed.sectionId } });
+    if (!section || section.tripId !== parsed.tripId) {
+      return Errors.validation('sectionId must reference a Section on this Trip');
+    }
+  }
+
   try {
     const idea = await prisma.idea.create({
       data: {
         tripId: parsed.tripId,
+        sectionId: parsed.sectionId ?? null,
         title: parsed.title,
         category: parsed.category ?? null,
         priority: parsed.priority,

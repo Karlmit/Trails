@@ -1,5 +1,6 @@
 package com.trails.app.network
 
+import com.trails.app.network.dto.ActivityEntryRequest
 import com.trails.app.network.dto.AttachmentDto
 import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.ChecklistDto
@@ -7,21 +8,26 @@ import com.trails.app.network.dto.ChecklistItemDto
 import com.trails.app.network.dto.ChecklistItemPatchRequest
 import com.trails.app.network.dto.ChecklistItemRequest
 import com.trails.app.network.dto.ChecklistRequest
+import com.trails.app.network.dto.ChecklistUpdateRequest
 import com.trails.app.network.dto.IdeaDto
 import com.trails.app.network.dto.IdeaRequest
+import com.trails.app.network.dto.IdeaUpdateRequest
 import com.trails.app.network.dto.ImportantInfoDto
 import com.trails.app.network.dto.ImportantInfoRequest
+import com.trails.app.network.dto.ImportantInfoUpdateRequest
 import com.trails.app.network.dto.LinkDto
 import com.trails.app.network.dto.LinkRequest
 import com.trails.app.network.dto.LoginRequest
 import com.trails.app.network.dto.LoginResponse
+import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.PhotoDto
 import com.trails.app.network.dto.SectionDto
 import com.trails.app.network.dto.SectionRequest
+import com.trails.app.network.dto.StayEntryRequest
 import com.trails.app.network.dto.TagDto
 import com.trails.app.network.dto.TagRequest
 import com.trails.app.network.dto.TimelineEntryDto
-import com.trails.app.network.dto.TimelineEntryRequest
+import com.trails.app.network.dto.TransportEntryRequest
 import com.trails.app.network.dto.TripDto
 import com.trails.app.network.dto.TripRequest
 import okhttp3.MultipartBody
@@ -81,10 +87,28 @@ interface TrailsApiService {
     suspend fun listTimelineEntries(@Query("tripId") tripId: String): List<TimelineEntryDto>
 
     @POST("api/v1/timeline-entries")
-    suspend fun createTimelineEntry(@Body body: TimelineEntryRequest): TimelineEntryDto
+    suspend fun createNoteEntry(@Body body: NoteEntryRequest): TimelineEntryDto
 
     @PATCH("api/v1/timeline-entries/{id}")
-    suspend fun updateTimelineEntry(@Path("id") id: String, @Body body: TimelineEntryRequest): TimelineEntryDto
+    suspend fun updateNoteEntry(@Path("id") id: String, @Body body: NoteEntryRequest): TimelineEntryDto
+
+    @POST("api/v1/timeline-entries")
+    suspend fun createStayEntry(@Body body: StayEntryRequest): TimelineEntryDto
+
+    @PATCH("api/v1/timeline-entries/{id}")
+    suspend fun updateStayEntry(@Path("id") id: String, @Body body: StayEntryRequest): TimelineEntryDto
+
+    @POST("api/v1/timeline-entries")
+    suspend fun createTransportEntry(@Body body: TransportEntryRequest): TimelineEntryDto
+
+    @PATCH("api/v1/timeline-entries/{id}")
+    suspend fun updateTransportEntry(@Path("id") id: String, @Body body: TransportEntryRequest): TimelineEntryDto
+
+    @POST("api/v1/timeline-entries")
+    suspend fun createActivityEntry(@Body body: ActivityEntryRequest): TimelineEntryDto
+
+    @PATCH("api/v1/timeline-entries/{id}")
+    suspend fun updateActivityEntry(@Path("id") id: String, @Body body: ActivityEntryRequest): TimelineEntryDto
 
     @DELETE("api/v1/timeline-entries/{id}")
     suspend fun deleteTimelineEntry(@Path("id") id: String): Response<ResponseBody>
@@ -108,7 +132,7 @@ interface TrailsApiService {
     suspend fun createChecklist(@Body body: ChecklistRequest): ChecklistDto
 
     @PATCH("api/v1/checklists/{id}")
-    suspend fun updateChecklist(@Path("id") id: String, @Body body: ChecklistRequest): ChecklistDto
+    suspend fun updateChecklist(@Path("id") id: String, @Body body: ChecklistUpdateRequest): ChecklistDto
 
     @DELETE("api/v1/checklists/{id}")
     suspend fun deleteChecklist(@Path("id") id: String): Response<ResponseBody>
@@ -129,7 +153,7 @@ interface TrailsApiService {
     suspend fun createImportantInfo(@Body body: ImportantInfoRequest): ImportantInfoDto
 
     @PATCH("api/v1/important-info/{id}")
-    suspend fun updateImportantInfo(@Path("id") id: String, @Body body: ImportantInfoRequest): ImportantInfoDto
+    suspend fun updateImportantInfo(@Path("id") id: String, @Body body: ImportantInfoUpdateRequest): ImportantInfoDto
 
     @DELETE("api/v1/important-info/{id}")
     suspend fun deleteImportantInfo(@Path("id") id: String): Response<ResponseBody>
@@ -141,7 +165,7 @@ interface TrailsApiService {
     suspend fun createIdea(@Body body: IdeaRequest): IdeaDto
 
     @PATCH("api/v1/ideas/{id}")
-    suspend fun updateIdea(@Path("id") id: String, @Body body: IdeaRequest): IdeaDto
+    suspend fun updateIdea(@Path("id") id: String, @Body body: IdeaUpdateRequest): IdeaDto
 
     @DELETE("api/v1/ideas/{id}")
     suspend fun deleteIdea(@Path("id") id: String): Response<ResponseBody>

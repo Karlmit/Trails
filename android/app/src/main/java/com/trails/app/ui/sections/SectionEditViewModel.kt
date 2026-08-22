@@ -18,7 +18,8 @@ data class SectionEditState(
     val name: String = "",
     val startDate: String = "",
     val endDate: String = "",
-    val emoji: String = "",
+    val emoji: String? = null,
+    val color: String? = null,
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -43,14 +44,17 @@ class SectionEditViewModel @Inject constructor(
             name = existing.name,
             startDate = existing.startDate,
             endDate = existing.endDate,
-            emoji = existing.emoji.orEmpty(),
+            emoji = existing.emoji,
+            color = existing.color,
         )
     }
 
     fun onNameChange(value: String) { _state.value = _state.value.copy(name = value) }
     fun onStartDateChange(value: String) { _state.value = _state.value.copy(startDate = value) }
     fun onEndDateChange(value: String) { _state.value = _state.value.copy(endDate = value) }
-    fun onEmojiChange(value: String) { _state.value = _state.value.copy(emoji = value) }
+    /** Toggles: tapping the already-selected emoji/color clears it back to the auto-cycled fallback. */
+    fun onEmojiToggle(value: String) { _state.value = _state.value.copy(emoji = if (_state.value.emoji == value) null else value) }
+    fun onColorToggle(value: String) { _state.value = _state.value.copy(color = if (_state.value.color == value) null else value) }
 
     fun save() {
         val current = _state.value
@@ -65,7 +69,8 @@ class SectionEditViewModel @Inject constructor(
                 name = current.name.trim(),
                 startDate = current.startDate,
                 endDate = current.endDate,
-                emoji = current.emoji.trim().takeIf { it.isNotEmpty() },
+                emoji = current.emoji,
+                color = current.color,
             )
             runCatching {
                 if (current.sectionId == null) timelineRepository.createSection(request)

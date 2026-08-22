@@ -7,7 +7,7 @@ import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.SectionRequest
-import com.trails.app.network.dto.TimelineEntryRequest
+import com.trails.app.network.dto.TimelineEntryWriteRequest
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -67,15 +67,25 @@ class TimelineRepository @Inject constructor(
         sectionDao.deleteById(sectionId)
     }
 
-    suspend fun createTimelineEntry(request: TimelineEntryRequest): TimelineEntryEntity {
-        val created = api.createTimelineEntry(request)
+    suspend fun createTimelineEntry(request: TimelineEntryWriteRequest): TimelineEntryEntity {
+        val created = when (request) {
+            is TimelineEntryWriteRequest.Note -> api.createNoteEntry(request.body)
+            is TimelineEntryWriteRequest.Stay -> api.createStayEntry(request.body)
+            is TimelineEntryWriteRequest.Transport -> api.createTransportEntry(request.body)
+            is TimelineEntryWriteRequest.Activity -> api.createActivityEntry(request.body)
+        }
         val entity = created.toEntity()
         timelineEntryDao.upsertAll(listOf(entity))
         return entity
     }
 
-    suspend fun updateTimelineEntry(entryId: String, request: TimelineEntryRequest): TimelineEntryEntity {
-        val updated = api.updateTimelineEntry(entryId, request)
+    suspend fun updateTimelineEntry(entryId: String, request: TimelineEntryWriteRequest): TimelineEntryEntity {
+        val updated = when (request) {
+            is TimelineEntryWriteRequest.Note -> api.updateNoteEntry(entryId, request.body)
+            is TimelineEntryWriteRequest.Stay -> api.updateStayEntry(entryId, request.body)
+            is TimelineEntryWriteRequest.Transport -> api.updateTransportEntry(entryId, request.body)
+            is TimelineEntryWriteRequest.Activity -> api.updateActivityEntry(entryId, request.body)
+        }
         val entity = updated.toEntity()
         timelineEntryDao.upsertAll(listOf(entity))
         return entity

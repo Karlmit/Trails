@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { commitStagedLinks, LinkStagingList, type StagedLink } from '@/components/LinkStagingList';
 
 const PRIORITIES = [
   { value: 'MUST_DO', label: 'Must do' },
@@ -19,10 +18,18 @@ const WEATHER_SUITABILITIES = [
 // FR-16, spec-ideas: create an Idea. Same toggle-open inline-form pattern as
 // SectionManager (open a `.card` form, POST, close + router.refresh on
 // success) -- no new UI pattern introduced for the create step itself.
-export function IdeaForm({ tripId }: { tripId: string }) {
+//
+// Tags and Links are deliberately NOT offered here -- user-reported: "Not
+// possible to add Tags and Links when not editing Idea." Both are only
+// addable from IdeaCard once the Idea actually exists (TagList/LinkList
+// there), unlike Entry/Idea's other create forms which stage Links before
+// the first save. A previous version of this form did stage Links the same
+// way; that staging was removed specifically for Ideas per that feedback.
+export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id: string; name: string }[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [sectionId, setSectionId] = useState('');
   const [category, setCategory] = useState('');
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]['value']>('WOULD_LIKE');
   const [weatherSuitability, setWeatherSuitability] =
@@ -33,13 +40,12 @@ export function IdeaForm({ tripId }: { tripId: string }) {
   const [locationMapLink, setLocationMapLink] = useState('');
   const [estimatedExpenseAmount, setEstimatedExpenseAmount] = useState('');
   const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState('');
-  const [stagedLinks, setStagedLinks] = useState<StagedLink[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
-    setStagedLinks([]);
     setTitle('');
+    setSectionId('');
     setCategory('');
     setPriority('WOULD_LIKE');
     setWeatherSuitability('EITHER');
@@ -59,6 +65,7 @@ export function IdeaForm({ tripId }: { tripId: string }) {
     const body: Record<string, unknown> = {
       tripId,
       title,
+      sectionId: sectionId || null,
       category: category || null,
       priority,
       weatherSuitability,
@@ -89,10 +96,6 @@ export function IdeaForm({ tripId }: { tripId: string }) {
       if (!response.ok) {
         setError(responseBody?.error?.message ?? 'Could not create this Idea.');
         return;
-      }
-
-      if (stagedLinks.length > 0) {
-        await commitStagedLinks('IDEA', responseBody.id, stagedLinks);
       }
 
       reset();
@@ -126,6 +129,18 @@ export function IdeaForm({ tripId }: { tripId: string }) {
           maxLength={200}
           required
         />
+      </div>
+
+      <div className="field">
+        <label htmlFor="idea-section">Section</label>
+        <select id="idea-section" value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+          <option value="">No Section</option>
+          {sections.map((section) => (
+            <option key={section.id} value={section.id}>
+              {section.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="field">
@@ -221,8 +236,6 @@ export function IdeaForm({ tripId }: { tripId: string }) {
           />
         </div>
       </div>
-
-      <LinkStagingList links={stagedLinks} onChange={setStagedLinks} />
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>

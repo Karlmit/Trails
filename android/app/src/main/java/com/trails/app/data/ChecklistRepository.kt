@@ -8,6 +8,7 @@ import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.ChecklistItemPatchRequest
 import com.trails.app.network.dto.ChecklistItemRequest
 import com.trails.app.network.dto.ChecklistRequest
+import com.trails.app.network.dto.ChecklistUpdateRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -61,7 +62,9 @@ class ChecklistRepository @Inject constructor(
     }
 
     suspend fun updateChecklist(checklistId: String, request: ChecklistRequest): ChecklistEntity {
-        val updated = api.updateChecklist(checklistId, request)
+        // checklistUpdateSchema is `.strict()` server-side and has no `tripId` key --
+        // sending the full create-shaped request body would 400.
+        val updated = api.updateChecklist(checklistId, ChecklistUpdateRequest(request.title, request.description))
         val entity = updated.toEntity()
         checklistDao.upsertAll(listOf(entity))
         return entity

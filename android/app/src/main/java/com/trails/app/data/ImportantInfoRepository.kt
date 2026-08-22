@@ -4,6 +4,7 @@ import com.trails.app.data.dao.ImportantInfoDao
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.ImportantInfoRequest
+import com.trails.app.network.dto.ImportantInfoUpdateRequest
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,7 +34,22 @@ class ImportantInfoRepository @Inject constructor(
     }
 
     suspend fun update(itemId: String, request: ImportantInfoRequest): ImportantInfoEntity {
-        val updated = api.updateImportantInfo(itemId, request)
+        // importantInfoUpdateSchema is `.strict()` server-side and has no `tripId`
+        // key -- sending the full create-shaped request body would 400.
+        val updateBody = ImportantInfoUpdateRequest(
+            title = request.title,
+            content = request.content,
+            locationName = request.locationName,
+            locationAddress = request.locationAddress,
+            locationLat = request.locationLat,
+            locationLng = request.locationLng,
+            locationMapLink = request.locationMapLink,
+            contactName = request.contactName,
+            contactPhone = request.contactPhone,
+            contactEmail = request.contactEmail,
+            isPrivate = request.isPrivate,
+        )
+        val updated = api.updateImportantInfo(itemId, updateBody)
         val entity = updated.toEntity()
         dao.upsertAll(listOf(entity))
         return entity

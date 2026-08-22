@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class IdeaDto(
     val id: String,
     val tripId: String,
+    val sectionId: String? = null,
     val title: String,
     val category: String? = null,
     val priority: String,

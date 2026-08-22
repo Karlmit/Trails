@@ -1,18 +1,24 @@
 package com.trails.app.ui.ideas
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.IdeaEntity
+import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.weatherTags
 import com.trails.app.network.dto.IdeaRequest
 import com.trails.app.ui.components.LinkFieldItem
+import com.trails.app.ui.components.TagFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,6 +31,7 @@ val IDEA_WEATHER_LABELS = mapOf("INDOOR" to "Indoor", "OUTDOOR" to "Outdoor", "E
 
 data class IdeaEditState(
     val ideaId: String? = null,
+    val sectionId: String? = null,
     val title: String = "",
     val category: String = "",
     val priority: String = "WOULD_LIKE",
@@ -35,6 +42,7 @@ data class IdeaEditState(
     val estimatedExpenseAmount: String = "",
     val estimatedExpenseCurrency: String = "",
     val links: List<LinkFieldItem> = emptyList(),
+    val tags: List<TagFieldItem> = emptyList(),
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -47,6 +55,7 @@ class IdeaEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: IdeaRepository,
     private val linksTagsRepository: LinksTagsRepository,
+    private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val ideaId: String? = savedStateHandle.get<String>("ideaId")?.takeUnless { it == "new" }
@@ -54,11 +63,25 @@ class IdeaEditViewModel @Inject constructor(
     private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId))
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
 
+    /** Empty (and never populated) until the Idea actually exists -- Photos, like Links/Tags, are add-after-creation only. */
+    val photos: StateFlow<List<PhotoEntity>> = ideaId
+        ?.let { documentsRepository.observePhotosForOwner(OWNER_TYPE, it) }
+        ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        ?: MutableStateFlow(emptyList())
+
     init {
+        // Links/Tags only ever load (and are only ever addable) once the
+        // Idea exists -- user-reported: "Not possible to add Tags and Links
+        // when not editing Idea." Unlike Entry/Idea's other resources, there
+        // is deliberately no staging-before-creation path here.
         ideaId?.let { ownerId ->
             viewModelScope.launch {
                 runCatching { linksTagsRepository.listLinks(OWNER_TYPE, ownerId) }
                     .onSuccess { links -> _state.value = _state.value.copy(links = links.map { LinkFieldItem(it.id, it.url, it.label) }) }
+            }
+            viewModelScope.launch {
+                runCatching { linksTagsRepository.listTags(OWNER_TYPE, ownerId) }
+                    .onSuccess { tags -> _state.value = _state.value.copy(tags = tags.map { TagFieldItem(it.id, it.text) }) }
             }
         }
     }
@@ -67,6 +90,7 @@ class IdeaEditViewModel @Inject constructor(
         val existing = ideas.find { it.id == ideaId } ?: return
         if (_state.value.title.isNotEmpty()) return
         _state.value = _state.value.copy(
+            sectionId = existing.sectionId,
             title = existing.title,
             category = existing.category.orEmpty(),
             priority = existing.priority,
@@ -79,6 +103,7 @@ class IdeaEditViewModel @Inject constructor(
         )
     }
 
+    fun onSectionChange(v: String?) { _state.value = _state.value.copy(sectionId = v) }
     fun onTitleChange(v: String) { _state.value = _state.value.copy(title = v) }
     fun onCategoryChange(v: String) { _state.value = _state.value.copy(category = v) }
     fun onPriorityChange(v: String) { _state.value = _state.value.copy(priority = v) }
@@ -92,11 +117,7 @@ class IdeaEditViewModel @Inject constructor(
     fun removeWeatherTag(tag: String) { _state.value = _state.value.copy(weatherTags = _state.value.weatherTags - tag) }
 
     fun addLink(url: String, label: String?) {
-        val ownerId = _state.value.ideaId
-        if (ownerId == null) {
-            _state.value = _state.value.copy(links = _state.value.links + LinkFieldItem(null, url, label))
-            return
-        }
+        val ownerId = _state.value.ideaId ?: return
         viewModelScope.launch {
             runCatching { linksTagsRepository.createLink(OWNER_TYPE, ownerId, url, label) }
                 .onSuccess { created -> _state.value = _state.value.copy(links = _state.value.links + LinkFieldItem(created.id, created.url, created.label)) }
@@ -105,19 +126,56 @@ class IdeaEditViewModel @Inject constructor(
     }
 
     fun removeLink(link: LinkFieldItem) {
-        if (link.id == null) {
-            _state.value = _state.value.copy(links = _state.value.links - link)
-            return
-        }
+        val id = link.id ?: return
         viewModelScope.launch {
-            runCatching { linksTagsRepository.deleteLink(link.id) }
-                .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == link.id }) }
+            runCatching { linksTagsRepository.deleteLink(id) }
+                .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == id }) }
                 .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove link.") }
+        }
+    }
+
+    fun addTag(text: String) {
+        val ownerId = _state.value.ideaId ?: return
+        viewModelScope.launch {
+            runCatching { linksTagsRepository.createTag(OWNER_TYPE, ownerId, text) }
+                .onSuccess { created -> _state.value = _state.value.copy(tags = _state.value.tags + TagFieldItem(created.id, created.text)) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add tag.") }
+        }
+    }
+
+    fun removeTag(tag: TagFieldItem) {
+        viewModelScope.launch {
+            runCatching { linksTagsRepository.deleteTag(tag.id) }
+                .onSuccess { _state.value = _state.value.copy(tags = _state.value.tags.filterNot { it.id == tag.id }) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove tag.") }
+        }
+    }
+
+    fun uploadPhoto(uri: Uri, filename: String) {
+        val ownerId = _state.value.ideaId ?: return
+        viewModelScope.launch {
+            runCatching { documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to upload photo.") }
+        }
+    }
+
+    fun deletePhoto(photoId: String) {
+        viewModelScope.launch {
+            runCatching { documentsRepository.deletePhoto(photoId) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to delete photo.") }
+        }
+    }
+
+    fun markPhotoPrimary(photoId: String) {
+        viewModelScope.launch {
+            runCatching { documentsRepository.markPhotoPrimary(photoId) }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to set cover photo.") }
         }
     }
 
     private fun toRequest(current: IdeaEditState) = IdeaRequest(
         tripId = tripId,
+        sectionId = current.sectionId,
         title = current.title.trim(),
         category = current.category.trim().takeIf { it.isNotEmpty() },
         priority = current.priority,
@@ -135,14 +193,15 @@ class IdeaEditViewModel @Inject constructor(
             _state.value = current.copy(error = "Title is required.")
             return
         }
+        if (current.estimatedExpenseAmount.isNotBlank() != current.estimatedExpenseCurrency.isNotBlank()) {
+            _state.value = current.copy(error = "Estimated expense requires both an amount and a currency, or neither.")
+            return
+        }
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
             runCatching {
                 if (current.ideaId == null) repository.create(toRequest(current)) else repository.update(current.ideaId, toRequest(current))
             }.onSuccess { result ->
-                current.links.filter { it.id == null }.forEach { link ->
-                    runCatching { linksTagsRepository.createLink(OWNER_TYPE, result.id, link.url, link.label) }
-                }
                 _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id)
             }.onFailure { e ->
                 _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Idea.")
