@@ -71,11 +71,14 @@ fun BlogEditScreen(
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {

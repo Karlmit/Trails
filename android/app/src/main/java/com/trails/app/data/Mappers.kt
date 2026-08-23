@@ -89,6 +89,7 @@ fun ChecklistDto.toEntity() = ChecklistEntity(
     tripId = tripId,
     title = title,
     description = description,
+    isPrivate = isPrivate,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )

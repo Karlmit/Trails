@@ -7,6 +7,7 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.AttachmentEntity
+import com.trails.app.sync.SyncScheduler
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,8 +27,16 @@ class DocumentsViewModel @Inject constructor(
     private val documentsRepository: DocumentsRepository,
     timelineRepository: TimelineRepository,
     importantInfoRepository: ImportantInfoRepository,
+    syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
+
+    // See ChecklistsViewModel's identical init block -- this screen had no
+    // sync trigger of its own before, only ever refreshed as a side effect
+    // of the Timeline tab having synced first.
+    init {
+        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+    }
 
     private val downloading = MutableStateFlow<Set<String>>(emptySet())
 

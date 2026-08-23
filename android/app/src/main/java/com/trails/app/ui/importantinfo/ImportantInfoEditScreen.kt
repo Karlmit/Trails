@@ -43,24 +43,27 @@ fun ImportantInfoEditScreen(
     LaunchedEffect(items) { viewModel.loadIfEditing(items) }
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
 
-        LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
-        MultilineLabeledField(label = "Content", value = state.content, onValueChange = viewModel::onContentChange)
-        LabeledField(label = "Location name", value = state.locationName, onValueChange = viewModel::onLocationNameChange)
-        LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
-        LabeledField(label = "Map link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
-        LabeledField(label = "Contact name", value = state.contactName, onValueChange = viewModel::onContactNameChange)
-        LabeledField(label = "Contact phone", value = state.contactPhone, onValueChange = viewModel::onContactPhoneChange)
-        LabeledField(label = "Contact email", value = state.contactEmail, onValueChange = viewModel::onContactEmailChange)
+        // Deliberately just Title/Description/Private -- user-reported: "too
+        // many fields when adding one." Location/contact fields are gone
+        // from the UI, but ImportantInfoEditViewModel still loads and
+        // resends whatever an existing item already has stored for them
+        // (see loadIfEditing/save), so no old data is lost by an edit that
+        // never meant to touch them.
+        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
+        MultilineLabeledField(label = "Description", value = state.content, onValueChange = viewModel::onContentChange)
         CheckboxRow(label = "Private (hidden from Guests)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
         LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
 

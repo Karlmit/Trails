@@ -46,6 +46,9 @@ fun TripEditScreen(
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     Scaffold(
         containerColor = TrailsColors.Canvas,
         topBar = {
@@ -70,7 +73,7 @@ fun TripEditScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {

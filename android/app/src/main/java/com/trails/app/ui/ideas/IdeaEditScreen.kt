@@ -81,11 +81,18 @@ fun IdeaEditScreen(
     // ChecklistEditScreen makes for its own items.
     LaunchedEffect(state.deleted, state.converted) { if (state.deleted || state.converted) onDone() }
 
+    val scrollState = rememberScrollState()
+    // The error banner lives at the very top of a long form -- without
+    // this, a validation/network error triggered by a control far down the
+    // screen (e.g. "+ Add photo") is invisible unless the user happens to
+    // scroll up, which read as "nothing happened" (user-reported).
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -161,8 +168,15 @@ fun IdeaEditScreen(
                 }
             }
             item {
-                TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                    Text("+ Add photo")
+                if (state.uploadingPhoto) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Text("Uploading…", color = TrailsColors.TextSoft, modifier = Modifier.padding(start = 8.dp))
+                    }
+                } else {
+                    TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                        Text("+ Add photo")
+                    }
                 }
             }
         }

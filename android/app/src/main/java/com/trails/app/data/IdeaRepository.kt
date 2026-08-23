@@ -6,8 +6,8 @@ import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.IdeaRequest
-import com.trails.app.network.dto.IdeaUpdateRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -36,25 +36,16 @@ class IdeaRepository @Inject constructor(
         return entity
     }
 
-    suspend fun update(ideaId: String, request: IdeaRequest): IdeaEntity {
-        // ideaUpdateSchema is `.strict()` server-side and has no `tripId` key --
-        // sending the full create-shaped request body would 400.
-        val updateBody = IdeaUpdateRequest(
-            sectionId = request.sectionId,
-            title = request.title,
-            category = request.category,
-            priority = request.priority,
-            weatherSuitability = request.weatherSuitability,
-            weatherTags = request.weatherTags,
-            locationName = request.locationName,
-            locationAddress = request.locationAddress,
-            locationLat = request.locationLat,
-            locationLng = request.locationLng,
-            locationMapLink = request.locationMapLink,
-            estimatedExpenseAmount = request.estimatedExpenseAmount,
-            estimatedExpenseCurrency = request.estimatedExpenseCurrency,
-        )
-        val updated = api.updateIdea(ideaId, updateBody)
+    /**
+     * [fields] is a partial JSON body containing only whatever the edit
+     * screen's ViewModel determined actually changed (see
+     * PartialPatch.kt's `diffFields`) -- ideaUpdateSchema is `.strict()`
+     * server-side and has no `tripId` key, but more importantly is a
+     * `.partial()` merge, so any field NOT present here keeps its current
+     * server-side value untouched.
+     */
+    suspend fun update(ideaId: String, fields: JsonObject): IdeaEntity {
+        val updated = api.updateIdea(ideaId, fields)
         val entity = updated.toEntity()
         dao.upsertAll(listOf(entity))
         return entity

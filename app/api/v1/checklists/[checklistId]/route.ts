@@ -46,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data: {
         ...(parsed.title !== undefined && { title: parsed.title }),
         ...(parsed.description !== undefined && { description: parsed.description }),
+        ...(parsed.isPrivate !== undefined && { isPrivate: parsed.isPrivate }),
       },
       include: { items: { orderBy: { createdAt: 'asc' } } },
     });

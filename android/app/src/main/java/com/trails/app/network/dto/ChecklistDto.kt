@@ -8,6 +8,7 @@ data class ChecklistDto(
     val tripId: String,
     val title: String,
     val description: String? = null,
+    val isPrivate: Boolean = false,
     val createdAt: String,
     val updatedAt: String,
     val items: List<ChecklistItemDto> = emptyList(),

@@ -52,11 +52,21 @@ fun BudgetScreen(
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(group.currency, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
-                                Text(
-                                    "Total: %.2f %s".format(group.total, group.currency),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TrailsColors.TextSoft,
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        "Total: %.2f %s".format(group.total, group.currency),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TrailsColors.TextSoft,
+                                    )
+                                    if (group.unpaidTotal > 0.0) {
+                                        Text(
+                                            "Unpaid: %.2f %s".format(group.unpaidTotal, group.currency),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = TrailsColors.Text,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        )
+                                    }
+                                }
                             }
                             group.lineItems.forEach { item ->
                                 Row(

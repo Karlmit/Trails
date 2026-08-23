@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.MultilineLabeledField
@@ -56,13 +57,16 @@ fun ChecklistEditScreen(
     LaunchedEffect(checklists) { viewModel.loadIfEditing(checklists) }
     LaunchedEffect(state.deleted) { if (state.deleted) onDone() }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     val itemsForThisChecklist = checklists.find { it.checklist.id == state.checklistId }?.items.orEmpty()
 
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -70,6 +74,10 @@ fun ChecklistEditScreen(
 
         LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
         MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+        // User-requested: "Checklists can be marked as private or shared
+        // with other trip users." See Checklist.isPrivate's schema comment
+        // for why this has no read-time enforcement effect yet.
+        CheckboxRow(label = "Private", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
 
         if (state.saving) {
             CircularProgressIndicator()

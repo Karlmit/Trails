@@ -7,12 +7,16 @@ import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.network.dto.ImportantInfoRequest
+import com.trails.app.network.dto.diffFields
+import com.trails.app.network.dto.jsonStringOrNull
 import com.trails.app.ui.components.LinkFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 private const val OWNER_TYPE = "IMPORTANT_INFO"
@@ -46,6 +50,24 @@ class ImportantInfoEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(ImportantInfoEditState(infoId = infoId))
     val state: StateFlow<ImportantInfoEditState> = _state.asStateFlow()
+
+    // Captured right after `loadIfEditing` populates the existing item's
+    // fields -- `save()` diffs against this so a PATCH only ever sends
+    // fields the user actually changed on this screen. Null for a create
+    // (nothing to diff against) or before loading finishes.
+    private var originalFields: Map<String, JsonElement>? = null
+
+    private fun fieldsOf(s: ImportantInfoEditState): Map<String, JsonElement> = mapOf(
+        "title" to JsonPrimitive(s.title.trim()),
+        "content" to jsonStringOrNull(s.content),
+        "locationName" to jsonStringOrNull(s.locationName),
+        "locationAddress" to jsonStringOrNull(s.locationAddress),
+        "locationMapLink" to jsonStringOrNull(s.locationMapLink),
+        "contactName" to jsonStringOrNull(s.contactName),
+        "contactPhone" to jsonStringOrNull(s.contactPhone),
+        "contactEmail" to jsonStringOrNull(s.contactEmail),
+        "isPrivate" to JsonPrimitive(s.isPrivate),
+    )
 
     init {
         infoId?.let { ownerId ->
@@ -95,6 +117,7 @@ class ImportantInfoEditViewModel @Inject constructor(
             contactEmail = existing.contactEmail.orEmpty(),
             isPrivate = existing.isPrivate,
         )
+        originalFields = fieldsOf(_state.value)
     }
 
     fun onTitleChange(value: String) { _state.value = _state.value.copy(title = value) }
@@ -115,20 +138,25 @@ class ImportantInfoEditViewModel @Inject constructor(
         }
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
-            val request = ImportantInfoRequest(
-                tripId = tripId,
-                title = current.title.trim(),
-                content = current.content.trim().takeIf { it.isNotEmpty() },
-                locationName = current.locationName.trim().takeIf { it.isNotEmpty() },
-                locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
-                locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
-                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
-                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
-                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
-                isPrivate = current.isPrivate,
-            )
             runCatching {
-                if (current.infoId == null) repository.create(request) else repository.update(current.infoId, request)
+                if (current.infoId == null) {
+                    repository.create(
+                        ImportantInfoRequest(
+                            tripId = tripId,
+                            title = current.title.trim(),
+                            content = current.content.trim().takeIf { it.isNotEmpty() },
+                            locationName = current.locationName.trim().takeIf { it.isNotEmpty() },
+                            locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+                            locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+                            contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                            contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                            contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                            isPrivate = current.isPrivate,
+                        ),
+                    )
+                } else {
+                    repository.update(current.infoId, diffFields(originalFields, fieldsOf(current)))
+                }
             }.onSuccess { result ->
                 current.links.filter { it.id == null }.forEach { link ->
                     runCatching { linksTagsRepository.createLink(OWNER_TYPE, result.id, link.url, link.label) }

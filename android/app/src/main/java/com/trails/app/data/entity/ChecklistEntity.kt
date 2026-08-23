@@ -10,6 +10,7 @@ data class ChecklistEntity(
     val tripId: String,
     val title: String,
     val description: String?,
+    val isPrivate: Boolean = false,
     val createdAt: String,
     val updatedAt: String,
 )

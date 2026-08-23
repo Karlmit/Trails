@@ -64,7 +64,7 @@ class ChecklistRepository @Inject constructor(
     suspend fun updateChecklist(checklistId: String, request: ChecklistRequest): ChecklistEntity {
         // checklistUpdateSchema is `.strict()` server-side and has no `tripId` key --
         // sending the full create-shaped request body would 400.
-        val updated = api.updateChecklist(checklistId, ChecklistUpdateRequest(request.title, request.description))
+        val updated = api.updateChecklist(checklistId, ChecklistUpdateRequest(request.title, request.description, request.isPrivate))
         val entity = updated.toEntity()
         checklistDao.upsertAll(listOf(entity))
         return entity

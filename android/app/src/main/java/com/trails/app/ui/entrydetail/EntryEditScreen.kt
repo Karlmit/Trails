@@ -48,6 +48,9 @@ fun EntryEditScreen(
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
+    val scrollState = rememberScrollState()
+    LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
+
     val isNote = state.entryType == "NOTE"
     val isActivity = state.entryType == "ACTIVITY"
     val isTransport = state.entryType == "TRANSPORT"
@@ -57,7 +60,7 @@ fun EntryEditScreen(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -119,7 +122,21 @@ fun EntryEditScreen(
                 )
                 LabeledField(label = "Currency", value = state.expenseCurrency, onValueChange = viewModel::onExpenseCurrencyChange, modifier = Modifier.weight(1f))
             }
-            LabeledField(label = "Payment status", value = state.expensePaymentStatus, onValueChange = viewModel::onExpensePaymentStatusChange)
+            // Preserve any pre-existing value outside the closed Paid/Unpaid
+            // set (e.g. an old "Partial") instead of silently discarding it
+            // the moment this screen is opened and saved, same as the web form.
+            val paymentStatusOptions = if (state.expensePaymentStatus.isNotBlank() && state.expensePaymentStatus !in PAYMENT_STATUSES) {
+                PAYMENT_STATUSES + state.expensePaymentStatus
+            } else {
+                PAYMENT_STATUSES
+            }
+            DropdownField(
+                label = "Payment status",
+                options = paymentStatusOptions,
+                selected = state.expensePaymentStatus,
+                onSelected = viewModel::onExpensePaymentStatusChange,
+                optionLabel = { PAYMENT_STATUS_LABELS[it] ?: it },
+            )
             LabeledField(label = "Payment note", value = state.expensePaymentNote, onValueChange = viewModel::onExpensePaymentNoteChange)
         }
 

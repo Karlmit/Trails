@@ -10,6 +10,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,7 +23,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       const response = await fetch('/api/v1/checklists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tripId, title, description: description || null }),
+        body: JSON.stringify({ tripId, title, description: description || null, isPrivate }),
       });
 
       const body = await response.json().catch(() => null);
@@ -33,6 +34,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
 
       setTitle('');
       setDescription('');
+      setIsPrivate(false);
       setOpen(false);
       router.refresh();
     } catch {
@@ -74,6 +76,11 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
           rows={2}
         />
       </div>
+
+      <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+        <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+        Private
+      </label>
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>

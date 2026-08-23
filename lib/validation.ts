@@ -308,6 +308,11 @@ export const checklistCreateSchema = z
     tripId: z.string().uuid('tripId must be a valid UUID'),
     title: z.string().trim().min(1, 'Title is required').max(200),
     description: z.string().trim().max(5000).optional().nullable(),
+    // User-requested: "Checklists can be marked as private or shared with
+    // other trip users." Stored/toggleable the same as
+    // ImportantInfo.isPrivate -- see that field's schema comment for why
+    // this has no read-time enforcement effect yet.
+    isPrivate: z.boolean().optional(),
   })
   .strict();
 
@@ -315,6 +320,7 @@ export const checklistUpdateSchema = z
   .object({
     title: z.string().trim().min(1, 'Title is required').max(200).optional(),
     description: z.string().trim().max(5000).optional().nullable(),
+    isPrivate: z.boolean().optional(),
   })
   .strict();
 

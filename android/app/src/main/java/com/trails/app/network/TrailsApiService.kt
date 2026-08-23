@@ -11,10 +11,8 @@ import com.trails.app.network.dto.ChecklistRequest
 import com.trails.app.network.dto.ChecklistUpdateRequest
 import com.trails.app.network.dto.IdeaDto
 import com.trails.app.network.dto.IdeaRequest
-import com.trails.app.network.dto.IdeaUpdateRequest
 import com.trails.app.network.dto.ImportantInfoDto
 import com.trails.app.network.dto.ImportantInfoRequest
-import com.trails.app.network.dto.ImportantInfoUpdateRequest
 import com.trails.app.network.dto.LinkDto
 import com.trails.app.network.dto.LinkRequest
 import com.trails.app.network.dto.LoginRequest
@@ -30,6 +28,7 @@ import com.trails.app.network.dto.TimelineEntryDto
 import com.trails.app.network.dto.TransportEntryRequest
 import com.trails.app.network.dto.TripDto
 import com.trails.app.network.dto.TripRequest
+import kotlinx.serialization.json.JsonObject
 import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -89,26 +88,23 @@ interface TrailsApiService {
     @POST("api/v1/timeline-entries")
     suspend fun createNoteEntry(@Body body: NoteEntryRequest): TimelineEntryDto
 
-    @PATCH("api/v1/timeline-entries/{id}")
-    suspend fun updateNoteEntry(@Path("id") id: String, @Body body: NoteEntryRequest): TimelineEntryDto
-
     @POST("api/v1/timeline-entries")
     suspend fun createStayEntry(@Body body: StayEntryRequest): TimelineEntryDto
-
-    @PATCH("api/v1/timeline-entries/{id}")
-    suspend fun updateStayEntry(@Path("id") id: String, @Body body: StayEntryRequest): TimelineEntryDto
 
     @POST("api/v1/timeline-entries")
     suspend fun createTransportEntry(@Body body: TransportEntryRequest): TimelineEntryDto
 
-    @PATCH("api/v1/timeline-entries/{id}")
-    suspend fun updateTransportEntry(@Path("id") id: String, @Body body: TransportEntryRequest): TimelineEntryDto
-
     @POST("api/v1/timeline-entries")
     suspend fun createActivityEntry(@Body body: ActivityEntryRequest): TimelineEntryDto
 
+    // One shared PATCH for every entryType -- the server's per-entryType
+    // schemas are each `.partial()` (see WriteRequests.kt's header comment),
+    // so a caller only ever needs to send the fields it actually changed;
+    // there's no need for 4 separate full-body-shaped update methods the
+    // way create needs (see TimelineRepository.updateTimelineEntry /
+    // EntryEditViewModel's diffFields usage).
     @PATCH("api/v1/timeline-entries/{id}")
-    suspend fun updateActivityEntry(@Path("id") id: String, @Body body: ActivityEntryRequest): TimelineEntryDto
+    suspend fun updateTimelineEntry(@Path("id") id: String, @Body body: JsonObject): TimelineEntryDto
 
     @DELETE("api/v1/timeline-entries/{id}")
     suspend fun deleteTimelineEntry(@Path("id") id: String): Response<ResponseBody>
@@ -152,8 +148,9 @@ interface TrailsApiService {
     @POST("api/v1/important-info")
     suspend fun createImportantInfo(@Body body: ImportantInfoRequest): ImportantInfoDto
 
+    // Partial JsonObject body -- see updateTimelineEntry's comment above.
     @PATCH("api/v1/important-info/{id}")
-    suspend fun updateImportantInfo(@Path("id") id: String, @Body body: ImportantInfoUpdateRequest): ImportantInfoDto
+    suspend fun updateImportantInfo(@Path("id") id: String, @Body body: JsonObject): ImportantInfoDto
 
     @DELETE("api/v1/important-info/{id}")
     suspend fun deleteImportantInfo(@Path("id") id: String): Response<ResponseBody>
@@ -164,8 +161,9 @@ interface TrailsApiService {
     @POST("api/v1/ideas")
     suspend fun createIdea(@Body body: IdeaRequest): IdeaDto
 
+    // Partial JsonObject body -- see updateTimelineEntry's comment above.
     @PATCH("api/v1/ideas/{id}")
-    suspend fun updateIdea(@Path("id") id: String, @Body body: IdeaUpdateRequest): IdeaDto
+    suspend fun updateIdea(@Path("id") id: String, @Body body: JsonObject): IdeaDto
 
     @DELETE("api/v1/ideas/{id}")
     suspend fun deleteIdea(@Path("id") id: String): Response<ResponseBody>

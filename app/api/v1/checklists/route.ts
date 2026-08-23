@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
         tripId: parsed.tripId,
         title: parsed.title,
         description: parsed.description ?? null,
+        isPrivate: parsed.isPrivate ?? false,
       },
     });
 

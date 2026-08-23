@@ -11,6 +11,16 @@ import { entryEndpointClockTime, entryEndpointDateKey } from '@/lib/trip-status'
 
 export type CreatableEntryType = 'STAY' | 'TRANSPORT' | 'ACTIVITY' | 'NOTE';
 
+// expensePaymentStatus stays a free-text column server-side (see
+// shared-fields.schema.ts) so no pre-existing value is ever rejected, but
+// the UI narrows it to a closed Paid/Unpaid choice per user request --
+// they'd been typing exactly "Paid" or "Unpaid" into the old free-text
+// field already, so those are the two canonical values here.
+const PAYMENT_STATUSES = [
+  { value: 'Paid', label: 'Paid' },
+  { value: 'Unpaid', label: 'Unpaid' },
+] as const;
+
 export interface EntryDTO {
   id: string;
   tripId: string;
@@ -676,12 +686,24 @@ export function EntryForm({
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
               <label htmlFor="entry-expense-status">Payment status</label>
-              <input
+              <select
                 id="entry-expense-status"
                 value={expensePaymentStatus}
                 onChange={(e) => setExpensePaymentStatus(e.target.value)}
-                placeholder="Paid / Unpaid / Partial"
-              />
+              >
+                <option value="">Not set</option>
+                {PAYMENT_STATUSES.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+                {/* Preserve any pre-existing value outside the closed set above
+                    (e.g. an old "Partial") instead of silently discarding it
+                    the moment this form is opened and saved. */}
+                {expensePaymentStatus && !PAYMENT_STATUSES.some((s) => s.value === expensePaymentStatus) && (
+                  <option value={expensePaymentStatus}>{expensePaymentStatus}</option>
+                )}
+              </select>
             </div>
             <div className="field" style={{ flex: 1 }}>
               <label htmlFor="entry-expense-note">Payment note</label>

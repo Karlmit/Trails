@@ -82,6 +82,14 @@ private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onA
 
 @Composable
 fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
+    // Fires at most once per app session, right after landing on the trip
+    // list from login (fresh or auto-relogin) -- user-reported: "If a trip
+    // is active the Android app automatically opens that trip's timeline."
+    // Deliberately NOT re-checked on every visit to the trip list (e.g. the
+    // drawer's "All Trips" item), which must stay a real escape hatch back
+    // to the list rather than bouncing straight back into the active trip.
+    var autoOpenActiveTripPending by remember { mutableStateOf(true) }
+
     NavHost(navController = navController, startDestination = ROUTE_LOGIN) {
         composable(ROUTE_LOGIN) {
             LoginScreen(
@@ -94,6 +102,8 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             TripListScreen(
                 onOpenTrip = { tripId -> navController.navigate(tripRoute(tripId, TripTab.TIMELINE.route)) },
                 onAddTrip = { navController.navigate("trips/new/edit") },
+                autoOpenActiveTrip = autoOpenActiveTripPending,
+                onAutoOpenConsumed = { autoOpenActiveTripPending = false },
             )
         }
 

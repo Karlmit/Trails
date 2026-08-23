@@ -2,6 +2,7 @@ package com.trails.app.ui.triplist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkInfo
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.sync.SyncScheduler
@@ -21,6 +22,10 @@ data class TripListUiState(
     val syncError: String? = null,
     // tripId -> currently running a "Save offline" full sync.
     val savingOfflineIds: Set<String> = emptySet(),
+    // tripId -> the last "Save offline" attempt for it actually failed --
+    // user-reported: no confirmation either way before this, so a failed
+    // sync looked identical to a successful one once the spinner cleared.
+    val saveOfflineErrorIds: Set<String> = emptySet(),
 )
 
 @HiltViewModel
@@ -33,13 +38,15 @@ class TripListViewModel @Inject constructor(
 
     private val syncState = MutableStateFlow(SyncState(isSyncing = false, error = null))
     private val savingOfflineIds = MutableStateFlow<Set<String>>(emptySet())
+    private val saveOfflineErrorIds = MutableStateFlow<Set<String>>(emptySet())
 
     val uiState: StateFlow<TripListUiState> = combine(
         tripRepository.observeTrips(),
         syncState,
         savingOfflineIds,
-    ) { trips, sync, saving ->
-        TripListUiState(trips = trips, isSyncing = sync.isSyncing, syncError = sync.error, savingOfflineIds = saving)
+        saveOfflineErrorIds,
+    ) { trips, sync, saving, saveErrors ->
+        TripListUiState(trips = trips, isSyncing = sync.isSyncing, syncError = sync.error, savingOfflineIds = saving, saveOfflineErrorIds = saveErrors)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TripListUiState())
 
     init {
@@ -64,9 +71,21 @@ class TripListViewModel @Inject constructor(
     fun saveOffline(tripId: String) {
         viewModelScope.launch {
             savingOfflineIds.value = savingOfflineIds.value + tripId
+            saveOfflineErrorIds.value = saveOfflineErrorIds.value - tripId
             val workId = syncScheduler.syncTripNow(tripId)
-            syncScheduler.observeWork(workId).first { it == null || it.state.isFinished }
+            val finished = syncScheduler.observeWork(workId).first { it == null || it.state.isFinished }
+            // WorkInfo reaching "finished" only means the job stopped, not
+            // that it succeeded -- a real network/API failure previously
+            // looked identical to success once the spinner cleared (user-
+            // reported: "I want to be sure it's actually saved offline").
+            if (finished == null || finished.state != WorkInfo.State.SUCCEEDED) {
+                saveOfflineErrorIds.value = saveOfflineErrorIds.value + tripId
+            }
             savingOfflineIds.value = savingOfflineIds.value - tripId
         }
+    }
+
+    fun dismissSaveOfflineError(tripId: String) {
+        saveOfflineErrorIds.value = saveOfflineErrorIds.value - tripId
     }
 }

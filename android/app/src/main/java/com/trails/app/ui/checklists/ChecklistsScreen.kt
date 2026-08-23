@@ -69,12 +69,17 @@ private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onToggle: (Str
         colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                checklistWithItems.checklist.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = TrailsColors.Text,
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
-            )
+            Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    checklistWithItems.checklist.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TrailsColors.Text,
+                    modifier = Modifier.weight(1f),
+                )
+                if (checklistWithItems.checklist.isPrivate) {
+                    Text("Private", style = MaterialTheme.typography.labelSmall, color = TrailsColors.TextSoft)
+                }
+            }
             checklistWithItems.checklist.description?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
             }

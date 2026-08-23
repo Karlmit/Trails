@@ -12,6 +12,8 @@ import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.weatherTags
 import com.trails.app.network.dto.IdeaRequest
+import com.trails.app.network.dto.diffFields
+import com.trails.app.network.dto.jsonStringOrNull
 import com.trails.app.ui.components.LinkFieldItem
 import com.trails.app.ui.components.TagFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -27,6 +29,10 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 private const val OWNER_TYPE = "IDEA"
@@ -55,6 +61,7 @@ data class IdeaEditState(
     val estimatedExpenseCurrency: String = DEFAULT_CURRENCY,
     val links: List<LinkFieldItem> = emptyList(),
     val tags: List<TagFieldItem> = emptyList(),
+    val uploadingPhoto: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -75,6 +82,33 @@ class IdeaEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId))
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
+
+    // Captured right after `loadIfEditing` populates the existing Idea's
+    // fields -- `save()` diffs against this so a PATCH only ever sends
+    // fields the user actually changed on this screen (or that this
+    // screen keeps synced with another field, like locationName tracking
+    // title). Null for a create (nothing to diff against) or before
+    // loading finishes.
+    private var originalFields: Map<String, JsonElement>? = null
+
+    private fun fieldsOf(s: IdeaEditState): Map<String, JsonElement> = mapOf(
+        "sectionId" to (s.sectionId?.let { JsonPrimitive(it) } ?: JsonNull),
+        "title" to JsonPrimitive(s.title.trim()),
+        "category" to (s.category?.let { JsonPrimitive(it) } ?: JsonNull),
+        "priority" to JsonPrimitive(s.priority),
+        "weatherSuitability" to JsonPrimitive(s.weatherSuitability),
+        "weatherTags" to JsonArray(s.weatherTags.map { JsonPrimitive(it) }),
+        // locationName always tracks title (see toRequest's comment) -- kept
+        // in the diffed field set so a title-only edit still sends it.
+        "locationName" to JsonPrimitive(s.title.trim()),
+        "locationAddress" to jsonStringOrNull(s.locationAddress),
+        "locationMapLink" to jsonStringOrNull(s.locationMapLink),
+        "estimatedExpenseAmount" to (s.estimatedExpenseAmount.toDoubleOrNull()?.let { JsonPrimitive(it) } ?: JsonNull),
+        "estimatedExpenseCurrency" to (
+            s.estimatedExpenseCurrency.trim().takeIf { it.isNotEmpty() && s.estimatedExpenseAmount.isNotBlank() }
+                ?.let { JsonPrimitive(it) } ?: JsonNull
+            ),
+    )
 
     // Same "in-flight create, don't fire a second one" guard as
     // BlogEditViewModel's own ensurePostId -- two photos added in quick
@@ -134,6 +168,7 @@ class IdeaEditViewModel @Inject constructor(
             estimatedExpenseAmount = existing.estimatedExpenseAmount?.toString().orEmpty(),
             estimatedExpenseCurrency = existing.estimatedExpenseCurrency.orEmpty(),
         )
+        originalFields = fieldsOf(_state.value)
     }
 
     fun onSectionChange(v: String?) { _state.value = _state.value.copy(sectionId = v) }
@@ -214,10 +249,15 @@ class IdeaEditViewModel @Inject constructor(
 
     fun uploadPhoto(uri: Uri, filename: String) {
         viewModelScope.launch {
+            _state.value = _state.value.copy(uploadingPhoto = true, error = null)
             runCatching {
                 val ownerId = ensureIdeaId()
                 documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename)
-            }.onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to upload photo.") }
+            }.onSuccess {
+                _state.value = _state.value.copy(uploadingPhoto = false)
+            }.onFailure { e ->
+                _state.value = _state.value.copy(uploadingPhoto = false, error = e.message ?: "Failed to upload photo.")
+            }
         }
     }
 
@@ -250,8 +290,12 @@ class IdeaEditViewModel @Inject constructor(
         locationName = current.title.trim(),
         locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
         locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+        // Only send currency when an amount is actually present -- the
+        // server requires both or neither (hasEstimatedExpensePair), and
+        // currency defaults to SEK in the UI even before an amount is
+        // entered, so it must not be sent alone.
         estimatedExpenseAmount = current.estimatedExpenseAmount.toDoubleOrNull(),
-        estimatedExpenseCurrency = current.estimatedExpenseCurrency.trim().takeIf { it.isNotEmpty() },
+        estimatedExpenseCurrency = current.estimatedExpenseCurrency.trim().takeIf { it.isNotEmpty() && current.estimatedExpenseAmount.isNotBlank() },
     )
 
     fun save() {
@@ -260,14 +304,24 @@ class IdeaEditViewModel @Inject constructor(
             _state.value = current.copy(error = "Title is required.")
             return
         }
-        if (current.estimatedExpenseAmount.isNotBlank() != current.estimatedExpenseCurrency.isNotBlank()) {
-            _state.value = current.copy(error = "Estimated expense requires both an amount and a currency, or neither.")
+        // Currency defaults to SEK even with no amount entered (so it's
+        // ready to go the moment someone *does* type an amount) -- so
+        // "both or neither" only actually needs to check the direction
+        // that can still fail: an amount with no currency. A currency
+        // alone (still just the default, amount never touched) must not
+        // block saving.
+        if (current.estimatedExpenseAmount.isNotBlank() && current.estimatedExpenseCurrency.isBlank()) {
+            _state.value = current.copy(error = "Estimated expense requires a currency.")
             return
         }
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
             runCatching {
-                if (current.ideaId == null) repository.create(toRequest(current)) else repository.update(current.ideaId, toRequest(current))
+                if (current.ideaId == null) {
+                    repository.create(toRequest(current))
+                } else {
+                    repository.update(current.ideaId, diffFields(originalFields, fieldsOf(current)))
+                }
             }.onSuccess { result ->
                 // Deliberately NOT navigating away here (state.saved isn't
                 // watched by the screen) -- creating an Idea must stay on

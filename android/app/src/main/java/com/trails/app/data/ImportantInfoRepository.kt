@@ -4,8 +4,8 @@ import com.trails.app.data.dao.ImportantInfoDao
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.ImportantInfoRequest
-import com.trails.app.network.dto.ImportantInfoUpdateRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,23 +33,16 @@ class ImportantInfoRepository @Inject constructor(
         return entity
     }
 
-    suspend fun update(itemId: String, request: ImportantInfoRequest): ImportantInfoEntity {
-        // importantInfoUpdateSchema is `.strict()` server-side and has no `tripId`
-        // key -- sending the full create-shaped request body would 400.
-        val updateBody = ImportantInfoUpdateRequest(
-            title = request.title,
-            content = request.content,
-            locationName = request.locationName,
-            locationAddress = request.locationAddress,
-            locationLat = request.locationLat,
-            locationLng = request.locationLng,
-            locationMapLink = request.locationMapLink,
-            contactName = request.contactName,
-            contactPhone = request.contactPhone,
-            contactEmail = request.contactEmail,
-            isPrivate = request.isPrivate,
-        )
-        val updated = api.updateImportantInfo(itemId, updateBody)
+    /**
+     * [fields] is a partial JSON body containing only whatever the edit
+     * screen's ViewModel determined actually changed (see
+     * PartialPatch.kt's `diffFields`) -- importantInfoUpdateSchema is
+     * `.strict()` server-side and has no `tripId` key, but more
+     * importantly is a `.partial()` merge, so any field NOT present here
+     * keeps its current server-side value untouched.
+     */
+    suspend fun update(itemId: String, fields: JsonObject): ImportantInfoEntity {
+        val updated = api.updateImportantInfo(itemId, fields)
         val entity = updated.toEntity()
         dao.upsertAll(listOf(entity))
         return entity

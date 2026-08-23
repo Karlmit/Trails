@@ -375,6 +375,14 @@ model Checklist {
   title       String
   description String?
 
+  // User-requested: "Checklists can be marked as private or shared with
+  // other trip users." Stored/toggleable the same as ImportantInfo.isPrivate
+  // -- this app has no per-Trip ownership/membership model (AD-7: any
+  // authenticated User has full access to every Trip) and no Guest-eligible
+  // surface for Checklists, so like ImportantInfo this has no read-time
+  // enforcement effect yet; it exists so the intent is captured and visible.
+  isPrivate Boolean @default(false) @map("is_private")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

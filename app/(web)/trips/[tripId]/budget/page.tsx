@@ -109,6 +109,12 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
                 <h3 style={{ margin: 0 }}>{group.currency}</h3>
                 <span className="text-soft">
                   Total: {group.total.toFixed(2)} {group.currency}
+                  {group.unpaidTotal > 0 && (
+                    <>
+                      {' · '}
+                      <strong>Unpaid: {group.unpaidTotal.toFixed(2)} {group.currency}</strong>
+                    </>
+                  )}
                 </span>
               </div>
               <div className="stack" style={{ gap: 'var(--space-2)' }}>

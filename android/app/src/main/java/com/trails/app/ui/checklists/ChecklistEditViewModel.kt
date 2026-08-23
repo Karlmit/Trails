@@ -18,6 +18,7 @@ data class ChecklistEditState(
     val checklistId: String? = null,
     val title: String = "",
     val description: String = "",
+    val isPrivate: Boolean = false,
     val newItemText: String = "",
     val saving: Boolean = false,
     val error: String? = null,
@@ -39,11 +40,16 @@ class ChecklistEditViewModel @Inject constructor(
     fun loadIfEditing(all: List<ChecklistWithItems>) {
         val existing = all.find { it.checklist.id == checklistId } ?: return
         if (_state.value.title.isNotEmpty()) return
-        _state.value = _state.value.copy(title = existing.checklist.title, description = existing.checklist.description.orEmpty())
+        _state.value = _state.value.copy(
+            title = existing.checklist.title,
+            description = existing.checklist.description.orEmpty(),
+            isPrivate = existing.checklist.isPrivate,
+        )
     }
 
     fun onTitleChange(value: String) { _state.value = _state.value.copy(title = value) }
     fun onDescriptionChange(value: String) { _state.value = _state.value.copy(description = value) }
+    fun onIsPrivateChange(value: Boolean) { _state.value = _state.value.copy(isPrivate = value) }
     fun onNewItemTextChange(value: String) { _state.value = _state.value.copy(newItemText = value) }
 
     fun save() {
@@ -54,7 +60,12 @@ class ChecklistEditViewModel @Inject constructor(
         }
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
-            val request = ChecklistRequest(tripId = tripId, title = current.title.trim(), description = current.description.trim().takeIf { it.isNotEmpty() })
+            val request = ChecklistRequest(
+                tripId = tripId,
+                title = current.title.trim(),
+                description = current.description.trim().takeIf { it.isNotEmpty() },
+                isPrivate = current.isPrivate,
+            )
             runCatching {
                 if (current.checklistId == null) repository.createChecklist(request) else repository.updateChecklist(current.checklistId, request)
             }.onSuccess { result ->

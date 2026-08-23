@@ -9,12 +9,14 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.SectionEntity
+import com.trails.app.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** One Ideas-list group -- a Section (in the Trip's own Section order) or the trailing "No Section" bucket. */
@@ -27,9 +29,17 @@ class IdeasViewModel @Inject constructor(
     repository: IdeaRepository,
     timelineRepository: TimelineRepository,
     documentsRepository: DocumentsRepository,
+    syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
     val ideas: Flow<List<IdeaEntity>> = repository.observeForTrip(tripId)
+
+    // See ChecklistsViewModel's identical init block -- this screen had no
+    // sync trigger of its own before, only ever refreshed as a side effect
+    // of the Timeline tab having synced first.
+    init {
+        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+    }
 
     /**
      * Grouped by Section in the Trip's own Section order, with a trailing

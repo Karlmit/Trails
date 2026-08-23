@@ -9,6 +9,7 @@ import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.SectionRequest
 import com.trails.app.network.dto.TimelineEntryWriteRequest
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -79,13 +80,16 @@ class TimelineRepository @Inject constructor(
         return entity
     }
 
-    suspend fun updateTimelineEntry(entryId: String, request: TimelineEntryWriteRequest): TimelineEntryEntity {
-        val updated = when (request) {
-            is TimelineEntryWriteRequest.Note -> api.updateNoteEntry(entryId, request.body)
-            is TimelineEntryWriteRequest.Stay -> api.updateStayEntry(entryId, request.body)
-            is TimelineEntryWriteRequest.Transport -> api.updateTransportEntry(entryId, request.body)
-            is TimelineEntryWriteRequest.Activity -> api.updateActivityEntry(entryId, request.body)
-        }
+    /**
+     * [fields] is a partial JSON body containing only whatever the edit
+     * screen's ViewModel determined actually changed (see
+     * PartialPatch.kt's `diffFields`) -- every entryType's PATCH schema is
+     * a `.partial()` merge (see WriteRequests.kt's header comment), so any
+     * field NOT present here keeps its current server-side value
+     * untouched, regardless of entryType.
+     */
+    suspend fun updateTimelineEntry(entryId: String, fields: JsonObject): TimelineEntryEntity {
+        val updated = api.updateTimelineEntry(entryId, fields)
         val entity = updated.toEntity()
         timelineEntryDao.upsertAll(listOf(entity))
         return entity

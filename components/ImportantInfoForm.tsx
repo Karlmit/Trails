@@ -120,7 +120,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
       </div>
 
       <div className="field">
-        <label htmlFor="important-info-content">Content</label>
+        <label htmlFor="important-info-content">Description</label>
         <textarea
           id="important-info-content"
           value={content}
@@ -130,60 +130,12 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
         />
       </div>
 
-      <div className="field">
-        <label htmlFor="important-info-location-name">Location name</label>
-        <input
-          id="important-info-location-name"
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="important-info-location-address">Location address</label>
-        <input
-          id="important-info-location-address"
-          value={locationAddress}
-          onChange={(e) => setLocationAddress(e.target.value)}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="important-info-location-map-link">Map link</label>
-        <input
-          id="important-info-location-map-link"
-          value={locationMapLink}
-          onChange={(e) => setLocationMapLink(e.target.value)}
-          placeholder="https://maps.google.com/…"
-        />
-      </div>
-
-      <div className="row">
-        <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="important-info-contact-name">Contact name</label>
-          <input
-            id="important-info-contact-name"
-            value={contactName}
-            onChange={(e) => setContactName(e.target.value)}
-          />
-        </div>
-        <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="important-info-contact-phone">Contact phone</label>
-          <input
-            id="important-info-contact-phone"
-            value={contactPhone}
-            onChange={(e) => setContactPhone(e.target.value)}
-          />
-        </div>
-        <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="important-info-contact-email">Contact email</label>
-          <input
-            id="important-info-contact-email"
-            value={contactEmail}
-            onChange={(e) => setContactEmail(e.target.value)}
-          />
-        </div>
-      </div>
+      {/* Location/contact fields deliberately have no inputs here any more
+          -- user-reported: "too many fields when adding one. It should
+          only be title and description." Their state above still starts
+          from `item`'s existing values and is still sent unchanged in the
+          submit body below, so editing an item that already has some of
+          this data (from before this simplification) never wipes it. */}
 
       <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
         <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />

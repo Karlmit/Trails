@@ -11,6 +11,7 @@ import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.StayEntryRequest
 import com.trails.app.network.dto.TimelineEntryWriteRequest
 import com.trails.app.network.dto.TransportEntryRequest
+import com.trails.app.network.dto.diffFields
 import com.trails.app.ui.components.LinkFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
@@ -32,6 +35,14 @@ val TRANSPORT_SUBTYPES = listOf("FLIGHT", "TRAIN", "FERRY", "BUS", "CAR", "TAXI"
 val ACTIVITY_SUBTYPES = listOf(
     "TOUR", "RESTAURANT", "ATTRACTION", "EVENT", "BEACH", "HIKE", "MUSEUM", "SHOPPING", "NIGHTLIFE", "ACTIVITY_OTHER",
 )
+
+// expensePaymentStatus stays free text server-side (see WriteRequests.kt) so
+// no pre-existing value is ever rejected, but the UI narrows it to a closed
+// Paid/Unpaid choice per user request -- they'd already been typing exactly
+// "Paid" or "Unpaid" into the old free-text field, so those are the two
+// canonical values plus "" for not-set.
+val PAYMENT_STATUSES = listOf("", "Paid", "Unpaid")
+val PAYMENT_STATUS_LABELS = mapOf("" to "Not set", "Paid" to "Paid", "Unpaid" to "Unpaid")
 
 fun subtypesFor(entryType: String): List<String> = when (entryType) {
     "STAY" -> STAY_SUBTYPES
@@ -93,6 +104,33 @@ class EntryEditViewModel @Inject constructor(
     private val _state = MutableStateFlow(EntryEditState(entryId = entryId))
     val state: StateFlow<EntryEditState> = _state.asStateFlow()
 
+    // Captured right after `loadFrom` populates the existing Entry's
+    // fields -- `save()` diffs against this so a PATCH only ever sends
+    // fields the user actually changed on this screen. Null for a create
+    // (nothing to diff against) or before loading finishes.
+    private var originalFields: Map<String, JsonElement>? = null
+
+    /**
+     * Reuses [toRequest]'s already-correct, entryType-specific field
+     * shape/transforms (trimming, "" -> null, typeDetails composition) by
+     * encoding whichever typed request it built straight to a JsonObject,
+     * rather than duplicating that logic here. `tripId`/`entryType` are
+     * stripped -- a PATCH doesn't need either (the server always applies
+     * the entry's own stored entryType's schema, never a client-supplied
+     * one), and stripping them keeps the diffed field set limited to
+     * things that can actually differ between [originalFields] and a
+     * later edit.
+     */
+    private fun fieldsOf(current: EntryEditState): Map<String, JsonElement> {
+        val body = when (val request = toRequest(current)) {
+            is TimelineEntryWriteRequest.Note -> Json.encodeToJsonElement(request.body)
+            is TimelineEntryWriteRequest.Stay -> Json.encodeToJsonElement(request.body)
+            is TimelineEntryWriteRequest.Transport -> Json.encodeToJsonElement(request.body)
+            is TimelineEntryWriteRequest.Activity -> Json.encodeToJsonElement(request.body)
+        } as JsonObject
+        return body.filterKeys { it != "tripId" && it != "entryType" }
+    }
+
     init {
         entryId?.let { ownerId ->
             viewModelScope.launch {
@@ -142,6 +180,7 @@ class EntryEditViewModel @Inject constructor(
             seat = typeDetails["seat"].orEmpty(),
             baggageInfo = typeDetails["baggageInfo"].orEmpty(),
         )
+        originalFields = fieldsOf(_state.value)
     }
 
     private fun parseTypeDetails(json: String?): Map<String, String> {
@@ -341,8 +380,11 @@ class EntryEditViewModel @Inject constructor(
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
             runCatching {
-                if (current.entryId == null) repository.createTimelineEntry(toRequest(current))
-                else repository.updateTimelineEntry(current.entryId, toRequest(current))
+                if (current.entryId == null) {
+                    repository.createTimelineEntry(toRequest(current))
+                } else {
+                    repository.updateTimelineEntry(current.entryId, diffFields(originalFields, fieldsOf(current)))
+                }
             }.onSuccess { result ->
                 current.links.filter { it.id == null }.forEach { link ->
                     runCatching { linksTagsRepository.createLink(OWNER_TYPE, result.id, link.url, link.label) }

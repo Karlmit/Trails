@@ -2,15 +2,23 @@ package com.trails.app.network.dto
 
 import kotlinx.serialization.Serializable
 
-// Request bodies for create/update calls. Most resources' PATCH schema is
-// a `.strict()` `.partial()` of the create shape that does NOT declare
-// `tripId` as a key at all (Checklist/Idea/ImportantInfo) -- sending it on
-// an update 400s, since a strict schema rejects an unrecognized key
-// regardless of that key's value. Those three get a dedicated
-// `*UpdateRequest` without it. Section's update schema is a plain
-// (non-strict) `z.object`, which silently strips unknown keys instead of
-// rejecting them, so it's safe to reuse the create shape there. TimelineEntry
-// is its own case -- see the comment above its request classes below.
+// Request bodies for create calls, plus PATCH bodies for the resources
+// that still need a fixed request shape (Checklist, Section, Trip, Blog
+// Post). Most resources' PATCH schema is a `.strict()` `.partial()` of the
+// create shape that does NOT declare `tripId` as a key at all
+// (Checklist/Idea/ImportantInfo) -- sending it on an update 400s, since a
+// strict schema rejects an unrecognized key regardless of that key's
+// value. Checklist gets a dedicated `ChecklistUpdateRequest` without it.
+// Section's update schema is a plain (non-strict) `z.object`, which
+// silently strips unknown keys instead of rejecting them, so it's safe to
+// reuse the create shape there. TimelineEntry/Idea/ImportantInfo's actual
+// edit-screen PATCH calls instead build a partial `JsonObject` body
+// directly (see PartialPatch.kt's `diffFields`) so an update only ever
+// sends the fields the user actually changed -- sending every field
+// unconditionally let a stale value silently clobber a concurrent edit
+// from another user (user-reported: "Changes users make are not syncing
+// correctly"). TimelineEntry is its own case beyond that -- see the
+// comment above its request classes below.
 
 @Serializable
 data class TripRequest(
@@ -35,14 +43,19 @@ data class SectionRequest(
 )
 
 @Serializable
-data class ChecklistRequest(val tripId: String, val title: String, val description: String? = null)
+data class ChecklistRequest(
+    val tripId: String,
+    val title: String,
+    val description: String? = null,
+    val isPrivate: Boolean = false,
+)
 
 // checklistUpdateSchema (lib/validation.ts) is `.strict()` and has no
 // `tripId` key -- PATCH must never send it, or the whole request 400s.
 // (ChecklistItem has no PATCH-by-full-body path at all, only the checked-
 // toggle's own ChecklistItemPatchRequest, so it needs no Update twin here.)
 @Serializable
-data class ChecklistUpdateRequest(val title: String, val description: String? = null)
+data class ChecklistUpdateRequest(val title: String, val description: String? = null, val isPrivate: Boolean = false)
 
 @Serializable
 data class ChecklistItemRequest(val checklistId: String, val text: String, val note: String? = null)
@@ -63,45 +76,9 @@ data class ImportantInfoRequest(
     val isPrivate: Boolean = false,
 )
 
-// importantInfoUpdateSchema (lib/important-info.schema.ts) is `.strict()`
-// and has no `tripId` key -- same reasoning as ChecklistUpdateRequest above.
-@Serializable
-data class ImportantInfoUpdateRequest(
-    val title: String,
-    val content: String? = null,
-    val locationName: String? = null,
-    val locationAddress: String? = null,
-    val locationLat: Double? = null,
-    val locationLng: Double? = null,
-    val locationMapLink: String? = null,
-    val contactName: String? = null,
-    val contactPhone: String? = null,
-    val contactEmail: String? = null,
-    val isPrivate: Boolean = false,
-)
-
 @Serializable
 data class IdeaRequest(
     val tripId: String,
-    val sectionId: String? = null,
-    val title: String,
-    val category: String? = null,
-    val priority: String,
-    val weatherSuitability: String,
-    val weatherTags: List<String> = emptyList(),
-    val locationName: String? = null,
-    val locationAddress: String? = null,
-    val locationLat: Double? = null,
-    val locationLng: Double? = null,
-    val locationMapLink: String? = null,
-    val estimatedExpenseAmount: Double? = null,
-    val estimatedExpenseCurrency: String? = null,
-)
-
-// ideaUpdateSchema (lib/validation.ts) is `.strict()` and has no `tripId`
-// key -- same reasoning as ChecklistUpdateRequest above.
-@Serializable
-data class IdeaUpdateRequest(
     val sectionId: String? = null,
     val title: String,
     val category: String? = null,

@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -28,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.data.entity.TripEntity
+import com.trails.app.ui.components.ErrorBanner
+import com.trails.app.ui.components.PillButton
+import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.TrailsTopBar
 import com.trails.app.ui.components.TripStatusBadge
 import com.trails.app.ui.theme.TrailsColors
@@ -37,10 +41,34 @@ import com.trails.app.ui.theme.TrailsShapes
 fun TripListScreen(
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
+    autoOpenActiveTrip: Boolean = false,
+    onAutoOpenConsumed: () -> Unit = {},
     viewModel: TripListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
-    TripListContent(state = state, onOpenTrip = onOpenTrip, onAddTrip = onAddTrip, onSaveOffline = viewModel::saveOffline)
+
+    // One-shot, per-app-entry only -- user-reported: "If a trip is active
+    // the Android app automatically opens that trip's timeline." Consumed
+    // immediately so a later manual visit to this screen (e.g. the drawer's
+    // "All Trips" item) never bounces the user straight back into the
+    // active trip. Only auto-opens when there's exactly one ACTIVE trip --
+    // with more than one, which to jump into is ambiguous, so the list is
+    // shown instead.
+    LaunchedEffect(autoOpenActiveTrip, state.trips) {
+        if (autoOpenActiveTrip && state.trips.isNotEmpty()) {
+            onAutoOpenConsumed()
+            val activeTrips = state.trips.filter { it.status == "ACTIVE" }
+            if (activeTrips.size == 1) onOpenTrip(activeTrips[0].id)
+        }
+    }
+
+    TripListContent(
+        state = state,
+        onOpenTrip = onOpenTrip,
+        onAddTrip = onAddTrip,
+        onSaveOffline = viewModel::saveOffline,
+        onDismissSaveOfflineError = viewModel::dismissSaveOfflineError,
+    )
 }
 
 /**
@@ -56,6 +84,7 @@ fun TripListContent(
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
     onSaveOffline: (String) -> Unit = {},
+    onDismissSaveOfflineError: (String) -> Unit = {},
 ) {
     Scaffold(
         containerColor = TrailsColors.Canvas,
@@ -87,8 +116,10 @@ fun TripListContent(
                         TripCard(
                             trip = trip,
                             isSavingOffline = trip.id in state.savingOfflineIds,
+                            hasSaveOfflineError = trip.id in state.saveOfflineErrorIds,
                             onClick = { onOpenTrip(trip.id) },
                             onSaveOffline = { onSaveOffline(trip.id) },
+                            onDismissError = { onDismissSaveOfflineError(trip.id) },
                         )
                     }
                 }
@@ -101,8 +132,10 @@ fun TripListContent(
 private fun TripCard(
     trip: TripEntity,
     isSavingOffline: Boolean,
+    hasSaveOfflineError: Boolean,
     onClick: () -> Unit,
     onSaveOffline: () -> Unit,
+    onDismissError: () -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
@@ -132,6 +165,12 @@ private fun TripCard(
                 color = TrailsColors.TextSoft,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            if (hasSaveOfflineError) {
+                ErrorBanner(
+                    "Couldn't save this Trip offline -- check your connection and try again.",
+                    modifier = Modifier.padding(top = 12.dp).clickable(onClick = onDismissError),
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -140,27 +179,41 @@ private fun TripCard(
                     isSavingOffline -> {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
                         Text(
-                            "Saving offline…",
+                            "Saving Trip + files to this device…",
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.TextSoft,
                             modifier = Modifier.padding(start = 8.dp),
                         )
                     }
+                    // A plain filled badge, not a button -- it must read as a
+                    // settled, confirmed status ("this trip's data and files
+                    // are on this device right now"), not as something that
+                    // might still be in progress or need a second tap to
+                    // trust. User-reported: the old version (colored text
+                    // that was ALSO the re-sync button) looked identical to
+                    // "still working" and left it unclear whether the tap
+                    // itself had done anything.
                     trip.cachedOffline -> {
+                        androidx.compose.material3.Surface(
+                            color = TrailsColors.BrandMint,
+                            contentColor = TrailsColors.BrandDeep,
+                            shape = com.trails.app.ui.theme.TrailsShapes.Pill,
+                        ) {
+                            Text(
+                                "✓ Saved to this device",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            )
+                        }
                         Text(
-                            "✓ Available offline",
+                            "Refresh",
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.BrandAccent,
-                            modifier = Modifier.clickable(onClick = onSaveOffline),
+                            modifier = Modifier.padding(start = 12.dp).clickable(onClick = onSaveOffline),
                         )
                     }
                     else -> {
-                        Text(
-                            "⬇ Save offline",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TrailsColors.BrandAccent,
-                            modifier = Modifier.clickable(onClick = onSaveOffline),
-                        )
+                        PillButton(text = "Save offline", variant = PillButtonVariant.Outline, onClick = onSaveOffline)
                     }
                 }
             }

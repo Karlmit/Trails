@@ -45,6 +45,12 @@ export interface BudgetLineItem extends BudgetEntryInput {
 export interface BudgetCurrencyGroup {
   currency: string;
   total: number;
+  // Sum of just the line items whose expensePaymentStatus reads as
+  // "Unpaid" -- user-reported: "budget view should separate them more to
+  // see the total of unpaid." expensePaymentStatus stays free text
+  // server-side, so this matches case-insensitively rather than assuming
+  // every row was written through the new Paid/Unpaid dropdown.
+  unpaidTotal: number;
   lineItems: BudgetLineItem[];
 }
 
@@ -105,6 +111,9 @@ export function groupByCurrency(lineItems: BudgetLineItem[]): BudgetCurrencyGrou
     .map(([currency, items]) => ({
       currency,
       total: items.reduce((sum, item) => sum + item.expenseAmount, 0),
+      unpaidTotal: items
+        .filter((item) => item.expensePaymentStatus?.trim().toLowerCase() === 'unpaid')
+        .reduce((sum, item) => sum + item.expenseAmount, 0),
       lineItems: items,
     }))
     .sort((a, b) => a.currency.localeCompare(b.currency));

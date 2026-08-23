@@ -16,6 +16,7 @@ export interface ChecklistDTO {
   tripId: string;
   title: string;
   description: string | null;
+  isPrivate: boolean;
   items: ChecklistItemDTO[];
 }
 
@@ -29,6 +30,8 @@ export interface ChecklistDTO {
 export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
   const router = useRouter();
   const [items, setItems] = useState(checklist.items);
+  const [isPrivate, setIsPrivate] = useState(checklist.isPrivate);
+  const [togglingPrivate, setTogglingPrivate] = useState(false);
   const [newItemText, setNewItemText] = useState('');
   const [newItemNote, setNewItemNote] = useState('');
   const [addingItem, setAddingItem] = useState(false);
@@ -46,6 +49,43 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
   useEffect(() => {
     setItems(checklist.items);
   }, [checklist.items]);
+
+  useEffect(() => {
+    setIsPrivate(checklist.isPrivate);
+  }, [checklist.isPrivate]);
+
+  // User-requested: "Checklists can be marked as private or shared with
+  // other trip users." Same single-request, optimistic, in-flight-guarded
+  // toggle as ImportantInfoCard's handleTogglePrivate.
+  async function handleTogglePrivate() {
+    if (togglingPrivate) return;
+    setError(null);
+    const nextPrivate = !isPrivate;
+    setTogglingPrivate(true);
+    setIsPrivate(nextPrivate);
+
+    try {
+      const response = await fetch(`/api/v1/checklists/${checklist.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPrivate: nextPrivate }),
+      });
+
+      if (!response.ok) {
+        setIsPrivate(!nextPrivate);
+        const body = await response.json().catch(() => null);
+        setError(body?.error?.message ?? 'Could not update this Checklist.');
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setIsPrivate(!nextPrivate);
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setTogglingPrivate(false);
+    }
+  }
 
   async function handleToggle(item: ChecklistItemDTO) {
     if (togglingIds.has(item.id)) return;
@@ -168,10 +208,20 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
           <h3 style={{ margin: 0 }}>{checklist.title}</h3>
           {checklist.description && <p className="text-soft text-multiline">{checklist.description}</p>}
         </div>
-        <div className="row" style={{ gap: 'var(--space-2)' }}>
+        <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
           <span className="text-soft">
             {checkedCount}/{items.length}
           </span>
+          <label className="row" style={{ gap: 'var(--space-1)', alignItems: 'center', margin: 0 }}>
+            <input
+              type="checkbox"
+              checked={isPrivate}
+              onChange={handleTogglePrivate}
+              disabled={togglingPrivate}
+              aria-label="Private"
+            />
+            <span className="text-soft">Private</span>
+          </label>
           <button
             type="button"
             className="btn-danger"
