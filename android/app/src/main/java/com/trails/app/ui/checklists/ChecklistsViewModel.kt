@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.trails.app.data.ChecklistRepository
 import com.trails.app.data.ChecklistWithItems
 import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +18,7 @@ import javax.inject.Inject
 class ChecklistsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: ChecklistRepository,
-    private val syncScheduler: SyncScheduler,
+    syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
     val checklists: Flow<List<ChecklistWithItems>> = repository.observeForTrip(tripId)
@@ -29,9 +30,14 @@ class ChecklistsViewModel @Inject constructor(
     // fresh data as a side effect of the Timeline tab's own sync having run
     // first. A user who opens a trip and stays on Checklists could see
     // arbitrarily stale data relative to another user's edits. Fire a full
-    // trip resync on open, same as Timeline's own `init { refresh() }`.
+    // trip resync on open, same as Timeline's own `init { refresh() }` --
+    // now also drives the pull-to-refresh gesture (user-requested).
+    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
+    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+    fun refresh() = refresher.refresh()
+
     init {
-        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+        refresh()
     }
 
     /** Online-only: requires connectivity, same as the web app's single-tap toggle. */

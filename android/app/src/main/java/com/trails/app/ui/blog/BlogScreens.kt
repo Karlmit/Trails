@@ -12,8 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +31,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.io.File
@@ -54,17 +56,23 @@ fun BlogListScreen(
     viewModel: BlogListViewModel = hiltViewModel(),
 ) {
     val posts by viewModel.posts.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (posts.isEmpty()) {
-            Text("No published posts yet.", modifier = Modifier.align(Alignment.Center).padding(24.dp), color = TrailsColors.TextSoft)
+            EmptyState(
+                emoji = "📖",
+                message = "No posts published yet.\nWrite about the trip -- it'll show up here.",
+                modifier = Modifier.align(Alignment.Center),
+            )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
                 items(posts, key = { it.entry.id }) { item ->
-                    Card(
+                    ElevatedCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
                         shape = TrailsShapes.Card,
-                        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+                        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("📖 ${item.entry.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.BrandDeep)
@@ -84,8 +92,9 @@ fun BlogListScreen(
 fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (entry == null) {
             Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
         } else {

@@ -8,6 +8,7 @@ import { checklistItemUpdateSchema } from '@/lib/validation';
 import { serializeChecklistItem } from '@/lib/serializers';
 import { isRecordNotFoundError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
+import { canViewChecklist } from '@/lib/checklist-access';
 
 interface RouteParams {
   params: Promise<{ itemId: string }>;
@@ -26,8 +27,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { itemId } = await params;
   if (!isUuid(itemId)) return Errors.notFound('Checklist item not found');
 
-  const existing = await prisma.checklistItem.findUnique({ where: { id: itemId } });
+  const existing = await prisma.checklistItem.findUnique({ where: { id: itemId }, include: { checklist: true } });
   if (!existing) return Errors.notFound('Checklist item not found');
+  if (!canViewChecklist(existing.checklist, user)) return Errors.notFound('Checklist item not found');
 
   let body: unknown;
   try {
@@ -80,6 +82,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     include: { checklist: true },
   });
   if (!existing) return Errors.notFound('Checklist item not found');
+  if (!canViewChecklist(existing.checklist, user)) return Errors.notFound('Checklist item not found');
 
   try {
     await prisma.checklistItem.delete({ where: { id: itemId } });

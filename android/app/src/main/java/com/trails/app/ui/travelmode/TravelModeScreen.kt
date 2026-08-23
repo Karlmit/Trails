@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
@@ -35,25 +37,32 @@ fun TravelModeScreen(
     viewModel: TravelModeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (state.tripStatus != "ACTIVE") {
-            Text(
-                if (state.tripStatus == "UPCOMING") "This Trip hasn't started yet." else if (state.tripStatus == "COMPLETED") "This Trip has ended." else "Loading…",
+            EmptyState(
+                emoji = if (state.tripStatus == "UPCOMING") "⏳" else if (state.tripStatus == "COMPLETED") "🏁" else "🧭",
+                message = if (state.tripStatus == "UPCOMING") {
+                    "This trip hasn't started yet.\nTravel Mode wakes up once you're on the move."
+                } else if (state.tripStatus == "COMPLETED") {
+                    "This trip has ended.\nHope it was a good one."
+                } else {
+                    "Loading…"
+                },
                 modifier = Modifier.align(Alignment.Center),
-                color = TrailsColors.TextSoft,
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
                 item {
-                    InfoCard("Current") {
+                    InfoCard("🧭 Right now") {
                         LabeledValue("Section", state.currentSectionName ?: "No Section covers today")
                         LabeledEntry("Stay", state.currentStay, onOpenEntry)
                         LabeledEntry("Activity", state.currentActivity, onOpenEntry)
                     }
                 }
                 item {
-                    InfoCard("Next") {
+                    InfoCard("⏭️ Up next") {
                         LabeledEntry("Next up", state.nextOverall, onOpenEntry)
                         LabeledEntry("Next Transport", state.nextTransport, onOpenEntry)
                         LabeledEntry("Next Activity", state.nextActivity, onOpenEntry)
@@ -61,7 +70,7 @@ fun TravelModeScreen(
                     }
                 }
                 item {
-                    InfoCard("Today's full itinerary") {
+                    InfoCard("📅 Today's full itinerary") {
                         if (state.todaysEntries.isEmpty()) {
                             Text("Nothing on the Timeline for today.", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
                         } else {
@@ -78,10 +87,11 @@ fun TravelModeScreen(
 
 @Composable
 private fun InfoCard(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         shape = TrailsShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)

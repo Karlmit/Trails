@@ -8,6 +8,7 @@ import { checklistItemCreateSchema } from '@/lib/validation';
 import { serializeChecklistItem } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
+import { canViewChecklist } from '@/lib/checklist-access';
 
 // FR-21, spec-checklists: ChecklistItem create (+ list-by-checklist), same
 // conventions as app/api/v1/checklists.
@@ -21,6 +22,12 @@ export async function GET(request: NextRequest) {
   if (!isUuid(checklistId)) {
     return Errors.validation('checklistId query parameter must be a valid UUID');
   }
+
+  // A private Checklist's Items are just as invisible to a non-creator as
+  // the Checklist itself -- otherwise this endpoint would leak them
+  // straight past the list endpoint's own filtering.
+  const checklist = await prisma.checklist.findUnique({ where: { id: checklistId } });
+  if (!checklist || !canViewChecklist(checklist, user)) return Errors.notFound('Checklist not found');
 
   const items = await prisma.checklistItem.findMany({
     where: { checklistId },
@@ -53,6 +60,7 @@ export async function POST(request: NextRequest) {
 
   const checklist = await prisma.checklist.findUnique({ where: { id: parsed.checklistId } });
   if (!checklist) return Errors.notFound('Checklist not found');
+  if (!canViewChecklist(checklist, user)) return Errors.notFound('Checklist not found');
 
   try {
     const item = await prisma.checklistItem.create({

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,8 @@ import com.trails.app.ui.components.LinksEditor
 import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 
 @Composable
 fun ImportantInfoEditScreen(
@@ -46,34 +49,54 @@ fun ImportantInfoEditScreen(
     val scrollState = rememberScrollState()
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
 
+    val isNew = state.infoId == null
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
 
-        // Deliberately just Title/Description/Private -- user-reported: "too
-        // many fields when adding one." Location/contact fields are gone
-        // from the UI, but ImportantInfoEditViewModel still loads and
-        // resends whatever an existing item already has stored for them
-        // (see loadIfEditing/save), so no old data is lost by an edit that
-        // never meant to touch them.
-        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
-        MultilineLabeledField(label = "Description", value = state.content, onValueChange = viewModel::onContentChange)
-        CheckboxRow(label = "Private (hidden from Guests)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
-        LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
+        TrailsCard {
+            ScreenHeading(
+                emoji = "📌",
+                title = if (isNew) "New important info" else "Edit important info",
+                subtitle = "The stuff nobody wants to dig for -- addresses, references, the plan B.",
+            )
 
-        if (state.saving) {
-            CircularProgressIndicator()
-        } else {
-            PillButton(text = if (state.infoId == null) "Create" else "Save changes", onClick = viewModel::save)
-            if (state.infoId != null) {
-                PillButton(text = "Delete", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
+            // Deliberately just Title/Description/Private -- user-reported: "too
+            // many fields when adding one." Location/contact fields are gone
+            // from the UI, but ImportantInfoEditViewModel still loads and
+            // resends whatever an existing item already has stored for them
+            // (see loadIfEditing/save), so no old data is lost by an edit that
+            // never meant to touch them.
+            LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
+            MultilineLabeledField(label = "Description", value = state.content, onValueChange = viewModel::onContentChange)
+            CheckboxRow(label = "Private -- hidden from Guests", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+            LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
+
+            if (state.saving) {
+                CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
+            } else {
+                PillButton(
+                    text = if (isNew) "Create" else "Save changes",
+                    onClick = viewModel::save,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
+        }
+
+        if (!isNew && !state.saving) {
+            PillButton(
+                text = "Delete",
+                variant = PillButtonVariant.Danger,
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 

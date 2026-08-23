@@ -8,6 +8,7 @@ import { checklistCreateSchema } from '@/lib/validation';
 import { serializeChecklist, serializeChecklistItem } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
+import { filterChecklistsForUser } from '@/lib/checklist-access';
 
 // FR-21, spec-checklists: Checklist CRUD, mirroring app/api/v1/sections'
 // Route Handler conventions exactly (UUID checks, error handling,
@@ -28,8 +29,14 @@ export async function GET(request: NextRequest) {
     include: { items: { orderBy: { createdAt: 'asc' } } },
   });
 
+  // A private Checklist is only visible to the User who created it (see
+  // lib/checklist-access.ts) -- filtered here, not in the schema `where`,
+  // so this stays the one place that rule is expressed, same convention as
+  // lib/viewer.ts's filterForViewer.
+  const visible = filterChecklistsForUser(checklists, user);
+
   return NextResponse.json(
-    checklists.map((checklist) => ({
+    visible.map((checklist) => ({
       ...serializeChecklist(checklist),
       items: checklist.items.map(serializeChecklistItem),
     })),
@@ -67,6 +74,7 @@ export async function POST(request: NextRequest) {
         title: parsed.title,
         description: parsed.description ?? null,
         isPrivate: parsed.isPrivate ?? false,
+        createdByUserId: user.id,
       },
     });
 

@@ -3,6 +3,7 @@ package com.trails.app.ui.entrydetail
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,10 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import com.trails.app.ui.timeline.graph.subtypeLabel
@@ -36,6 +40,13 @@ import com.trails.app.util.openCachedFile
 import com.trails.app.util.openExternalUrl
 import com.trails.app.util.queryDisplayName
 import java.io.File
+
+private fun entryTypeEmoji(entryType: String) = when (entryType) {
+    "STAY" -> "🏨"
+    "TRANSPORT" -> "🚗"
+    "ACTIVITY" -> "🎟️"
+    else -> "📝"
+}
 
 /** Mirrors components/EntryDetailPanel.tsx, plus Photo/Attachment upload (not in the web's read-only panel, but the whole point of an on-device Documents cache). */
 @Composable
@@ -50,29 +61,33 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
     val pickAttachment = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.uploadAttachment(uri, queryDisplayName(context, uri))
     }
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    com.trails.app.ui.components.PullToRefreshScreen(
+        isRefreshing = isRefreshing,
+        onRefresh = viewModel::refresh,
+        modifier = Modifier.padding(padding).fillMaxSize(),
+    ) {
         if (entry == null) {
             Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
-            return@Box
+            return@PullToRefreshScreen
         }
-        LazyColumn(contentPadding = PaddingValues(20.dp)) {
-            item {
-                Text(entry.title, style = MaterialTheme.typography.titleLarge, color = TrailsColors.Brand)
-                Text(
-                    buildString {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            TrailsCard {
+                ScreenHeading(
+                    emoji = entryTypeEmoji(entry.entryType),
+                    title = entry.title,
+                    subtitle = buildString {
                         append(ENTRY_TYPE_LABELS[entry.entryType] ?: entry.entryType)
                         entry.subtype?.let { append(" · ${subtypeLabel(it)}") }
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TrailsColors.TextSoft,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
-            }
-            item { Field("When", "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}") }
-            if (entry.locationName != null || entry.locationAddress != null) {
-                item {
-                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                Field("When", "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}")
+                if (entry.locationName != null || entry.locationAddress != null) {
+                    Column {
                         Text("LOCATION", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
                         Text(
                             listOfNotNull(entry.locationName, entry.locationAddress).joinToString(" · "),
@@ -89,11 +104,9 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         }
                     }
                 }
-            }
-            entry.bookingReference?.let { item { Field("Booking reference", it) } }
-            entry.website?.let { website ->
-                item {
-                    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+                entry.bookingReference?.let { Field("Booking reference", it) }
+                entry.website?.let { website ->
+                    Column {
                         Text("WEBSITE", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
                         Text(
                             website,
@@ -103,10 +116,8 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         )
                     }
                 }
-            }
-            entry.bookedVia?.let { item { Field("Booked via", it) } }
-            if (entry.expenseAmount != null) {
-                item {
+                entry.bookedVia?.let { Field("Booked via", it) }
+                if (entry.expenseAmount != null) {
                     Field(
                         "Expense",
                         "${entry.expenseAmount} ${entry.expenseCurrency ?: ""}" +
@@ -114,18 +125,19 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                             (entry.expensePaymentNote?.let { " · $it" } ?: ""),
                     )
                 }
+                if (entry.contactName != null || entry.contactPhone != null || entry.contactEmail != null) {
+                    Field("Contact", listOfNotNull(entry.contactName, entry.contactPhone, entry.contactEmail).joinToString(" · "))
+                }
+                state.typeDetails.forEach { (key, value) ->
+                    if (value.isNotBlank()) Field(key, value)
+                }
+                entry.notes?.let { Field("Notes", it) }
+                entry.postTripNotes?.let { Field("Post-trip notes", it) }
             }
-            if (entry.contactName != null || entry.contactPhone != null || entry.contactEmail != null) {
-                item { Field("Contact", listOfNotNull(entry.contactName, entry.contactPhone, entry.contactEmail).joinToString(" · ")) }
-            }
-            state.typeDetails.forEach { (key, value) ->
-                if (value.isNotBlank()) item { Field(key, value) }
-            }
-            entry.notes?.let { item { Field("Notes", it) } }
-            entry.postTripNotes?.let { item { Field("Post-trip notes", it) } }
 
-            item {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+            TrailsCard {
+                ScreenHeading(emoji = "📎", title = "Photos & attachments")
+                Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         "+ Add photo",
                         style = MaterialTheme.typography.bodyMedium,
@@ -141,11 +153,8 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },
                     )
                 }
-            }
 
-            if (state.photos.isNotEmpty()) {
-                item {
-                    Text("Photos", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text, modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+                if (state.photos.isNotEmpty()) {
                     LazyRow {
                         items(state.photos) { photo ->
                             if (photo.localPath != null) {
@@ -159,23 +168,22 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         }
                     }
                 }
-            }
 
-            if (state.attachments.isNotEmpty()) {
-                item {
-                    Text("Attachments", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-                }
-                items(state.attachments) { attachment ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable {
-                            viewModel.ensureCached(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
-                        },
-                    ) {
-                        Text(
-                            attachment.originalFilename,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TrailsColors.BrandAccent,
-                        )
+                if (state.attachments.isNotEmpty()) {
+                    Column {
+                        state.attachments.forEach { attachment ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable {
+                                    viewModel.ensureCached(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
+                                },
+                            ) {
+                                Text(
+                                    attachment.originalFilename,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = TrailsColors.BrandAccent,
+                                )
+                            }
+                        }
                     }
                 }
             }

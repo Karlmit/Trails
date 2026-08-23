@@ -68,6 +68,7 @@ fun TripListScreen(
         onAddTrip = onAddTrip,
         onSaveOffline = viewModel::saveOffline,
         onDismissSaveOfflineError = viewModel::dismissSaveOfflineError,
+        onRefresh = viewModel::refresh,
     )
 }
 
@@ -85,6 +86,7 @@ fun TripListContent(
     onAddTrip: () -> Unit = {},
     onSaveOffline: (String) -> Unit = {},
     onDismissSaveOfflineError: (String) -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = TrailsColors.Canvas,
@@ -95,18 +97,30 @@ fun TripListContent(
             }
         },
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+        com.trails.app.ui.components.PullToRefreshScreen(
+            isRefreshing = state.isSyncing,
+            onRefresh = onRefresh,
+            modifier = Modifier.padding(padding).fillMaxSize(),
+        ) {
             if (state.trips.isEmpty() && state.isSyncing) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = TrailsColors.BrandAccent,
                 )
             } else if (state.trips.isEmpty()) {
-                Text(
-                    state.syncError ?: "No trips yet. Create your first Trip to start building a Timeline.",
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    color = TrailsColors.TextSoft,
-                )
+                if (state.syncError != null) {
+                    Text(
+                        state.syncError,
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        color = TrailsColors.TextSoft,
+                    )
+                } else {
+                    com.trails.app.ui.components.EmptyState(
+                        emoji = "🧳",
+                        message = "No trips yet.\nTap + to plan your first one.",
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(16.dp),

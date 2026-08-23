@@ -34,8 +34,17 @@ import com.trails.app.ui.components.LinksEditor
 import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import com.trails.app.ui.timeline.graph.subtypeLabel
+
+private fun entryTypeEmoji(entryType: String) = when (entryType) {
+    "STAY" -> "🏨"
+    "TRANSPORT" -> "🚗"
+    "ACTIVITY" -> "🎟️"
+    else -> "📝"
+}
 
 @Composable
 fun EntryEditScreen(
@@ -56,15 +65,23 @@ fun EntryEditScreen(
     val isTransport = state.entryType == "TRANSPORT"
     val isStay = state.entryType == "STAY"
 
+    val isNew = state.entryId == null
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
+
+        TrailsCard {
+        ScreenHeading(
+            emoji = entryTypeEmoji(state.entryType),
+            title = if (isNew) "New ${ENTRY_TYPE_LABELS[state.entryType]?.lowercase() ?: "entry"}" else "Edit entry",
+        )
 
         if (state.entryId == null) {
             DropdownField(
@@ -159,17 +176,27 @@ fun EntryEditScreen(
         if (state.entryId != null) {
             MultilineLabeledField(label = "Post-trip notes", value = state.postTripNotes, onValueChange = viewModel::onPostTripNotesChange)
         }
-        CheckboxRow(label = "Private (only visible to you)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+        CheckboxRow(label = "Private -- only visible to you", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
         LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
 
         if (state.saving) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
         } else {
-            PillButton(text = if (state.entryId == null) "Create Entry" else "Save changes", onClick = viewModel::save)
-            if (state.entryId != null) {
-                HorizontalDivider()
-                PillButton(text = "Delete Entry", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
-            }
+            PillButton(
+                text = if (isNew) "Create entry" else "Save changes",
+                onClick = viewModel::save,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        }
+
+        if (!isNew && !state.saving) {
+            PillButton(
+                text = "Delete entry",
+                variant = PillButtonVariant.Danger,
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 

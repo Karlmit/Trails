@@ -49,6 +49,7 @@ import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.queryDisplayName
@@ -74,6 +75,11 @@ fun BlogEditScreen(
     val scrollState = rememberScrollState()
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
 
+    // Deliberately no TrailsCard wrapper here -- per an earlier, explicit
+    // user request ("I would like the blog content editor to be a full
+    // page experience"), this stays one continuous writing surface (same
+    // choice globals.css's `.blog-editor-form` makes on web), not a boxed
+    // panel among several like the other edit screens.
     Column(
         modifier = Modifier
             .padding(padding)
@@ -82,13 +88,17 @@ fun BlogEditScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        ScreenHeading(emoji = "📖", title = if (state.entryId == null) "New blog post" else "Edit blog post")
         state.error?.let { ErrorBanner(it) }
         if (state.lostFormattingWarning) {
-            Text(
-                "This post has formatting (tables, code blocks, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.",
-                color = TrailsColors.TextSoft,
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Surface(color = TrailsColors.GoldLightest, shape = TrailsShapes.Input) {
+                Text(
+                    "This post has formatting (tables, code blocks, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.",
+                    color = TrailsColors.BrandDeep,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
         }
 
         LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
@@ -170,14 +180,14 @@ fun BlogEditScreen(
         if (state.saving) {
             CircularProgressIndicator()
         } else {
-            PillButton(text = "Save", onClick = viewModel::save)
+            PillButton(text = "Save", onClick = viewModel::save, modifier = Modifier.fillMaxWidth())
             if (state.entryId != null) {
                 if (state.isPublished) {
-                    PillButton(text = "Unpublish", variant = PillButtonVariant.Outline, onClick = viewModel::unpublish)
+                    PillButton(text = "Unpublish", variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth())
                 } else {
-                    PillButton(text = "Publish", variant = PillButtonVariant.Outline, onClick = viewModel::publish)
+                    PillButton(text = "Publish", variant = PillButtonVariant.Outline, onClick = viewModel::publish, modifier = Modifier.fillMaxWidth())
                 }
-                PillButton(text = "Delete Post", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
+                PillButton(text = "Delete post", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth())
             }
         }
     }

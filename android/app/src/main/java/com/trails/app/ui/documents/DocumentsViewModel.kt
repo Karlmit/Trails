@@ -8,6 +8,7 @@ import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,9 +34,14 @@ class DocumentsViewModel @Inject constructor(
 
     // See ChecklistsViewModel's identical init block -- this screen had no
     // sync trigger of its own before, only ever refreshed as a side effect
-    // of the Timeline tab having synced first.
+    // of the Timeline tab having synced first. Now also drives the
+    // pull-to-refresh gesture (user-requested).
+    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
+    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+    fun refresh() = refresher.refresh()
+
     init {
-        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+        refresh()
     }
 
     private val downloading = MutableStateFlow<Set<String>>(emptySet())

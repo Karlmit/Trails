@@ -46,6 +46,7 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(modifier = Modifier.widthIn(max = 380.dp).fillMaxWidth()) {
+            Text("🧭", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(bottom = 8.dp))
             Text("Log in", style = MaterialTheme.typography.titleLarge, color = TrailsColors.Brand)
             Text(
                 "Welcome back to Trails.",

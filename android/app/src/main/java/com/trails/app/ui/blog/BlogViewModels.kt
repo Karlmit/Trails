@@ -7,7 +7,10 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -24,8 +27,21 @@ data class BlogListItem(val entry: TimelineEntryEntity, val excerpt: String)
 class BlogListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     timelineRepository: TimelineRepository,
+    syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
+
+    // See ChecklistsViewModel's identical init block -- this screen had no
+    // sync trigger of its own before, only ever refreshed as a side effect
+    // of the Timeline tab having synced first. Now also drives the
+    // pull-to-refresh gesture (user-requested).
+    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
+    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+    fun refresh() = refresher.refresh()
+
+    init {
+        refresh()
+    }
 
     val posts: StateFlow<List<BlogListItem>> = timelineRepository.observeEntries(tripId)
         .map { entries ->
@@ -49,9 +65,19 @@ class BlogDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val timelineRepository: TimelineRepository,
     private val documentsRepository: DocumentsRepository,
+    private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
     private val tripId: String? = savedStateHandle["tripId"]
+
+    // Pull-to-refresh (user-requested) -- tripId is nullable here (see
+    // comment above), so this is a no-op if it's somehow missing rather
+    // than crashing a detail screen over a gesture.
+    private val refresher = tripId?.let { TripRefresher(viewModelScope, it, syncScheduler) }
+    val isRefreshing: StateFlow<Boolean> = refresher?.isRefreshing ?: MutableStateFlow(false)
+    fun refresh() {
+        refresher?.refresh()
+    }
 
     val uiState: StateFlow<BlogDetailUiState> = combine(
         timelineRepository.observeEntry(entryId),

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,20 +25,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.data.entity.SectionEntity
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
+import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.timeline.graph.sectionSolidColor
 
 /** Mirrors app/(web)/trips/[tripId]/sections/page.tsx, plus create/edit via [onOpenSection]'s FAB/tap wiring in the nav host. */
 @Composable
 fun SectionsScreen(padding: PaddingValues, onOpenSection: (String?) -> Unit = {}, viewModel: SectionsViewModel = hiltViewModel()) {
     val sections by viewModel.sections.collectAsState(initial = emptyList())
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (sections.isEmpty()) {
-            Text(
-                "No Sections yet.",
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = TrailsColors.TextSoft,
+            EmptyState(
+                emoji = "🗂️",
+                message = "No sections yet.\nSplit the trip into legs -- a city, a leg, a house.",
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
@@ -51,28 +57,35 @@ fun SectionsScreen(padding: PaddingValues, onOpenSection: (String?) -> Unit = {}
 
 @Composable
 private fun SectionRow(section: SectionEntity, index: Int, onClick: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(14.dp)
-                    .background(sectionSolidColor(index, section.color), CircleShape),
-            )
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick),
+        shape = TrailsShapes.Card,
+        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(sectionSolidColor(index, section.color), CircleShape),
+                )
+                Text(
+                    text = buildString {
+                        if (section.emoji != null) append("${section.emoji} ")
+                        append(section.name)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TrailsColors.Text,
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
             Text(
-                text = buildString {
-                    if (section.emoji != null) append("${section.emoji} ")
-                    append(section.name)
-                },
-                style = MaterialTheme.typography.titleMedium,
-                color = TrailsColors.Text,
-                modifier = Modifier.padding(start = 10.dp),
+                "${section.startDate} → ${section.endDate}",
+                style = MaterialTheme.typography.bodySmall,
+                color = TrailsColors.TextSoft,
+                modifier = Modifier.padding(start = 24.dp, top = 2.dp),
             )
         }
-        Text(
-            "${section.startDate} → ${section.endDate}",
-            style = MaterialTheme.typography.bodySmall,
-            color = TrailsColors.TextSoft,
-            modifier = Modifier.padding(start = 24.dp),
-        )
     }
 }

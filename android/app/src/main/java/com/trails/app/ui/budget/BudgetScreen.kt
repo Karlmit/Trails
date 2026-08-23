@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -33,25 +35,27 @@ fun BudgetScreen(
     viewModel: BudgetViewModel = hiltViewModel(),
 ) {
     val groups by viewModel.groups.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (groups.isEmpty()) {
-            Text(
-                "No expenses recorded on this Trip yet.",
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = TrailsColors.TextSoft,
+            EmptyState(
+                emoji = "💰",
+                message = "No expenses recorded yet.\nAdd one to an Entry and it'll show up here.",
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
                 items(groups) { group ->
-                    Card(
+                    ElevatedCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                         shape = TrailsShapes.Card,
-                        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+                        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(group.currency, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+                                Text("💰 ${group.currency}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         "Total: %.2f %s".format(group.total, group.currency),

@@ -15,8 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.data.weatherTags
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.io.File
@@ -45,10 +47,15 @@ private val WEATHER_LABELS = mapOf("INDOOR" to "Indoor", "OUTDOOR" to "Outdoor",
 @Composable
 fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, viewModel: IdeasViewModel = hiltViewModel()) {
     val groups by viewModel.groups.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (groups.isEmpty()) {
-            Text("No Ideas yet.", modifier = Modifier.align(Alignment.Center).padding(24.dp), color = TrailsColors.TextSoft)
+            EmptyState(
+                emoji = "💡",
+                message = "No ideas yet.\nSomething worth doing on this trip? Pin it here.",
+                modifier = Modifier.align(Alignment.Center),
+            )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
@@ -74,10 +81,11 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
     val idea = item.idea
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
         shape = TrailsShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onClick)) {

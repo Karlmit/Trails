@@ -6,9 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,8 +23,13 @@ class ImportantInfoViewModel @Inject constructor(
 
     // See ChecklistsViewModel's identical init block -- this screen had no
     // sync trigger of its own before, only ever refreshed as a side effect
-    // of the Timeline tab having synced first.
+    // of the Timeline tab having synced first. Now also drives the
+    // pull-to-refresh gesture (user-requested).
+    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
+    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+    fun refresh() = refresher.refresh()
+
     init {
-        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+        refresh()
     }
 }

@@ -7,6 +7,7 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import com.trails.app.ui.timeline.graph.SectionRange
 import com.trails.app.ui.timeline.graph.sectionIndexForDateKey
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,7 +15,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import javax.inject.Inject
@@ -43,9 +43,14 @@ class TravelModeViewModel @Inject constructor(
     // See ChecklistsViewModel's identical init block -- this screen had no
     // sync trigger of its own before, only ever refreshed as a side effect
     // of the Timeline tab having synced first. Especially relevant here --
-    // Travel Mode is meant to reflect what's happening *right now*.
+    // Travel Mode is meant to reflect what's happening *right now*. Now
+    // also drives the pull-to-refresh gesture (user-requested).
+    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
+    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
+    fun refresh() = refresher.refresh()
+
     init {
-        viewModelScope.launch { syncScheduler.syncTripNow(tripId) }
+        refresh()
     }
 
     val uiState: StateFlow<TravelModeUiState> = combine(

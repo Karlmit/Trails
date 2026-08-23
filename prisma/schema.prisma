@@ -41,6 +41,7 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   sessions Session[]
+  createdChecklists Checklist[]
 
   @@map("users")
 }
@@ -375,23 +376,34 @@ model Checklist {
   title       String
   description String?
 
-  // User-requested: "Checklists can be marked as private or shared with
-  // other trip users." Stored/toggleable the same as ImportantInfo.isPrivate
-  // -- this app has no per-Trip ownership/membership model (AD-7: any
-  // authenticated User has full access to every Trip) and no Guest-eligible
-  // surface for Checklists, so like ImportantInfo this has no read-time
-  // enforcement effect yet; it exists so the intent is captured and visible.
+  // User-clarified: "Guests can't see checklists. they are only for signed
+  // in users. With private checklist, its only visible to the user who
+  // created it. If not marked as private, the checklist can be seen and
+  // edited by all signed in users." Guest exclusion was already true (no
+  // Guest-eligible surface for Checklists at all, see proxy.ts's
+  // GUEST_ELIGIBLE_PATH). isPrivate now has real enforcement, unlike
+  // ImportantInfo.isPrivate -- see createdByUserId below, and
+  // lib/checklist-access.ts for the shared predicate every Checklist/
+  // ChecklistItem route applies.
   isPrivate Boolean @default(false) @map("is_private")
+
+  // Who created this Checklist -- the only "ownership" concept this app
+  // has for any resource (AD-7 is explicit that Trips themselves have
+  // none). Required so a private Checklist has someone to be private TO;
+  // backfilled for pre-existing rows in this feature's own migration.
+  createdByUserId String @map("created_by_user_id") @db.Uuid
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // No Section field anywhere on Checklist or ChecklistItem (spec's
   // "Never" boundary) -- Trip is the only relation.
-  trip  Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  items ChecklistItem[]
+  trip      Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  createdBy User            @relation(fields: [createdByUserId], references: [id])
+  items     ChecklistItem[]
 
   @@index([tripId])
+  @@index([createdByUserId])
   @@map("checklists")
 }
 

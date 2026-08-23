@@ -38,6 +38,8 @@ import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.SECTION_COLOR_OPTIONS
 import com.trails.app.ui.timeline.graph.SECTION_EMOJI_OPTIONS
@@ -60,34 +62,50 @@ fun SectionEditScreen(
     val scrollState = rememberScrollState()
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
 
+    val isNew = state.sectionId == null
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
 
-        LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
-        DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
-        DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
+        TrailsCard {
+            ScreenHeading(
+                emoji = state.emoji?.takeIf { it.isNotBlank() } ?: "🗂️",
+                title = if (isNew) "New section" else "Edit section",
+                subtitle = "A leg of the trip -- give it a name, dates, and a look of its own.",
+            )
 
-        ColorSwatchPicker(selected = state.color, onToggle = viewModel::onColorToggle)
-        EmojiPicker(selected = state.emoji, onToggle = viewModel::onEmojiToggle)
+            LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
+            DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
+            DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
 
-        if (state.saving) {
-            CircularProgressIndicator()
-        } else {
-            PillButton(text = if (state.sectionId == null) "Create Section" else "Save changes", onClick = viewModel::save)
-            if (state.sectionId != null) {
+            ColorSwatchPicker(selected = state.color, onToggle = viewModel::onColorToggle)
+            EmojiPicker(selected = state.emoji, onToggle = viewModel::onEmojiToggle)
+
+            if (state.saving) {
+                CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
+            } else {
                 PillButton(
-                    text = "Delete Section",
-                    variant = PillButtonVariant.Danger,
-                    onClick = { showDeleteConfirm = true },
+                    text = if (isNew) "Create section" else "Save changes",
+                    onClick = viewModel::save,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
+        }
+
+        if (!isNew && !state.saving) {
+            PillButton(
+                text = "Delete section",
+                variant = PillButtonVariant.Danger,
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 

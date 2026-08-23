@@ -16,13 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +42,9 @@ import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.LinksEditor
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TagsEditor
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.util.queryDisplayName
@@ -88,113 +85,139 @@ fun IdeaEditScreen(
     // scroll up, which read as "nothing happened" (user-reported).
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
 
+    val isNew = state.ideaId == null
+
     Column(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.error?.let { ErrorBanner(it) }
 
-        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
-
-        val sectionOptions = listOf<String?>(null) + sections.map { it.id }
-        DropdownField(
-            label = "Section",
-            options = sectionOptions,
-            selected = state.sectionId,
-            onSelected = viewModel::onSectionChange,
-            optionLabel = { id -> sections.find { it.id == id }?.let { "${it.emoji.orEmpty()} ${it.name}".trim() } ?: "No Section" },
-        )
-
-        CreatableDropdownField(
-            label = "Category",
-            options = categoryOptions,
-            selected = state.category,
-            onSelected = viewModel::onCategoryChange,
-            onAddOption = viewModel::addCategoryOption,
-            onRemoveOption = viewModel::removeCategoryOption,
-        )
-        DropdownField(
-            label = "Priority",
-            options = IDEA_PRIORITIES,
-            selected = state.priority,
-            onSelected = viewModel::onPriorityChange,
-            optionLabel = { IDEA_PRIORITY_LABELS[it] ?: it },
-        )
-        DropdownField(
-            label = "Weather suitability",
-            options = IDEA_WEATHER_SUITABILITY,
-            selected = state.weatherSuitability,
-            onSelected = viewModel::onWeatherSuitabilityChange,
-            optionLabel = { IDEA_WEATHER_LABELS[it] ?: it },
-        )
-        LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
-        LabeledField(label = "Google Maps link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LabeledField(
-                label = "Est. expense",
-                value = state.estimatedExpenseAmount,
-                onValueChange = viewModel::onExpenseAmountChange,
-                modifier = Modifier.weight(1f),
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+        TrailsCard {
+            ScreenHeading(
+                emoji = "💡",
+                title = if (isNew) "New idea" else "Edit idea",
+                subtitle = "Something worth doing on this trip -- pin it here before you forget.",
             )
-            LabeledField(
-                label = "Currency",
-                value = state.estimatedExpenseCurrency,
-                onValueChange = viewModel::onExpenseCurrencyChange,
-                modifier = Modifier.weight(1f),
-            )
-        }
 
-        HorizontalDivider()
-        Text("Cover photo", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
-        LazyRow {
-            items(photos, key = { it.id }) { photo ->
-                Row(modifier = Modifier.padding(end = 8.dp)) {
-                    if (photo.localPath != null) {
-                        AsyncImage(
-                            model = File(photo.localPath),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(88.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.markPhotoPrimary(photo.id) },
-                        )
-                    }
-                }
+            LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
+
+            val sectionOptions = listOf<String?>(null) + sections.map { it.id }
+            DropdownField(
+                label = "Section",
+                options = sectionOptions,
+                selected = state.sectionId,
+                onSelected = viewModel::onSectionChange,
+                optionLabel = { id -> sections.find { it.id == id }?.let { "${it.emoji.orEmpty()} ${it.name}".trim() } ?: "No Section" },
+            )
+
+            CreatableDropdownField(
+                label = "Category",
+                options = categoryOptions,
+                selected = state.category,
+                onSelected = viewModel::onCategoryChange,
+                onAddOption = viewModel::addCategoryOption,
+                onRemoveOption = viewModel::removeCategoryOption,
+            )
+            DropdownField(
+                label = "Priority",
+                options = IDEA_PRIORITIES,
+                selected = state.priority,
+                onSelected = viewModel::onPriorityChange,
+                optionLabel = { IDEA_PRIORITY_LABELS[it] ?: it },
+            )
+            DropdownField(
+                label = "Weather suitability",
+                options = IDEA_WEATHER_SUITABILITY,
+                selected = state.weatherSuitability,
+                onSelected = viewModel::onWeatherSuitabilityChange,
+                optionLabel = { IDEA_WEATHER_LABELS[it] ?: it },
+            )
+            LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
+            LabeledField(label = "Google Maps link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LabeledField(
+                    label = "Est. expense",
+                    value = state.estimatedExpenseAmount,
+                    onValueChange = viewModel::onExpenseAmountChange,
+                    modifier = Modifier.weight(1f),
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+                )
+                LabeledField(
+                    label = "Currency",
+                    value = state.estimatedExpenseCurrency,
+                    onValueChange = viewModel::onExpenseCurrencyChange,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            item {
-                if (state.uploadingPhoto) {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Text("Uploading…", color = TrailsColors.TextSoft, modifier = Modifier.padding(start = 8.dp))
-                    }
-                } else {
-                    TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                        Text("+ Add photo")
-                    }
-                }
+
+            if (state.saving) {
+                CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
+            } else {
+                PillButton(
+                    text = if (isNew) "Create idea" else "Save changes",
+                    onClick = viewModel::save,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
 
-        if (state.saving) {
-            CircularProgressIndicator()
-        } else {
-            PillButton(text = if (state.ideaId == null) "Create Idea" else "Save changes", onClick = viewModel::save)
+        TrailsCard {
+            ScreenHeading(emoji = "📷", title = "Cover photo")
+            LazyRow {
+                items(photos, key = { it.id }) { photo ->
+                    Row(modifier = Modifier.padding(end = 8.dp)) {
+                        if (photo.localPath != null) {
+                            AsyncImage(
+                                model = File(photo.localPath),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { viewModel.markPhotoPrimary(photo.id) },
+                            )
+                        }
+                    }
+                }
+                item {
+                    if (state.uploadingPhoto) {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text("Uploading…", color = TrailsColors.TextSoft, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    } else {
+                        TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                            Text("+ Add photo")
+                        }
+                    }
+                }
+            }
         }
 
-        if (state.ideaId != null) {
-            HorizontalDivider()
-            TagsEditor(tags = state.tags, onAdd = viewModel::addTag, onRemove = viewModel::removeTag)
-            LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
+        if (!isNew) {
+            TrailsCard {
+                ScreenHeading(emoji = "🏷️", title = "Tags & links")
+                TagsEditor(tags = state.tags, onAdd = viewModel::addTag, onRemove = viewModel::removeTag)
+                LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
+            }
 
-            HorizontalDivider()
-            PillButton(text = "Convert to Timeline Entry", variant = PillButtonVariant.Outline, onClick = { showConvertConfirm = true })
-            PillButton(text = "Delete Idea", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
+            PillButton(
+                text = "Convert to Timeline Entry",
+                variant = PillButtonVariant.Outline,
+                onClick = { showConvertConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PillButton(
+                text = "Delete idea",
+                variant = PillButtonVariant.Danger,
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 

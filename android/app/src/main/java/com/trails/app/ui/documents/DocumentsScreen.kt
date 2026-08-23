@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.openCachedFile
@@ -33,23 +35,25 @@ import com.trails.app.util.openCachedFile
 fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hiltViewModel()) {
     val groups by viewModel.groups.collectAsState()
     val downloadingIds by viewModel.downloadingIds.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val context = LocalContext.current
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (groups.isEmpty()) {
-            Text(
-                "No documents uploaded on this Trip yet.",
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = TrailsColors.TextSoft,
+            EmptyState(
+                emoji = "📎",
+                message = "No documents yet.\nTickets, vouchers, confirmations -- upload them here.",
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
-                        Card(
+                        ElevatedCard(
                             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                             shape = TrailsShapes.Card,
-                            colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+                            colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(group.label, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)

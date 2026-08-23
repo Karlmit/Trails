@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
+import { getSessionUser } from '@/lib/auth';
 import { serializeChecklist, serializeChecklistItem } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
+import { filterChecklistsForUser } from '@/lib/checklist-access';
 import { ChecklistForm } from '@/components/ChecklistForm';
 import { ChecklistCard } from '@/components/ChecklistCard';
 
@@ -17,6 +19,14 @@ export default async function ChecklistsPage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
+  // This page is fully requireAuth (proxy.ts never lists it as
+  // Guest-eligible), so a null user here should be unreachable in
+  // practice -- but a private Checklist's own visibility depends on
+  // knowing who's asking, so this page needs the real User, not just the
+  // fact that *someone* is signed in.
+  const user = await getSessionUser();
+  if (!user) notFound();
+
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
@@ -28,7 +38,7 @@ export default async function ChecklistsPage({ params }: PageProps) {
   });
   if (!trip) notFound();
 
-  const checklists = trip.checklists.map((checklist) => ({
+  const checklists = filterChecklistsForUser(trip.checklists, user).map((checklist) => ({
     ...serializeChecklist(checklist),
     items: checklist.items.map(serializeChecklistItem),
   }));

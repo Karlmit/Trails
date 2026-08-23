@@ -1,5 +1,6 @@
 package com.trails.app.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DatePicker
@@ -125,6 +128,12 @@ fun <T> DropdownField(
     }
 }
 
+/**
+ * A tappable toggle chip, not a bare checkbox-plus-label -- the lock/unlock
+ * icon gives "Private" (this row's only real-world caller today) an
+ * immediate visual meaning instead of relying on the label text alone.
+ * Whole row is clickable, not just the small checkbox hit-target.
+ */
 @Composable
 fun CheckboxRow(
     label: String,
@@ -132,13 +141,33 @@ fun CheckboxRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = CheckboxDefaults.colors(checkedColor = TrailsColors.BrandAccent),
-        )
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.Text)
+    androidx.compose.material3.Surface(
+        modifier = modifier.fillMaxWidth().clickable { onCheckedChange(!checked) },
+        color = if (checked) TrailsColors.BrandMint else TrailsColors.SurfaceCool,
+        shape = TrailsShapes.Input,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (checked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                contentDescription = null,
+                tint = if (checked) TrailsColors.BrandDeep else TrailsColors.TextSoft,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (checked) TrailsColors.BrandDeep else TrailsColors.Text,
+                modifier = Modifier.padding(start = 10.dp).weight(1f),
+            )
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = CheckboxDefaults.colors(checkedColor = TrailsColors.BrandAccent),
+            )
+        }
     }
 }
 

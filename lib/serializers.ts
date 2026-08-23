@@ -134,6 +134,7 @@ export function serializeChecklist(checklist: Checklist) {
     title: checklist.title,
     description: checklist.description,
     isPrivate: checklist.isPrivate,
+    createdByUserId: checklist.createdByUserId,
     createdAt: checklist.createdAt.toISOString(),
     updatedAt: checklist.updatedAt.toISOString(),
   };

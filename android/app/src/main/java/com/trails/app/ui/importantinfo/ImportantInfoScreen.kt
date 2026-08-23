@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.data.entity.ImportantInfoEntity
+import com.trails.app.ui.components.EmptyState
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -28,13 +30,14 @@ import com.trails.app.ui.theme.TrailsShapes
 @Composable
 fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = {}, viewModel: ImportantInfoViewModel = hiltViewModel()) {
     val items by viewModel.items.collectAsState(initial = emptyList())
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (items.isEmpty()) {
-            Text(
-                "No Important Info yet.",
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = TrailsColors.TextSoft,
+            EmptyState(
+                emoji = "📌",
+                message = "No important info yet.\nAddresses, references, the plan B -- keep it here.",
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp)) {
@@ -46,13 +49,14 @@ fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = 
 
 @Composable
 private fun ImportantInfoCard(item: ImportantInfoEntity, onClick: () -> Unit) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable(onClick = onClick),
         shape = TrailsShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(item.title, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+            Text("📌 ${item.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
             item.content?.let {
                 Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text, modifier = Modifier.padding(top = 6.dp))
             }

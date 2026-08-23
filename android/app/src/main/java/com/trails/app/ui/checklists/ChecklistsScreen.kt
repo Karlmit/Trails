@@ -8,13 +8,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,7 +30,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.data.ChecklistWithItems
+import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.ErrorBanner
+import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -34,13 +41,14 @@ import com.trails.app.ui.theme.TrailsShapes
 fun ChecklistsScreen(padding: PaddingValues, onOpenChecklist: (String?) -> Unit = {}, viewModel: ChecklistsViewModel = hiltViewModel()) {
     val checklists by viewModel.checklists.collectAsState(initial = emptyList())
     val error by viewModel.error.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+    PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (checklists.isEmpty()) {
-            Text(
-                "No Checklists yet.",
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                color = TrailsColors.TextSoft,
+            EmptyState(
+                emoji = "🧳",
+                message = "No checklists yet.\nStart a packing list or a pre-departure to-do.",
+                modifier = Modifier.align(Alignment.Center),
             )
         } else {
             Column {
@@ -63,13 +71,15 @@ fun ChecklistsScreen(padding: PaddingValues, onOpenChecklist: (String?) -> Unit 
 
 @Composable
 private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onToggle: (String, Boolean) -> Unit, onOpen: () -> Unit) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         shape = TrailsShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = TrailsColors.Surface),
+        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen), verticalAlignment = Alignment.CenterVertically) {
+                Text("✅", modifier = Modifier.padding(end = 8.dp))
                 Text(
                     checklistWithItems.checklist.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -77,7 +87,20 @@ private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onToggle: (Str
                     modifier = Modifier.weight(1f),
                 )
                 if (checklistWithItems.checklist.isPrivate) {
-                    Text("Private", style = MaterialTheme.typography.labelSmall, color = TrailsColors.TextSoft)
+                    Surface(color = TrailsColors.BrandMint, shape = TrailsShapes.Pill) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        ) {
+                            Icon(Icons.Filled.Lock, contentDescription = null, tint = TrailsColors.BrandDeep, modifier = Modifier.size(12.dp))
+                            Text(
+                                "Private",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TrailsColors.BrandDeep,
+                                modifier = Modifier.padding(start = 4.dp),
+                            )
+                        }
+                    }
                 }
             }
             checklistWithItems.checklist.description?.let {

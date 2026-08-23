@@ -8,6 +8,7 @@ import { checklistUpdateSchema } from '@/lib/validation';
 import { serializeChecklist, serializeChecklistItem } from '@/lib/serializers';
 import { isRecordNotFoundError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
+import { canViewChecklist } from '@/lib/checklist-access';
 
 interface RouteParams {
   params: Promise<{ checklistId: string }>;
@@ -22,6 +23,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const existing = await prisma.checklist.findUnique({ where: { id: checklistId } });
   if (!existing) return Errors.notFound('Checklist not found');
+  // A private Checklist not created by this User doesn't exist as far as
+  // they're concerned (404, not 403 -- same "don't confirm existence"
+  // shape as every other not-found here).
+  if (!canViewChecklist(existing, user)) return Errors.notFound('Checklist not found');
 
   let body: unknown;
   try {
@@ -74,6 +79,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   const existing = await prisma.checklist.findUnique({ where: { id: checklistId } });
   if (!existing) return Errors.notFound('Checklist not found');
+  if (!canViewChecklist(existing, user)) return Errors.notFound('Checklist not found');
 
   try {
     // Deleting a Checklist cascades to its Items at the database layer

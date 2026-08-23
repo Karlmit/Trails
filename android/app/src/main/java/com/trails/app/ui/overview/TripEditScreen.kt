@@ -3,12 +3,16 @@ package com.trails.app.ui.overview
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -32,6 +36,8 @@ import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,37 +68,56 @@ fun TripEditScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Text("←", color = TrailsColors.Brand, style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TrailsColors.Brand)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),
             )
         },
     ) { padding ->
+        val isNew = state.tripId == null
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             state.error?.let { ErrorBanner(it) }
 
-            LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
-            LabeledField(label = "Destination (optional)", value = state.destination, onValueChange = viewModel::onDestinationChange)
-            DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
-            DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
-            LabeledField(label = "Timezone (IANA, e.g. Europe/Stockholm)", value = state.timezone, onValueChange = viewModel::onTimezoneChange)
-            MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+            TrailsCard {
+                ScreenHeading(
+                    emoji = "🧳",
+                    title = if (isNew) "New trip" else "Trip details",
+                    subtitle = "Where you're going and when -- everything else builds on this.",
+                )
 
-            if (state.saving) {
-                CircularProgressIndicator()
-            } else {
-                PillButton(text = if (state.tripId == null) "Create Trip" else "Save changes", onClick = viewModel::save)
-                if (state.tripId != null) {
-                    PillButton(text = "Delete Trip", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true })
+                LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
+                LabeledField(label = "Destination (optional)", value = state.destination, onValueChange = viewModel::onDestinationChange)
+                DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
+                DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
+                LabeledField(label = "Timezone (IANA, e.g. Europe/Stockholm)", value = state.timezone, onValueChange = viewModel::onTimezoneChange)
+                MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+
+                if (state.saving) {
+                    CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
+                } else {
+                    PillButton(
+                        text = if (isNew) "Create trip" else "Save changes",
+                        onClick = viewModel::save,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
+            }
+
+            if (!isNew && !state.saving) {
+                PillButton(
+                    text = "Delete trip",
+                    variant = PillButtonVariant.Danger,
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

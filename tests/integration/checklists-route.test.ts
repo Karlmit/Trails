@@ -6,7 +6,7 @@ import {
   DELETE as deleteChecklist,
   PATCH as patchChecklist,
 } from '@/app/api/v1/checklists/[checklistId]/route';
-import { POST as createItem } from '@/app/api/v1/checklist-items/route';
+import { GET as listItems, POST as createItem } from '@/app/api/v1/checklist-items/route';
 import {
   DELETE as deleteItem,
   PATCH as patchItem,
@@ -279,6 +279,120 @@ describe.skipIf(!hasTestDatabase)('checklists route', () => {
         checklistParams(UNKNOWN_ID),
       );
       expect(res.status).toBe(404);
+    });
+  });
+
+  // User-clarified: "With private checklist, its only visible to the user
+  // who created it. If not marked as private, the checklist can be seen
+  // and edited by all signed in users." `token`/user "sara" above is the
+  // creator in every case here; `otherToken`/"mira" is the second signed-in
+  // user checking they can't see/touch what isn't theirs.
+  describe('private checklists', () => {
+    let otherToken: string;
+
+    beforeEach(async () => {
+      const other = await testPrisma().user.create({
+        data: { username: 'mira', passwordHash: 'irrelevant', role: 'USER' },
+      });
+      otherToken = (await issueSession(other.id)).token;
+    });
+
+    it('excludes a private Checklist from another User\'s list, but includes it in the creator\'s own list', async () => {
+      const created = await createChecklist(
+        jsonRequest('http://localhost/api/v1/checklists', 'POST', { tripId, title: 'Secret plans', isPrivate: true }, token),
+      );
+      const checklistId = (await created.json()).id;
+
+      const ownList = await listChecklists(
+        jsonRequest(`http://localhost/api/v1/checklists?tripId=${tripId}`, 'GET', undefined, token),
+      );
+      expect((await ownList.json()).map((c: { id: string }) => c.id)).toContain(checklistId);
+
+      const otherList = await listChecklists(
+        jsonRequest(`http://localhost/api/v1/checklists?tripId=${tripId}`, 'GET', undefined, otherToken),
+      );
+      expect((await otherList.json()).map((c: { id: string }) => c.id)).not.toContain(checklistId);
+    });
+
+    it('includes a non-private Checklist in every signed-in User\'s list', async () => {
+      const created = await createChecklist(
+        jsonRequest('http://localhost/api/v1/checklists', 'POST', { tripId, title: 'Shared list' }, token),
+      );
+      const checklistId = (await created.json()).id;
+
+      const otherList = await listChecklists(
+        jsonRequest(`http://localhost/api/v1/checklists?tripId=${tripId}`, 'GET', undefined, otherToken),
+      );
+      expect((await otherList.json()).map((c: { id: string }) => c.id)).toContain(checklistId);
+    });
+
+    it('404s a non-creator\'s PATCH/DELETE of a private Checklist', async () => {
+      const created = await createChecklist(
+        jsonRequest('http://localhost/api/v1/checklists', 'POST', { tripId, title: 'Secret plans', isPrivate: true }, token),
+      );
+      const checklistId = (await created.json()).id;
+
+      const patchRes = await patchChecklist(
+        jsonRequest(`http://localhost/api/v1/checklists/${checklistId}`, 'PATCH', { title: 'Hijacked' }, otherToken),
+        checklistParams(checklistId),
+      );
+      expect(patchRes.status).toBe(404);
+
+      const deleteRes = await deleteChecklist(
+        jsonRequest(`http://localhost/api/v1/checklists/${checklistId}`, 'DELETE', undefined, otherToken),
+        checklistParams(checklistId),
+      );
+      expect(deleteRes.status).toBe(404);
+
+      const stillThere = await testPrisma().checklist.findUnique({ where: { id: checklistId } });
+      expect(stillThere?.title).toBe('Secret plans');
+    });
+
+    it('allows a non-creator to PATCH a non-private Checklist (shared editing)', async () => {
+      const created = await createChecklist(
+        jsonRequest('http://localhost/api/v1/checklists', 'POST', { tripId, title: 'Shared list' }, token),
+      );
+      const checklistId = (await created.json()).id;
+
+      const patchRes = await patchChecklist(
+        jsonRequest(`http://localhost/api/v1/checklists/${checklistId}`, 'PATCH', { title: 'Shared list (edited by mira)' }, otherToken),
+        checklistParams(checklistId),
+      );
+      expect(patchRes.status).toBe(200);
+      expect((await patchRes.json()).title).toBe('Shared list (edited by mira)');
+    });
+
+    it('404s a non-creator listing/adding/toggling items on a private Checklist', async () => {
+      const created = await createChecklist(
+        jsonRequest('http://localhost/api/v1/checklists', 'POST', { tripId, title: 'Secret plans', isPrivate: true }, token),
+      );
+      const checklistId = (await created.json()).id;
+      const itemRes = await createItem(
+        jsonRequest('http://localhost/api/v1/checklist-items', 'POST', { checklistId, text: 'Passport' }, token),
+      );
+      const itemId = (await itemRes.json()).id;
+
+      const listRes = await listItems(
+        jsonRequest(`http://localhost/api/v1/checklist-items?checklistId=${checklistId}`, 'GET', undefined, otherToken),
+      );
+      expect(listRes.status).toBe(404);
+
+      const addRes = await createItem(
+        jsonRequest('http://localhost/api/v1/checklist-items', 'POST', { checklistId, text: 'Sunscreen' }, otherToken),
+      );
+      expect(addRes.status).toBe(404);
+
+      const toggleRes = await patchItem(
+        jsonRequest(`http://localhost/api/v1/checklist-items/${itemId}`, 'PATCH', { checked: true }, otherToken),
+        itemParams(itemId),
+      );
+      expect(toggleRes.status).toBe(404);
+
+      const deleteRes = await deleteItem(
+        jsonRequest(`http://localhost/api/v1/checklist-items/${itemId}`, 'DELETE', undefined, otherToken),
+        itemParams(itemId),
+      );
+      expect(deleteRes.status).toBe(404);
     });
   });
 });

@@ -9,7 +9,10 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.sync.SyncScheduler
+import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -32,8 +35,19 @@ class EntryDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     timelineRepository: TimelineRepository,
     private val documentsRepository: DocumentsRepository,
+    syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
+
+    // Pull-to-refresh (user-requested) -- tripId is nullable here (the
+    // route always supplies it, but this stays defensive rather than
+    // crashing a detail screen over a gesture if it somehow doesn't).
+    private val navTripId: String? = savedStateHandle["tripId"]
+    private val refresher = navTripId?.let { TripRefresher(viewModelScope, it, syncScheduler) }
+    val isRefreshing: StateFlow<Boolean> = refresher?.isRefreshing ?: MutableStateFlow(false)
+    fun refresh() {
+        refresher?.refresh()
+    }
 
     fun uploadPhoto(uri: Uri, filename: String) {
         viewModelScope.launch {
