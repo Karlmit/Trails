@@ -1,19 +1,22 @@
-// FR-16: Ideas are filterable by Priority, Section, and Category. Pure,
-// DB-free function so it's unit-testable on its own (per this spec's Tasks:
-// "unit for filtering") -- both the GET /api/v1/ideas Route Handler and the
-// Ideas page's server-rendered `?priority=&sectionId=&category=` filter form
-// call this, so the predicate is defined exactly once.
+// FR-16: Ideas are filterable by Priority, Section, Category, and Weather
+// suitability. Pure, DB-free function so it's unit-testable on its own (per
+// this spec's Tasks: "unit for filtering") -- both the GET /api/v1/ideas
+// Route Handler and the Ideas page's server-rendered
+// `?priority=&sectionId=&category=&weatherSuitability=` filter form call
+// this, so the predicate is defined exactly once.
 
 export interface IdeaFilterInput {
   priority: string;
   sectionId?: string | null;
   category?: string | null;
+  weatherSuitability: string;
 }
 
 export interface IdeaFilters {
   priority?: string | null;
   sectionId?: string | null;
   category?: string | null;
+  weatherSuitability?: string | null;
 }
 
 export function filterIdeas<T extends IdeaFilterInput>(ideas: T[], filters: IdeaFilters): T[] {
@@ -21,6 +24,7 @@ export function filterIdeas<T extends IdeaFilterInput>(ideas: T[], filters: Idea
     if (filters.priority && idea.priority !== filters.priority) return false;
     if (filters.sectionId && idea.sectionId !== filters.sectionId) return false;
     if (filters.category && idea.category !== filters.category) return false;
+    if (filters.weatherSuitability && idea.weatherSuitability !== filters.weatherSuitability) return false;
     return true;
   });
 }

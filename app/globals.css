@@ -658,6 +658,15 @@ p {
   background: var(--band-color);
 }
 
+/* User-requested: the day a Section ends and the next begins gets a
+   half-and-half band (this Section's color on top, the next Section's on
+   the bottom) instead of a flat single color, marking the handoff -- a
+   hard-stop gradient (both color-stops at the same 50% position), not a
+   smooth blend. */
+.timeline-row-bg.is-section-transition {
+  background: linear-gradient(to bottom, var(--band-color) 50%, var(--band-color-next) 50%);
+}
+
 .timeline-row-bg.is-today {
   box-shadow: inset 3px 0 0 var(--color-gold);
 }

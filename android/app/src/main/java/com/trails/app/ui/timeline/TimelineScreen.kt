@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.ui.theme.TrailsColors
@@ -77,6 +78,17 @@ fun TimelineScreen(
                         val previousSectionIndex = if (index > 0) layout.days[index - 1].day.sectionIndex else null
                         val section = day.day.sectionIndex?.let { state.sections.getOrNull(it) }
                         val showSectionLabel = section != null && day.day.sectionIndex != previousSectionIndex
+                        // User-requested: the day a Section ends and the
+                        // next begins gets a half-and-half band instead of
+                        // a flat color -- see DayRow's own comment.
+                        val nextSectionIndex = if (index < layout.days.size - 1) layout.days[index + 1].day.sectionIndex else null
+                        val isSectionTransition =
+                            day.day.sectionIndex != null && nextSectionIndex != null && nextSectionIndex != day.day.sectionIndex
+                        val nextBandColor = if (isSectionTransition) {
+                            state.sections.getOrNull(nextSectionIndex!!)?.let { sectionBandColor(nextSectionIndex, it.color) }
+                        } else {
+                            null
+                        }
                         DayRow(
                             day = day,
                             graphWidth = graphWidth,
@@ -84,6 +96,7 @@ fun TimelineScreen(
                             sectionEmoji = section?.emoji,
                             trunkColor = section?.let { sectionSolidColor(day.day.sectionIndex!!, it.color) },
                             bandColor = section?.let { sectionBandColor(day.day.sectionIndex!!, it.color) },
+                            nextBandColor = nextBandColor,
                             showSectionLabel = showSectionLabel,
                             tripTimezone = trip.timezone,
                             onOpenEntry = onOpenEntry,
@@ -103,6 +116,7 @@ private fun DayRow(
     sectionEmoji: String?,
     trunkColor: androidx.compose.ui.graphics.Color?,
     bandColor: androidx.compose.ui.graphics.Color?,
+    nextBandColor: androidx.compose.ui.graphics.Color?,
     showSectionLabel: Boolean,
     tripTimezone: String,
     onOpenEntry: (String, String) -> Unit,
@@ -113,7 +127,16 @@ private fun DayRow(
     // day's row with zero gap, or the trunk reads as broken into segments
     // instead of one continuous line (exactly what any vertical inset here
     // causes). All breathing room lives on the date/content columns only.
-    val rowModifier = if (bandColor != null) {
+    // User-requested: the day a Section ends and the next begins gets a
+    // half-and-half band (this Section's color on top, the next Section's
+    // on the bottom) instead of a flat single color -- a hard-stop
+    // gradient (two color-stops at the same 0.5f position), not a smooth
+    // blend, same convention as the web version's CSS gradient.
+    val rowModifier = if (bandColor != null && nextBandColor != null) {
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(
+            Brush.verticalGradient(0f to bandColor, 0.5f to bandColor, 0.5f to nextBandColor, 1f to nextBandColor),
+        )
+    } else if (bandColor != null) {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor)
     } else {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min)

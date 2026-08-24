@@ -4,10 +4,10 @@ import { distinctCategories, filterIdeas } from '@/lib/ideas';
 // FR-16, spec-ideas: "unit for filtering" -- pure, DB-free.
 describe('filterIdeas', () => {
   const ideas = [
-    { id: '1', priority: 'MUST_DO', sectionId: 'sec-1', category: 'Food' },
-    { id: '2', priority: 'WOULD_LIKE', sectionId: 'sec-2', category: 'Sights' },
-    { id: '3', priority: 'MAYBE', sectionId: 'sec-1', category: 'Food' },
-    { id: '4', priority: 'MAYBE', sectionId: null, category: null },
+    { id: '1', priority: 'MUST_DO', sectionId: 'sec-1', category: 'Food', weatherSuitability: 'INDOOR' },
+    { id: '2', priority: 'WOULD_LIKE', sectionId: 'sec-2', category: 'Sights', weatherSuitability: 'OUTDOOR' },
+    { id: '3', priority: 'MAYBE', sectionId: 'sec-1', category: 'Food', weatherSuitability: 'OUTDOOR' },
+    { id: '4', priority: 'MAYBE', sectionId: null, category: null, weatherSuitability: 'EITHER' },
   ];
 
   it('returns every Idea when no filters are given', () => {
@@ -29,8 +29,13 @@ describe('filterIdeas', () => {
     expect(result.map((i) => i.id)).toEqual(['1', '3']);
   });
 
-  it('filters by priority, sectionId, and category combined', () => {
-    const result = filterIdeas(ideas, { priority: 'MAYBE', sectionId: 'sec-1', category: 'Food' });
+  it('filters by weatherSuitability only', () => {
+    const result = filterIdeas(ideas, { weatherSuitability: 'OUTDOOR' });
+    expect(result.map((i) => i.id)).toEqual(['2', '3']);
+  });
+
+  it('filters by priority, sectionId, category, and weatherSuitability combined', () => {
+    const result = filterIdeas(ideas, { priority: 'MAYBE', sectionId: 'sec-1', category: 'Food', weatherSuitability: 'OUTDOOR' });
     expect(result.map((i) => i.id)).toEqual(['3']);
   });
 

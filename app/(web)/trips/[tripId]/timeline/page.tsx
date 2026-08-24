@@ -240,15 +240,26 @@ export default async function TimelinePage({ params }: PageProps) {
 
       <div className="timeline-grid" style={{ gridTemplateColumns }}>
         {laidOutDays.map((day, index) => {
+          const bandColorFor = (sectionIndex: number | null) => {
+            const s = sectionIndex !== null ? trip.sections[sectionIndex] : null;
+            return s ? (s.color && sectionCustomColorBand(s.color)) ?? sectionColor(sectionIndex!) : undefined;
+          };
           const section = day.sectionIndex !== null ? trip.sections[day.sectionIndex] : null;
-          const bandColor = section
-            ? (section.color && sectionCustomColorBand(section.color)) ?? sectionColor(day.sectionIndex!)
-            : undefined;
+          const bandColor = bandColorFor(day.sectionIndex);
           const trunkColor = section
             ? (section.color && sectionCustomColorSolid(section.color)) ?? sectionColorSolid(day.sectionIndex!)
             : undefined;
           const previousSectionIndex = index > 0 ? laidOutDays[index - 1].sectionIndex : null;
           const showSectionLabel = section !== null && day.sectionIndex !== previousSectionIndex;
+          // User-requested: the day a Section ends and the next begins
+          // reads as an abrupt hard cut between two solid-colored rows --
+          // splitting this one day's own band half-and-half (this
+          // Section's color on top, the next Section's on the bottom)
+          // marks the handoff without needing a day that belongs to both.
+          const nextSectionIndex = index < laidOutDays.length - 1 ? laidOutDays[index + 1].sectionIndex : null;
+          const isSectionTransition =
+            day.sectionIndex !== null && nextSectionIndex !== null && nextSectionIndex !== day.sectionIndex;
+          const nextBandColor = isSectionTransition ? bandColorFor(nextSectionIndex) : undefined;
           const rowLine = index + 1;
           const dayLabel = formatDayLabel(day.dateKey);
 
@@ -256,10 +267,11 @@ export default async function TimelinePage({ params }: PageProps) {
             <div key={day.dateKey} className="timeline-grid-row">
               <div
                 id={`day-${day.dateKey}`}
-                className={`timeline-row-bg${day.isToday ? ' is-today' : ''}`}
+                className={`timeline-row-bg${day.isToday ? ' is-today' : ''}${nextBandColor ? ' is-section-transition' : ''}`}
                 style={{
                   gridRow: rowLine,
                   ...(bandColor ? { ['--band-color' as string]: bandColor } : undefined),
+                  ...(nextBandColor ? { ['--band-color-next' as string]: nextBandColor } : undefined),
                 }}
               />
 

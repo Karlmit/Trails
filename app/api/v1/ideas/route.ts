@@ -24,16 +24,17 @@ export async function GET(request: NextRequest) {
   const priority = request.nextUrl.searchParams.get('priority');
   const sectionId = request.nextUrl.searchParams.get('sectionId');
   const category = request.nextUrl.searchParams.get('category');
+  const weatherSuitability = request.nextUrl.searchParams.get('weatherSuitability');
 
   const ideas = await prisma.idea.findMany({
     where: { tripId },
     orderBy: { createdAt: 'asc' },
   });
 
-  // FR-16: filter by Priority/Section/Category -- an empty result (no
-  // match) is a normal, non-error outcome, not filtered here as an error
-  // case.
-  const filtered = filterIdeas(ideas.map(serializeIdea), { priority, sectionId, category });
+  // FR-16: filter by Priority/Section/Category/Weather suitability -- an
+  // empty result (no match) is a normal, non-error outcome, not filtered
+  // here as an error case.
+  const filtered = filterIdeas(ideas.map(serializeIdea), { priority, sectionId, category, weatherSuitability });
 
   return NextResponse.json(filtered);
 }

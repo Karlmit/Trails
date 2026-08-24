@@ -87,12 +87,15 @@ export function IdeaCard({
           onCancel={() => setEditing(false)}
         />
         {error && <div className="form-error-banner">{error}</div>}
-        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-          {busy ? 'Deleting…' : 'Delete Idea'}
-        </button>
+        {/* Tags/Links/Photos before Delete -- same ordering
+            ImportantInfoForm uses (supplementary content stays near the
+            main form; the destructive action comes last). */}
         <TagList ownerType="IDEA" ownerId={idea.id} />
         <LinkList ownerType="IDEA" ownerId={idea.id} />
         <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
+        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
+          {busy ? 'Deleting…' : 'Delete Idea'}
+        </button>
       </div>
     );
   }

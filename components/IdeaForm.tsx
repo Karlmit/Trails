@@ -175,17 +175,27 @@ export function IdeaForm({
 
       <div className="field">
         <label htmlFor="idea-category">Category</label>
-        <input
-          id="idea-category"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          list="idea-category-options"
-        />
-        <datalist id="idea-category-options">
-          {categoryOptions.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
+        <input id="idea-category" value={category} onChange={(e) => setCategory(e.target.value)} />
+        {/* User-reported: the native <datalist> dropdown this used to be
+            wasn't recognizable as "pick from existing categories" -- easy
+            to miss its suggestion popup entirely, and easy to confuse with
+            unrelated browser/OS text-suggestion bubbles. Plain clickable
+            chips are unambiguous and need no explanation. */}
+        {categoryOptions.length > 0 && (
+          <div className="row" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-1)', flexWrap: 'wrap' }}>
+            {categoryOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="tag-chip"
+                onClick={() => setCategory(option)}
+                style={{ border: 'none', cursor: 'pointer' }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="field">
