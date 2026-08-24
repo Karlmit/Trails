@@ -74,9 +74,13 @@ fun TimelineGraphColumn(
             drawPath(path, color = entryTypeColor(branch.entryType), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
         }
 
-        val lineCount = day.lines.size.coerceAtLeast(1)
+        // A Stay's own through-day renders no text at all in the content
+        // column (TimelineScreen.kt's DayRow) -- excluded here too, or
+        // every later line's dot would drift from its own text line.
+        val visibleLines = day.lines.filterNot { it.entryType == "STAY" && !it.isStart && !it.isEnd }
+        val lineCount = visibleLines.size.coerceAtLeast(1)
         val slotHeight = h / lineCount
-        day.lines.forEachIndexed { index, line ->
+        visibleLines.forEachIndexed { index, line ->
             if (line.isStart && line.isEnd) {
                 val cy = slotHeight * index + slotHeight / 2
                 drawCircle(canvasBackground, radius = 6.dp.toPx(), center = Offset(trunkX, cy))

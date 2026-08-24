@@ -35,32 +35,67 @@ fun formatDayLabel(dateKey: String): DayLabel = runCatching {
     DayLabel("$month ${date.dayOfMonth}", date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()))
 }.getOrDefault(DayLabel(dateKey, ""))
 
-data class DayLineLabel(val text: String, val showSubtype: Boolean)
+data class DayLineLabel(val hidden: Boolean, val title: String, val subtitle: String?, val showSubtype: Boolean)
+
+// User-requested: a multi-day Stay's name repeated on every day it spans was
+// noise -- the branch line itself already shows it's ongoing, so a Stay is
+// now only visible on its check-in/check-out days, each with its own time
+// as a subtitle below the name (rather than folded into one inline string
+// the way Transport's Departure/Arrival still is).
+private fun stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: String): String {
+    val parts = mutableListOf<String>()
+    if (line.isStart) {
+        val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
+        parts += if (hour != 0 || minute != 0) {
+            "Check-in ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}"
+        } else {
+            "Check-in"
+        }
+    }
+    if (line.isEnd && line.endAt != null) {
+        val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
+        parts += if (hour != 0 || minute != 0) {
+            "Check-out ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}"
+        } else {
+            "Check-out"
+        }
+    }
+    return parts.joinToString(" · ")
+}
 
 /** lib/(web)/trips/[tripId]/timeline/page.tsx::dayLineLabel */
 fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
-    val isTimedType = line.entryType == "TRANSPORT" || line.entryType == "STAY"
-    if (!isTimedType) return DayLineLabel(line.title, showSubtype = true)
-
-    if (line.isStart) {
-        val word = if (line.entryType == "TRANSPORT") "Departure" else "Check-in"
-        val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
-        val text = if (hour != 0 || minute != 0) {
-            "${line.title} · $word ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}"
-        } else {
-            "${line.title} · $word"
+    if (line.entryType == "STAY") {
+        if (!line.isStart && !line.isEnd) {
+            return DayLineLabel(hidden = true, title = "", subtitle = null, showSubtype = false)
         }
-        return DayLineLabel(text, showSubtype = false)
+        return DayLineLabel(
+            hidden = false,
+            title = line.title,
+            subtitle = stayEndpointSubtitle(line, tripTimezone),
+            showSubtype = false,
+        )
     }
-    if (line.isEnd && line.endAt != null) {
-        val word = if (line.entryType == "TRANSPORT") "Arrival" else "Check-out"
-        val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
-        val text = if (hour != 0 || minute != 0) {
-            "${line.title} · $word ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}"
-        } else {
-            "${line.title} · $word"
+    if (line.entryType == "TRANSPORT") {
+        if (line.isStart) {
+            val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
+            val title = if (hour != 0 || minute != 0) {
+                "${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}"
+            } else {
+                "${line.title} · Departure"
+            }
+            return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false)
         }
-        return DayLineLabel(text, showSubtype = false)
+        if (line.isEnd && line.endAt != null) {
+            val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
+            val title = if (hour != 0 || minute != 0) {
+                "${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}"
+            } else {
+                "${line.title} · Arrival"
+            }
+            return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false)
+        }
+        return DayLineLabel(hidden = false, title = line.title, subtitle = null, showSubtype = false)
     }
-    return DayLineLabel(line.title, showSubtype = false)
+    return DayLineLabel(hidden = false, title = line.title, subtitle = null, showSubtype = true)
 }

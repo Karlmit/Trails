@@ -83,30 +83,60 @@ function formatHHMM(date: Date, zone: string | null, tripTimezone: string): stri
 // `timeRequired={false}`, EntryForm.tsx), stored as literal midnight; the
 // word (Check-in/Departure/etc.) still shows, just without a fabricated
 // "00:00" the traveler never actually entered.
-function dayLineLabel(line: TimelineDayLine, tripTimezone: string): { text: string; showSubtype: boolean } {
-  const isTimedType = line.entryType === 'TRANSPORT' || line.entryType === 'STAY';
-  if (!isTimedType) {
-    return { text: line.title, showSubtype: true };
-  }
+interface DayLineLabel {
+  hidden: boolean;
+  title: string;
+  subtitle: string | null;
+  showSubtype: boolean;
+}
+
+// User-requested: a multi-day Stay's name repeated on every day it spans
+// was noise -- the branch line itself already shows it's ongoing, so a
+// Stay is now only visible on its check-in/check-out days, each with its
+// own time as a subtitle below the name (rather than folded into one
+// inline string the way Transport's Departure/Arrival still is).
+function stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: string): string {
+  const parts: string[] = [];
   if (line.isStart) {
-    const word = line.entryType === 'TRANSPORT' ? 'Departure' : 'Check-in';
     const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
     const hasTime = hour !== 0 || minute !== 0;
-    const text = hasTime
-      ? `${line.title} · ${word} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
-      : `${line.title} · ${word}`;
-    return { text, showSubtype: false };
+    parts.push(hasTime ? `Check-in ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}` : 'Check-in');
   }
   if (line.isEnd && line.endAt) {
-    const word = line.entryType === 'TRANSPORT' ? 'Arrival' : 'Check-out';
     const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
     const hasTime = hour !== 0 || minute !== 0;
-    const text = hasTime
-      ? `${line.title} · ${word} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
-      : `${line.title} · ${word}`;
-    return { text, showSubtype: false };
+    parts.push(hasTime ? `Check-out ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}` : 'Check-out');
   }
-  return { text: line.title, showSubtype: false };
+  return parts.join(' · ');
+}
+
+function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel {
+  if (line.entryType === 'STAY') {
+    if (!line.isStart && !line.isEnd) {
+      return { hidden: true, title: '', subtitle: null, showSubtype: false };
+    }
+    return { hidden: false, title: line.title, subtitle: stayEndpointSubtitle(line, tripTimezone), showSubtype: false };
+  }
+  if (line.entryType === 'TRANSPORT') {
+    if (line.isStart) {
+      const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
+      const hasTime = hour !== 0 || minute !== 0;
+      const title = hasTime
+        ? `${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
+        : `${line.title} · Departure`;
+      return { hidden: false, title, subtitle: null, showSubtype: false };
+    }
+    if (line.isEnd && line.endAt) {
+      const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
+      const hasTime = hour !== 0 || minute !== 0;
+      const title = hasTime
+        ? `${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
+        : `${line.title} · Arrival`;
+      return { hidden: false, title, subtitle: null, showSubtype: false };
+    }
+    return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
+  }
+  return { hidden: false, title: line.title, subtitle: null, showSubtype: true };
 }
 
 // spec-timeline-git-graph: the path data for one branch segment, in
@@ -256,9 +286,22 @@ export default async function TimelinePage({ params }: PageProps) {
                 </svg>
                 <div className="timeline-dots-column">
                   {day.lines.map((line) => {
+                    // A Stay's own through-day has no slot at all in the
+                    // content column (see entry-dot-list below) -- mirror
+                    // that exactly here so every later line's dot still
+                    // lines up with its own text line.
+                    if (line.entryType === 'STAY' && !line.isStart && !line.isEnd) return null;
+                    // A Stay's check-in/check-out line renders two lines of
+                    // text (name + time subtitle) in the content column --
+                    // this slot must grow to match or every later line's
+                    // dot creeps upward relative to its own text.
+                    const isTallStayLine = line.entryType === 'STAY' && (line.isStart || line.isEnd);
                     const isSingleDay = line.isStart && line.isEnd;
                     return (
-                      <div key={line.entryId} className="timeline-dot-slot">
+                      <div
+                        key={line.entryId}
+                        className={`timeline-dot-slot${isTallStayLine ? ' timeline-dot-slot-tall' : ''}`}
+                      >
                         {isSingleDay && (
                           <span
                             className="timeline-dot"
@@ -299,7 +342,10 @@ export default async function TimelinePage({ params }: PageProps) {
                 {day.lines.length > 0 ? (
                   <div className="entry-dot-list">
                     {day.lines.map((line) => {
-                      const { text, showSubtype } = dayLineLabel(line, trip.timezone);
+                      const label = dayLineLabel(line, trip.timezone);
+                      // A Stay's own through-day: the branch line already
+                      // shows it's ongoing, so no text at all here.
+                      if (label.hidden) return null;
                       const isBlogPost = line.entryType === 'BLOG_POST';
                       return (
                         <Link
@@ -319,8 +365,11 @@ export default async function TimelinePage({ params }: PageProps) {
                               📖
                             </span>
                           )}
-                          <span>{text}</span>
-                          {showSubtype && line.subtype && (
+                          <span>{label.title}</span>
+                          {label.subtitle && (
+                            <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
+                          )}
+                          {label.showSubtype && line.subtype && (
                             <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
                           )}
                           {isBlogPost && <span className="entry-chip-blog-cta"> Read post →</span>}

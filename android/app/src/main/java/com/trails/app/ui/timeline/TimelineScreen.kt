@@ -162,24 +162,36 @@ private fun DayRow(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     day.lines.forEach { line ->
+                        val label = dayLineLabel(line, tripTimezone)
+                        // A Stay's own through-day: the branch line already
+                        // shows it's ongoing, so no text at all here (must
+                        // match TimelineGraphColumn's own line filtering).
+                        if (label.hidden) return@forEach
                         val isBlog = line.entryType == "BLOG_POST"
-                        val (text, showSubtype) = dayLineLabel(line, tripTimezone)
-                        Row(
-                            modifier = Modifier.clickable { onOpenEntry(line.entryType, line.entryId) },
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            if (isBlog) {
-                                Text("📖 ", style = MaterialTheme.typography.bodyMedium)
+                        Column(modifier = Modifier.clickable { onOpenEntry(line.entryType, line.entryId) }) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                if (isBlog) {
+                                    Text("📖 ", style = MaterialTheme.typography.bodyMedium)
+                                }
+                                Text(
+                                    buildString {
+                                        append(label.title)
+                                        if (label.showSubtype && line.subtype != null) append(" · ${subtypeLabel(line.subtype)}")
+                                        if (isBlog) append(" Read post →")
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,
+                                )
                             }
-                            Text(
-                                buildString {
-                                    append(text)
-                                    if (showSubtype && line.subtype != null) append(" · ${subtypeLabel(line.subtype)}")
-                                    if (isBlog) append(" Read post →")
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,
-                            )
+                            // User-requested: a Stay's check-in/check-out time as its
+                            // own line below the name, not folded into the title.
+                            if (label.subtitle != null) {
+                                Text(
+                                    label.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TrailsColors.TextSoft,
+                                )
+                            }
                         }
                     }
                 }

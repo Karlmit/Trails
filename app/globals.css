@@ -733,6 +733,14 @@ p {
   min-height: 1.4rem;
 }
 
+/* Matches a Stay's check-in/check-out line exactly: .entry-chip's own
+   1.4rem line-height plus .entry-chip-subtitle's 1.3rem line-height and
+   1px margin-top -- so a later line's dot still centers on its own text
+   instead of drifting up by one subtitle's worth of height. */
+.timeline-dot-slot-tall {
+  min-height: calc(1.4rem + 1px + 1.3rem);
+}
+
 .timeline-dot {
   width: 10px;
   height: 10px;
@@ -866,6 +874,16 @@ p {
 
 .entry-chip-blog-icon {
   margin-right: 2px;
+}
+
+/* User-requested: a Stay's check-in/check-out time as its own line below
+   the name, not folded into one inline string -- `display: block` forces
+   the break regardless of where the title's own text happens to wrap. */
+.entry-chip-subtitle {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.3rem;
+  margin-top: 1px;
 }
 
 .entry-chip-blog-cta {
