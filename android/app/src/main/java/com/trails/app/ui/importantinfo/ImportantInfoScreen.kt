@@ -40,7 +40,7 @@ fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = 
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 items(items, key = { it.id }) { item -> ImportantInfoCard(item, onClick = { onOpenItem(item.id) }) }
             }
         }

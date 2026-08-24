@@ -53,7 +53,7 @@ fun TravelModeScreen(
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 item {
                     InfoCard("🧭 Right now") {
                         LabeledValue("Section", state.currentSectionName ?: "No Section covers today")

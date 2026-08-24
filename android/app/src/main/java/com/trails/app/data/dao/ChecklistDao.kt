@@ -36,8 +36,14 @@ interface ChecklistItemDao {
     @Upsert
     suspend fun upsertAll(items: List<ChecklistItemEntity>)
 
-    @Query("UPDATE checklist_items SET checked = :checked WHERE id = :id")
-    suspend fun setChecked(id: String, checked: Boolean)
+    // Immediate, always-succeeds local write for a checked toggle -- marks
+    // it `syncPending` so it can be found and pushed later regardless of
+    // whether the network PATCH that follows succeeds or not.
+    @Query("UPDATE checklist_items SET checked = :checked, syncPending = 1 WHERE id = :id")
+    suspend fun setCheckedPending(id: String, checked: Boolean)
+
+    @Query("SELECT * FROM checklist_items WHERE syncPending = 1")
+    suspend fun getAllPending(): List<ChecklistItemEntity>
 
     @Query(
         "DELETE FROM checklist_items WHERE checklistId IN " +

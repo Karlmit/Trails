@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       description: parsed.description ?? null,
       coverImage: parsed.coverImage ?? null,
       visibility: parsed.visibility ?? 'PRIVATE',
+      pinnedActive: parsed.pinnedActive ?? false,
     },
   });
 

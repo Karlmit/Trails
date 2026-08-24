@@ -16,6 +16,7 @@ interface EditTripFormProps {
     description: string | null;
     coverImage: string | null;
     visibility: 'PUBLIC' | 'PRIVATE';
+    pinnedActive: boolean;
   };
   onDone: () => void;
 }
@@ -34,6 +35,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
   const [description, setDescription] = useState(trip.description ?? '');
   const [coverImage, setCoverImage] = useState(trip.coverImage ?? '');
   const [visibility, setVisibility] = useState(trip.visibility);
+  const [pinnedActive, setPinnedActive] = useState(trip.pinnedActive);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -64,6 +66,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
           description: description || null,
           coverImage: coverImage || null,
           visibility,
+          pinnedActive,
         }),
       });
 
@@ -169,6 +172,16 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
           <option value="PUBLIC">Public</option>
         </select>
       </div>
+      <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+        <input type="checkbox" checked={pinnedActive} onChange={(e) => setPinnedActive(e.target.checked)} />
+        Mark this Trip as Active
+      </label>
+      {pinnedActive && (
+        <p className="text-soft">
+          Overrides the normal date-based Status -- this Trip will always show as Active while
+          this is checked, and the Android app opens straight to its Timeline on launch.
+        </p>
+      )}
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
           {submitting ? 'Saving…' : 'Save changes'}

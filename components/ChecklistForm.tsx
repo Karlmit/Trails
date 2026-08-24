@@ -9,7 +9,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [emoji, setEmoji] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -23,7 +23,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       const response = await fetch('/api/v1/checklists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tripId, title, description: description || null, isPrivate }),
+        body: JSON.stringify({ tripId, title, emoji: emoji.trim() || null, isPrivate }),
       });
 
       const body = await response.json().catch(() => null);
@@ -33,7 +33,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       }
 
       setTitle('');
-      setDescription('');
+      setEmoji('');
       setIsPrivate(false);
       setOpen(false);
       router.refresh();
@@ -68,12 +68,14 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       </div>
 
       <div className="field">
-        <label htmlFor="checklist-description">Description</label>
-        <textarea
-          id="checklist-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
+        <label htmlFor="checklist-emoji">Emoji (optional)</label>
+        <input
+          id="checklist-emoji"
+          value={emoji}
+          onChange={(e) => setEmoji(e.target.value)}
+          maxLength={16}
+          placeholder="✅"
+          style={{ maxWidth: '80px' }}
         />
       </div>
 

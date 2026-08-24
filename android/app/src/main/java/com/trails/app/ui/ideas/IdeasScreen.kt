@@ -57,7 +57,7 @@ fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, view
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
                         Text(

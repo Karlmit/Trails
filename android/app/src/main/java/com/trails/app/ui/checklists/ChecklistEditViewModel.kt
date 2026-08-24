@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trails.app.data.ChecklistRepository
 import com.trails.app.data.ChecklistWithItems
-import com.trails.app.network.dto.ChecklistItemRequest
 import com.trails.app.network.dto.ChecklistRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,12 +13,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// User-requested: editing a Checklist is now just its Title/Emoji/Private
+// metadata + Delete -- Items moved to ChecklistDetailScreen ("When I click
+// on a checklist, I should only see its items and title"). Description
+// was fully removed (not just hidden).
 data class ChecklistEditState(
     val checklistId: String? = null,
     val title: String = "",
-    val description: String = "",
+    val emoji: String = "",
     val isPrivate: Boolean = false,
-    val newItemText: String = "",
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -42,15 +44,14 @@ class ChecklistEditViewModel @Inject constructor(
         if (_state.value.title.isNotEmpty()) return
         _state.value = _state.value.copy(
             title = existing.checklist.title,
-            description = existing.checklist.description.orEmpty(),
+            emoji = existing.checklist.emoji.orEmpty(),
             isPrivate = existing.checklist.isPrivate,
         )
     }
 
     fun onTitleChange(value: String) { _state.value = _state.value.copy(title = value) }
-    fun onDescriptionChange(value: String) { _state.value = _state.value.copy(description = value) }
+    fun onEmojiChange(value: String) { _state.value = _state.value.copy(emoji = value) }
     fun onIsPrivateChange(value: Boolean) { _state.value = _state.value.copy(isPrivate = value) }
-    fun onNewItemTextChange(value: String) { _state.value = _state.value.copy(newItemText = value) }
 
     fun save() {
         val current = _state.value
@@ -63,7 +64,7 @@ class ChecklistEditViewModel @Inject constructor(
             val request = ChecklistRequest(
                 tripId = tripId,
                 title = current.title.trim(),
-                description = current.description.trim().takeIf { it.isNotEmpty() },
+                emoji = current.emoji.trim().takeIf { it.isNotEmpty() },
                 isPrivate = current.isPrivate,
             )
             runCatching {
@@ -76,6 +77,9 @@ class ChecklistEditViewModel @Inject constructor(
         }
     }
 
+    // User-requested: "Delete checklist only available when in edit mode"
+    // -- this ViewModel (and its Delete button) only ever backs the Edit
+    // screen now, never the Detail/view screen.
     fun deleteChecklist() {
         val id = _state.value.checklistId ?: return
         _state.value = _state.value.copy(saving = true, error = null)
@@ -83,31 +87,6 @@ class ChecklistEditViewModel @Inject constructor(
             runCatching { repository.deleteChecklist(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
                 .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete Checklist.") }
-        }
-    }
-
-    fun addItem() {
-        val id = _state.value.checklistId ?: return
-        val text = _state.value.newItemText.trim()
-        if (text.isEmpty()) return
-        viewModelScope.launch {
-            runCatching { repository.createChecklistItem(ChecklistItemRequest(checklistId = id, text = text)) }
-                .onSuccess { _state.value = _state.value.copy(newItemText = "") }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add item.") }
-        }
-    }
-
-    fun deleteItem(itemId: String) {
-        viewModelScope.launch {
-            runCatching { repository.deleteChecklistItem(itemId) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to delete item.") }
-        }
-    }
-
-    fun setChecked(itemId: String, checked: Boolean) {
-        viewModelScope.launch {
-            runCatching { repository.setChecked(itemId, checked) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to update item.") }
         }
     }
 }

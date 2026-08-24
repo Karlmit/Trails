@@ -16,6 +16,7 @@ data class TripDto(
     val description: String? = null,
     val coverImage: String? = null,
     val visibility: String,
+    val pinnedActive: Boolean = false,
     val status: String,
     val durationDays: Int,
     val createdAt: String,

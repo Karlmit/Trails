@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 5,
-    "identityHash": "c94c579fe0215b43f9e67b918b6de140",
+    "version": 6,
+    "identityHash": "7d26b03512726f53e2a33a7f2655f007",
     "entities": [
       {
         "tableName": "trips",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `destination` TEXT, `startDate` TEXT NOT NULL, `endDate` TEXT NOT NULL, `timezone` TEXT NOT NULL, `description` TEXT, `coverImage` TEXT, `visibility` TEXT NOT NULL, `status` TEXT NOT NULL, `durationDays` INTEGER NOT NULL, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `cachedOffline` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `destination` TEXT, `startDate` TEXT NOT NULL, `endDate` TEXT NOT NULL, `timezone` TEXT NOT NULL, `description` TEXT, `coverImage` TEXT, `visibility` TEXT NOT NULL, `pinnedActive` INTEGER NOT NULL, `status` TEXT NOT NULL, `durationDays` INTEGER NOT NULL, `createdAt` TEXT NOT NULL, `updatedAt` TEXT NOT NULL, `cachedOffline` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -57,6 +57,12 @@
             "fieldPath": "visibility",
             "columnName": "visibility",
             "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinnedActive",
+            "columnName": "pinnedActive",
+            "affinity": "INTEGER",
             "notNull": true
           },
           {
@@ -914,7 +920,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c94c579fe0215b43f9e67b918b6de140')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7d26b03512726f53e2a33a7f2655f007')"
     ]
   }
 }

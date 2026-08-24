@@ -31,6 +31,7 @@ fun TripDto.toEntity() = TripEntity(
     description = description,
     coverImage = coverImage,
     visibility = visibility,
+    pinnedActive = pinnedActive,
     status = status,
     durationDays = durationDays,
     createdAt = createdAt,
@@ -88,12 +89,14 @@ fun ChecklistDto.toEntity() = ChecklistEntity(
     id = id,
     tripId = tripId,
     title = title,
-    description = description,
+    emoji = emoji,
     isPrivate = isPrivate,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
 
+// syncPending always false here -- this is what the server just confirmed,
+// so any local pending toggle is by definition resolved once this lands.
 fun ChecklistItemDto.toEntity() = ChecklistItemEntity(
     id = id,
     checklistId = checklistId,
@@ -102,6 +105,7 @@ fun ChecklistItemDto.toEntity() = ChecklistItemEntity(
     note = note,
     createdAt = createdAt,
     updatedAt = updatedAt,
+    syncPending = false,
 )
 
 fun ImportantInfoDto.toEntity() = ImportantInfoEntity(

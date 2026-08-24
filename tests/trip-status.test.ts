@@ -51,6 +51,26 @@ describe('computeTripStatus (FR-2, AD-8)', () => {
     expect(computeTripStatus(trip, now)).toBe('COMPLETED');
   });
 
+  // User-requested: a manual override so a Trip reads as ACTIVE regardless
+  // of what its dates alone would compute.
+  it('is ACTIVE when pinnedActive is set, even for a future start date', () => {
+    const now = new Date('2026-08-01T12:00:00.000Z');
+    const trip = { startDate: dateOnly('2026-08-10'), endDate: dateOnly('2026-08-20'), timezone, pinnedActive: true };
+    expect(computeTripStatus(trip, now)).toBe('ACTIVE');
+  });
+
+  it('is ACTIVE when pinnedActive is set, even for a past end date', () => {
+    const now = new Date('2026-08-25T12:00:00.000Z');
+    const trip = { startDate: dateOnly('2026-08-10'), endDate: dateOnly('2026-08-20'), timezone, pinnedActive: true };
+    expect(computeTripStatus(trip, now)).toBe('ACTIVE');
+  });
+
+  it('falls back to date-based Status when pinnedActive is false', () => {
+    const now = new Date('2026-08-01T12:00:00.000Z');
+    const trip = { startDate: dateOnly('2026-08-10'), endDate: dateOnly('2026-08-20'), timezone, pinnedActive: false };
+    expect(computeTripStatus(trip, now)).toBe('UPCOMING');
+  });
+
   it('disagrees with a naive UTC-only comparison near a timezone boundary', () => {
     // 2026-08-20T23:30 in Asia/Bangkok (UTC+7) is already 2026-08-21 UTC.
     // A Trip ending 2026-08-20 must read COMPLETED in its own timezone even

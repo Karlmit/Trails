@@ -15,7 +15,7 @@ export interface ChecklistDTO {
   id: string;
   tripId: string;
   title: string;
-  description: string | null;
+  emoji: string | null;
   isPrivate: boolean;
   items: ChecklistItemDTO[];
 }
@@ -205,8 +205,9 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
 
       <div className="row-between">
         <div>
-          <h3 style={{ margin: 0 }}>{checklist.title}</h3>
-          {checklist.description && <p className="text-soft text-multiline">{checklist.description}</p>}
+          <h3 style={{ margin: 0 }}>
+            {checklist.emoji ?? '✅'} {checklist.title}
+          </h3>
         </div>
         <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
           <span className="text-soft">

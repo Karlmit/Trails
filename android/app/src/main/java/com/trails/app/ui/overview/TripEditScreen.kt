@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
@@ -99,6 +100,14 @@ fun TripEditScreen(
                 DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
                 LabeledField(label = "Timezone (IANA, e.g. Europe/Stockholm)", value = state.timezone, onValueChange = viewModel::onTimezoneChange)
                 MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+                // User-requested: a manual override so this Trip reads as
+                // Active regardless of its dates -- the Android app
+                // auto-opens the single Active trip's Timeline on launch.
+                CheckboxRow(
+                    label = "Mark as active",
+                    checked = state.pinnedActive,
+                    onCheckedChange = viewModel::onPinnedActiveChange,
+                )
 
                 if (state.saving) {
                     CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))

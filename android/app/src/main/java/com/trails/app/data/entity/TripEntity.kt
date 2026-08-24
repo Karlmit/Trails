@@ -14,6 +14,10 @@ data class TripEntity(
     val description: String?,
     val coverImage: String?,
     val visibility: String,
+    // User-requested: a manual override so a Trip reads (and auto-opens
+    // on launch) as ACTIVE regardless of its dates -- see `status`'s own
+    // computation on the server, lib/trip-status.ts::computeTripStatus.
+    val pinnedActive: Boolean = false,
     val status: String,
     val durationDays: Int,
     val createdAt: String,

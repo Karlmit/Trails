@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       data: {
         tripId: parsed.tripId,
         title: parsed.title,
-        description: parsed.description ?? null,
+        emoji: parsed.emoji ?? null,
         isPrivate: parsed.isPrivate ?? false,
         createdByUserId: user.id,
       },

@@ -57,6 +57,7 @@ fun TripDrawerScaffold(
     navController: NavHostController,
     showBackButton: Boolean = false,
     floatingActionButton: @Composable () -> Unit = {},
+    actions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val shellViewModel: TripShellViewModel = hiltViewModel()
@@ -140,6 +141,7 @@ fun TripDrawerScaffold(
                             )
                         }
                     },
+                    actions = actions,
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),
                 )
             },

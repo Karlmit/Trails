@@ -7,12 +7,17 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -23,8 +28,12 @@ import com.trails.app.ui.blog.BlogDetailScreen
 import com.trails.app.ui.blog.BlogEditScreen
 import com.trails.app.ui.blog.BlogListScreen
 import com.trails.app.ui.budget.BudgetScreen
+import com.trails.app.ui.checklists.ChecklistDetailScreen
+import com.trails.app.ui.checklists.ChecklistDetailViewModel
 import com.trails.app.ui.checklists.ChecklistEditScreen
+import com.trails.app.ui.checklists.ChecklistEditViewModel
 import com.trails.app.ui.checklists.ChecklistsScreen
+import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.documents.DocumentsScreen
 import com.trails.app.ui.entrydetail.EntryDetailScreen
 import com.trails.app.ui.entrydetail.EntryEditScreen
@@ -57,7 +66,9 @@ private fun entryEditRoute(tripId: String, entryId: String?) = "trip/$tripId/ent
 private fun blogDetailRoute(tripId: String, entryId: String) = "trip/$tripId/blog/$entryId"
 private fun blogEditRoute(tripId: String, entryId: String?) = "trip/$tripId/blog/${entryId ?: NEW_ID}/edit"
 private fun sectionEditRoute(tripId: String, sectionId: String?) = "trip/$tripId/sections/${sectionId ?: NEW_ID}/edit"
+private fun checklistDetailRoute(tripId: String, checklistId: String) = "trip/$tripId/checklists/$checklistId"
 private fun checklistEditRoute(tripId: String, checklistId: String?) = "trip/$tripId/checklists/${checklistId ?: NEW_ID}/edit"
+private val CHECKLISTS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.CHECKLISTS.route}"
 private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/important-info/${infoId ?: NEW_ID}/edit"
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 
@@ -102,6 +113,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             TripListScreen(
                 onOpenTrip = { tripId -> navController.navigate(tripRoute(tripId, TripTab.TIMELINE.route)) },
                 onAddTrip = { navController.navigate("trips/new/edit") },
+                onOpenOverview = { tripId -> navController.navigate("trip/$tripId/overview") },
                 autoOpenActiveTrip = autoOpenActiveTripPending,
                 onAutoOpenConsumed = { autoOpenActiveTripPending = false },
             )
@@ -206,7 +218,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         }
 
         composable(
-            route = "trip/{$ARG_TRIP_ID}/${TripTab.CHECKLISTS.route}",
+            route = CHECKLISTS_LIST_ROUTE_PATTERN,
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
@@ -214,8 +226,36 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
                 tripId, TripTab.CHECKLISTS, "Checklists", navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(checklistEditRoute(tripId, null)) }) },
             ) { padding ->
-                ChecklistsScreen(padding, onOpenChecklist = { id -> navController.navigate(checklistEditRoute(tripId, id)) })
+                ChecklistsScreen(padding, onOpenChecklist = { id -> navController.navigate(checklistDetailRoute(tripId, id)) })
             }
+        }
+
+        // User-requested: "When I click on a checklist, I should only see
+        // its items and title" -- this view, not the edit form, is where
+        // tapping a Checklist in the list now lands. Its own Edit button
+        // (top-right) is the only way into ChecklistEditScreen for an
+        // existing Checklist.
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/checklists/{$ARG_CHECKLIST_ID}",
+            arguments = listOf(
+                navArgument(ARG_TRIP_ID) { type = NavType.StringType },
+                navArgument(ARG_CHECKLIST_ID) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            val checklistId = backStackEntry.arguments?.getString(ARG_CHECKLIST_ID).orEmpty()
+            val detailViewModel: ChecklistDetailViewModel = hiltViewModel()
+            val checklistWithItems by detailViewModel.checklist.collectAsState()
+            TripDrawerScaffold(
+                tripId, TripTab.CHECKLISTS,
+                checklistWithItems?.checklist?.title ?: "Checklist",
+                navController, showBackButton = true,
+                actions = {
+                    IconButton(onClick = { navController.navigate(checklistEditRoute(tripId, checklistId)) }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = TrailsColors.Brand)
+                    }
+                },
+            ) { padding -> ChecklistDetailScreen(padding, viewModel = detailViewModel) }
         }
 
         composable(
@@ -226,8 +266,36 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.CHECKLISTS, "Edit Checklist", navController, showBackButton = true) { padding ->
-                ChecklistEditScreen(padding, onDone = { navController.popBackStack() })
+            val editViewModel: ChecklistEditViewModel = hiltViewModel()
+            val editState by editViewModel.state.collectAsState()
+            // Save moved to the top app bar's action slot (user-requested);
+            // this reacts once the save actually lands, forwarding to the
+            // Detail screen for either a freshly-created or a just-edited
+            // Checklist -- popUpTo the list so "back" from Detail returns
+            // there directly, not into this now-stale Edit form.
+            LaunchedEffect(editState.saved, editState.checklistId) {
+                val savedId = editState.checklistId
+                if (editState.saved && savedId != null) {
+                    navController.navigate(checklistDetailRoute(tripId, savedId)) {
+                        popUpTo(CHECKLISTS_LIST_ROUTE_PATTERN) { inclusive = false }
+                    }
+                }
+            }
+            TripDrawerScaffold(
+                tripId, TripTab.CHECKLISTS,
+                if (editState.checklistId == null) "New Checklist" else "Edit Checklist",
+                navController, showBackButton = true,
+                actions = {
+                    TextButton(onClick = editViewModel::save, enabled = !editState.saving) {
+                        Text("Save", color = TrailsColors.Brand)
+                    }
+                },
+            ) { padding ->
+                ChecklistEditScreen(
+                    padding,
+                    onDeleted = { navController.popBackStack(CHECKLISTS_LIST_ROUTE_PATTERN, inclusive = false) },
+                    viewModel = editViewModel,
+                )
             }
         }
 
@@ -302,11 +370,15 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         }
 
         composable(
-            route = "trip/{$ARG_TRIP_ID}/${TripTab.OVERVIEW.route}",
+            route = "trip/{$ARG_TRIP_ID}/overview",
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.OVERVIEW, "Overview", navController) { padding ->
+            // No longer a drawer tab (user-requested -- reached from a
+            // button on TripListScreen's own card instead), so no
+            // TripTab to highlight and a back arrow rather than the
+            // hamburger, matching Travel Mode's own equally-tab-less route.
+            TripDrawerScaffold(tripId, null, "Overview", navController, showBackButton = true) { padding ->
                 OverviewScreen(padding, onEdit = { navController.navigate("trip/$tripId/edit") })
             }
         }

@@ -82,6 +82,13 @@ model Trip {
   description String?
   coverImage  String?        @map("cover_image")
   visibility  TripVisibility @default(PRIVATE)
+  // User-requested: a manual override so a Trip can be marked ACTIVE
+  // regardless of what its dates alone would compute (spec's Status field
+  // used to be date-only, "Never manually overridable" -- see
+  // lib/trip-status.ts's computeTripStatus, which now checks this first).
+  // The Android app auto-opens the single ACTIVE trip's Timeline on launch,
+  // which is this flag's main real-world purpose.
+  pinnedActive Boolean       @default(false) @map("pinned_active")
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -373,8 +380,13 @@ model Checklist {
   id     String @id @default(uuid()) @db.Uuid
   tripId String @map("trip_id") @db.Uuid
 
-  title       String
-  description String?
+  title String
+
+  // User-requested: "user can choose an emoji" for each Checklist, typed
+  // via the device's own emoji keyboard (not a curated picker like
+  // Section's emoji field) -- free text, no enum restriction. Nullable;
+  // clients fall back to a generic checklist glyph when unset.
+  emoji String? @db.VarChar(16)
 
   // User-clarified: "Guests can't see checklists. they are only for signed
   // in users. With private checklist, its only visible to the user who

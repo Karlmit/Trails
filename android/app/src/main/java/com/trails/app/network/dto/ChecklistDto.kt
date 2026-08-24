@@ -7,7 +7,7 @@ data class ChecklistDto(
     val id: String,
     val tripId: String,
     val title: String,
-    val description: String? = null,
+    val emoji: String? = null,
     val isPrivate: Boolean = false,
     val createdAt: String,
     val updatedAt: String,

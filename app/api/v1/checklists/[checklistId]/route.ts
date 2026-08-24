@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       where: { id: checklistId },
       data: {
         ...(parsed.title !== undefined && { title: parsed.title }),
-        ...(parsed.description !== undefined && { description: parsed.description }),
+        ...(parsed.emoji !== undefined && { emoji: parsed.emoji }),
         ...(parsed.isPrivate !== undefined && { isPrivate: parsed.isPrivate }),
       },
       include: { items: { orderBy: { createdAt: 'asc' } } },

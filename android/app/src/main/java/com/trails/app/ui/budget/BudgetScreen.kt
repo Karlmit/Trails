@@ -45,7 +45,7 @@ fun BudgetScreen(
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 items(groups) { group ->
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),

@@ -45,7 +45,7 @@ fun SectionsScreen(padding: PaddingValues, onOpenSection: (String?) -> Unit = {}
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 items(sections, key = { it.id }) { section ->
                     val index = sections.indexOf(section)
                     SectionRow(section, index, onClick = { onOpenSection(section.id) })

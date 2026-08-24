@@ -143,6 +143,9 @@ export const tripCreateSchema = z
     description: z.string().max(5000).optional().nullable(),
     coverImage: coverImageField,
     visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
+    // User-requested: a manual override so a Trip reads as ACTIVE
+    // regardless of its dates -- see lib/trip-status.ts's computeTripStatus.
+    pinnedActive: z.boolean().optional(),
   })
   .refine((data) => data.endDate.getTime() >= data.startDate.getTime(), {
     message: 'End date must be on or after the start date',
@@ -159,6 +162,7 @@ export const tripUpdateSchema = z
     description: z.string().max(5000).optional().nullable(),
     coverImage: coverImageField,
     visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
+    pinnedActive: z.boolean().optional(),
   })
   .refine(
     (data) =>
@@ -299,15 +303,17 @@ export const ideaUpdateSchema = ideaFieldsSchema.partial();
 
 // FR-21, spec-checklists: Checklist/ChecklistItem CRUD, mirroring the
 // Section/Idea schema shape above. Both schemas are `.strict()` so an
-// unlisted field (spec's "Ask First" boundary -- nothing beyond
-// title/description on Checklist, text/checked/note on ChecklistItem) is
-// rejected as a 400 rather than silently ignored.
+// unlisted field (spec's "Ask First" boundary) is rejected as a 400 rather
+// than silently ignored. `description` was removed outright (user: "Fully
+// remove description from checklists, its not needed"); `emoji` is free
+// text typed via the device's own emoji keyboard, no curated set like
+// Section's.
 
 export const checklistCreateSchema = z
   .object({
     tripId: z.string().uuid('tripId must be a valid UUID'),
     title: z.string().trim().min(1, 'Title is required').max(200),
-    description: z.string().trim().max(5000).optional().nullable(),
+    emoji: z.string().trim().max(16).optional().nullable(),
     // User-requested: "Checklists can be marked as private or shared with
     // other trip users." Stored/toggleable the same as
     // ImportantInfo.isPrivate -- see that field's schema comment for why
@@ -319,7 +325,7 @@ export const checklistCreateSchema = z
 export const checklistUpdateSchema = z
   .object({
     title: z.string().trim().min(1, 'Title is required').max(200).optional(),
-    description: z.string().trim().max(5000).optional().nullable(),
+    emoji: z.string().trim().max(16).optional().nullable(),
     isPrivate: z.boolean().optional(),
   })
   .strict();

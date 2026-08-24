@@ -46,7 +46,7 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
                         ElevatedCard(

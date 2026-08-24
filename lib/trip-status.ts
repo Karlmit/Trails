@@ -8,6 +8,11 @@ export interface TripDateRange {
   startDate: Date;
   endDate: Date;
   timezone: string;
+  // User-requested: a manual override so a Trip reads as ACTIVE regardless
+  // of what its dates alone would compute -- see computeTripStatus below.
+  // Optional so every existing call site that only ever had the three
+  // date fields keeps compiling unchanged.
+  pinnedActive?: boolean;
 }
 
 /** Formats a Date as `YYYY-MM-DD` in the given IANA timezone. */
@@ -192,9 +197,16 @@ export function timezoneDisclosure(zone: string | null, tripTimezone: string): s
 
 /**
  * Computes Trip Status (FR-2) from the Trip's start/end dates relative to
- * "today" in the Trip's own timezone. Never manually overridable.
+ * "today" in the Trip's own timezone -- unless `pinnedActive` is set, in
+ * which case it's always ACTIVE regardless of dates. User-requested: a way
+ * to force a Trip active (the Android app auto-opens the single ACTIVE
+ * trip's Timeline on launch) when the recorded dates don't actually match
+ * what's happening. This was previously "Never manually overridable";
+ * that's the one boundary this feature deliberately crosses.
  */
 export function computeTripStatus(trip: TripDateRange, now: Date = new Date()): TripStatus {
+  if (trip.pinnedActive) return 'ACTIVE';
+
   const today = dateKeyInTimezone(now, trip.timezone);
   const start = dateKeyOfDateColumn(trip.startDate);
   const end = dateKeyOfDateColumn(trip.endDate);

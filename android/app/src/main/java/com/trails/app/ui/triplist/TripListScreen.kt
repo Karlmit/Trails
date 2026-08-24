@@ -41,6 +41,7 @@ import com.trails.app.ui.theme.TrailsShapes
 fun TripListScreen(
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
+    onOpenOverview: (String) -> Unit = {},
     autoOpenActiveTrip: Boolean = false,
     onAutoOpenConsumed: () -> Unit = {},
     viewModel: TripListViewModel = hiltViewModel(),
@@ -66,6 +67,7 @@ fun TripListScreen(
         state = state,
         onOpenTrip = onOpenTrip,
         onAddTrip = onAddTrip,
+        onOpenOverview = onOpenOverview,
         onSaveOffline = viewModel::saveOffline,
         onDismissSaveOfflineError = viewModel::dismissSaveOfflineError,
         onRefresh = viewModel::refresh,
@@ -84,6 +86,7 @@ fun TripListContent(
     state: TripListUiState,
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
+    onOpenOverview: (String) -> Unit = {},
     onSaveOffline: (String) -> Unit = {},
     onDismissSaveOfflineError: (String) -> Unit = {},
     onRefresh: () -> Unit = {},
@@ -123,6 +126,7 @@ fun TripListContent(
                 }
             } else {
                 LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -132,6 +136,7 @@ fun TripListContent(
                             isSavingOffline = trip.id in state.savingOfflineIds,
                             hasSaveOfflineError = trip.id in state.saveOfflineErrorIds,
                             onClick = { onOpenTrip(trip.id) },
+                            onOpenOverview = { onOpenOverview(trip.id) },
                             onSaveOffline = { onSaveOffline(trip.id) },
                             onDismissError = { onDismissSaveOfflineError(trip.id) },
                         )
@@ -148,6 +153,7 @@ private fun TripCard(
     isSavingOffline: Boolean,
     hasSaveOfflineError: Boolean,
     onClick: () -> Unit,
+    onOpenOverview: () -> Unit,
     onSaveOffline: () -> Unit,
     onDismissError: () -> Unit,
 ) {
@@ -178,6 +184,15 @@ private fun TripCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = TrailsColors.TextSoft,
                 modifier = Modifier.padding(top = 4.dp),
+            )
+            // User-requested: "Move overview to a button on the trip in
+            // 'all trips' menu as a button on the trip" -- Overview is no
+            // longer a drawer tab, this is its only entry point now.
+            PillButton(
+                text = "Overview",
+                variant = PillButtonVariant.Outline,
+                onClick = onOpenOverview,
+                modifier = Modifier.padding(top = 10.dp),
             )
             if (hasSaveOfflineError) {
                 ErrorBanner(

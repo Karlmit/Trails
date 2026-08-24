@@ -30,6 +30,7 @@ data class TripRequest(
     val description: String? = null,
     val coverImage: String? = null,
     val visibility: String = "PRIVATE",
+    val pinnedActive: Boolean = false,
 )
 
 @Serializable
@@ -46,7 +47,7 @@ data class SectionRequest(
 data class ChecklistRequest(
     val tripId: String,
     val title: String,
-    val description: String? = null,
+    val emoji: String? = null,
     val isPrivate: Boolean = false,
 )
 
@@ -55,7 +56,7 @@ data class ChecklistRequest(
 // (ChecklistItem has no PATCH-by-full-body path at all, only the checked-
 // toggle's own ChecklistItemPatchRequest, so it needs no Update twin here.)
 @Serializable
-data class ChecklistUpdateRequest(val title: String, val description: String? = null, val isPrivate: Boolean = false)
+data class ChecklistUpdateRequest(val title: String, val emoji: String? = null, val isPrivate: Boolean = false)
 
 @Serializable
 data class ChecklistItemRequest(val checklistId: String, val text: String, val note: String? = null)

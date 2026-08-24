@@ -14,6 +14,7 @@ interface TripOverviewPanelProps {
     description: string | null;
     coverImage: string | null;
     visibility: 'PUBLIC' | 'PRIVATE';
+    pinnedActive: boolean;
     status: string;
     durationDays: number;
   };

@@ -9,6 +9,7 @@ import com.trails.app.network.dto.ChecklistItemPatchRequest
 import com.trails.app.network.dto.ChecklistItemRequest
 import com.trails.app.network.dto.ChecklistRequest
 import com.trails.app.network.dto.ChecklistUpdateRequest
+import com.trails.app.sync.SyncScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -21,6 +22,7 @@ class ChecklistRepository @Inject constructor(
     private val api: TrailsApiService,
     private val checklistDao: ChecklistDao,
     private val itemDao: ChecklistItemDao,
+    private val syncScheduler: SyncScheduler,
 ) {
     fun observeForTrip(tripId: String): Flow<List<ChecklistWithItems>> =
         combine(checklistDao.observeForTrip(tripId), itemDao.observeForTrip(tripId)) { checklists, items ->
@@ -30,6 +32,11 @@ class ChecklistRepository @Inject constructor(
         }
 
     suspend fun syncTrip(tripId: String) {
+        // Push any offline-made checked toggles before pulling the server's
+        // own state down, so they aren't overwritten by what's now stale
+        // server-side data for those specific items.
+        flushPendingItems()
+
         val remote = api.listChecklists(tripId)
         if (remote.isEmpty()) {
             itemDao.deleteAllForTrip(tripId)
@@ -48,10 +55,37 @@ class ChecklistRepository @Inject constructor(
         }
     }
 
-    /** Online-only action: PATCHes the server first, then mirrors the result locally. */
+    /**
+     * Pushes every locally-pending checked toggle (across every Trip) to
+     * the server. Called both by [ChecklistItemSyncWorker] (the
+     * network-constrained "once back online" retry) and by [syncTrip]
+     * itself (so any regular sync -- pull-to-refresh, opening a screen --
+     * also flushes whatever's pending). A single attempt per item per
+     * call; one that still fails (offline, or a genuine server error)
+     * just stays `syncPending` for the next opportunity.
+     */
+    suspend fun flushPendingItems() {
+        itemDao.getAllPending().forEach { pending ->
+            runCatching { api.patchChecklistItem(pending.id, ChecklistItemPatchRequest(pending.checked)) }
+                .onSuccess { itemDao.upsertAll(listOf(it.toEntity())) }
+        }
+    }
+
+    /**
+     * User-requested: a checked toggle must save locally when offline and
+     * sync once back online, not fail outright. Always writes the local
+     * row immediately (works with zero connectivity); the PATCH attempt
+     * that follows either confirms it right away, or -- on any failure --
+     * leaves it `syncPending` and schedules [SyncScheduler
+     * .scheduleChecklistItemRetry] to push it once connectivity returns.
+     * Deliberately never throws: an offline toggle is expected, successful
+     * behavior now, not an error to surface.
+     */
     suspend fun setChecked(itemId: String, checked: Boolean) {
-        val updated = api.patchChecklistItem(itemId, ChecklistItemPatchRequest(checked))
-        itemDao.setChecked(updated.id, updated.checked)
+        itemDao.setCheckedPending(itemId, checked)
+        runCatching { api.patchChecklistItem(itemId, ChecklistItemPatchRequest(checked)) }
+            .onSuccess { itemDao.upsertAll(listOf(it.toEntity())) }
+            .onFailure { syncScheduler.scheduleChecklistItemRetry() }
     }
 
     suspend fun createChecklist(request: ChecklistRequest): ChecklistEntity {
@@ -64,7 +98,7 @@ class ChecklistRepository @Inject constructor(
     suspend fun updateChecklist(checklistId: String, request: ChecklistRequest): ChecklistEntity {
         // checklistUpdateSchema is `.strict()` server-side and has no `tripId` key --
         // sending the full create-shaped request body would 400.
-        val updated = api.updateChecklist(checklistId, ChecklistUpdateRequest(request.title, request.description, request.isPrivate))
+        val updated = api.updateChecklist(checklistId, ChecklistUpdateRequest(request.title, request.emoji, request.isPrivate))
         val entity = updated.toEntity()
         checklistDao.upsertAll(listOf(entity))
         return entity

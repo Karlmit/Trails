@@ -24,6 +24,9 @@ data class TripEditState(
     val timezone: String = ZoneId.systemDefault().id,
     val description: String = "",
     val visibility: String = "PRIVATE",
+    // User-requested: a manual override so a Trip reads (and auto-opens on
+    // launch) as ACTIVE regardless of its dates.
+    val pinnedActive: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val saved: Boolean = false,
@@ -58,6 +61,7 @@ class TripEditViewModel @Inject constructor(
             timezone = existing.timezone,
             description = existing.description.orEmpty(),
             visibility = existing.visibility,
+            pinnedActive = existing.pinnedActive,
         )
     }
 
@@ -67,6 +71,7 @@ class TripEditViewModel @Inject constructor(
     fun onEndDateChange(v: String) { _state.value = _state.value.copy(endDate = v) }
     fun onTimezoneChange(v: String) { _state.value = _state.value.copy(timezone = v) }
     fun onDescriptionChange(v: String) { _state.value = _state.value.copy(description = v) }
+    fun onPinnedActiveChange(v: Boolean) { _state.value = _state.value.copy(pinnedActive = v) }
 
     fun save() {
         val current = _state.value
@@ -88,6 +93,7 @@ class TripEditViewModel @Inject constructor(
                 timezone = current.timezone,
                 description = current.description.trim().takeIf { it.isNotEmpty() },
                 visibility = current.visibility,
+                pinnedActive = current.pinnedActive,
             )
             runCatching {
                 if (current.tripId == null) repository.createTrip(request) else repository.updateTrip(current.tripId, request)

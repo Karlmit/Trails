@@ -173,6 +173,25 @@ describe.skipIf(!hasTestDatabase)('trips route (detail: PATCH/DELETE)', () => {
     expect(body.startDate).toBe('2026-08-01');
   });
 
+  // User-requested: a manual override so a Trip reads as ACTIVE regardless
+  // of its dates. This Trip's own dates (2026-08-01 to 2026-08-20) are in
+  // the past relative to the real clock, so without the override its
+  // Status would be COMPLETED -- confirming the override actually changes
+  // computed Status, not just the stored flag.
+  it('persists pinnedActive and makes Status read ACTIVE regardless of dates', async () => {
+    const res = await patchTrip(
+      detailRequest('PATCH', tripId, { pinnedActive: true }, token),
+      tripParams(tripId),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.pinnedActive).toBe(true);
+    expect(body.status).toBe('ACTIVE');
+
+    const stored = await testPrisma().trip.findUnique({ where: { id: tripId } });
+    expect(stored?.pinnedActive).toBe(true);
+  });
+
   // Item 3 regression: a one-field PATCH must still be checked against the
   // *other* field's existing stored value, not skip date-order validation
   // just because only one of startDate/endDate was submitted.

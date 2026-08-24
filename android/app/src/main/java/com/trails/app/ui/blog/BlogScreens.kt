@@ -66,7 +66,7 @@ fun BlogListScreen(
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 items(posts, key = { it.entry.id }) { item ->
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
@@ -98,7 +98,7 @@ fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hi
         if (entry == null) {
             Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
         } else {
-            LazyColumn(contentPadding = PaddingValues(20.dp)) {
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
                 item {
                     Text(entry.title, style = MaterialTheme.typography.titleLarge, color = TrailsColors.Brand)
                     Text(

@@ -87,6 +87,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         ...(parsed.description !== undefined && { description: parsed.description }),
         ...(parsed.coverImage !== undefined && { coverImage: parsed.coverImage }),
         ...(parsed.visibility !== undefined && { visibility: parsed.visibility }),
+        ...(parsed.pinnedActive !== undefined && { pinnedActive: parsed.pinnedActive }),
       },
     });
 

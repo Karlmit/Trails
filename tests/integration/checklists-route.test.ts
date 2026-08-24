@@ -259,18 +259,18 @@ describe.skipIf(!hasTestDatabase)('checklists route', () => {
       checklistId = (await res.json()).id;
     });
 
-    it('updates title/description via PATCH', async () => {
+    it('updates title/emoji via PATCH', async () => {
       const res = await patchChecklist(
         jsonRequest(`http://localhost/api/v1/checklists/${checklistId}`, 'PATCH', {
           title: 'Packing list (updated)',
-          description: 'Everything for the trip',
+          emoji: '🧳',
         }, token),
         checklistParams(checklistId),
       );
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.title).toBe('Packing list (updated)');
-      expect(body.description).toBe('Everything for the trip');
+      expect(body.emoji).toBe('🧳');
     });
 
     it('returns 404 for a PATCH to an unknown/malformed checklist id', async () => {
