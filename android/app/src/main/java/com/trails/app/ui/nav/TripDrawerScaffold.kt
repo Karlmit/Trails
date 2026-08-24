@@ -43,10 +43,16 @@ private const val ROUTE_TRIPS = "trips"
  * [showBackButton]: sub-screens reached by tapping something (Entry/Blog
  * detail), not by picking a tab, get a plain back arrow instead of the
  * hamburger -- popping one entry is the right action there, not opening
- * the drawer. Tab navigation itself always collapses the backstack to
- * [trips, currentTab] (see navigateTo's popUpTo) so switching tabs never
- * grows an unbounded stack, and the system back button/gesture reliably
- * returns to the trip list from any tab in exactly one press.
+ * the drawer.
+ *
+ * User-requested: while inside a Trip, the system back button/gesture
+ * must always return to Timeline (never straight to the trip list) --
+ * "All Trips" is reached only by deliberately tapping that drawer item.
+ * Tab navigation (navigateTo's popUpTo) always collapses the backstack
+ * down to [timeline, currentTab] rather than [trips, currentTab], and
+ * TrailsNavHost's onOpenTrip pops "trips" off entirely once Timeline is
+ * first shown, so Timeline sits at the bottom of every Trip-scoped
+ * backstack with nothing below it to fall back to.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +71,12 @@ fun TripDrawerScaffold(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    val timelineRoute = "trip/$tripId/${TripTab.TIMELINE.route}"
+
     fun navigateTo(route: String) {
         scope.launch { drawerState.close() }
         navController.navigate("trip/$tripId/$route") {
-            popUpTo(ROUTE_TRIPS) { inclusive = false }
+            popUpTo(timelineRoute) { inclusive = route == TripTab.TIMELINE.route }
             launchSingleTop = true
         }
     }
@@ -97,7 +105,13 @@ fun TripDrawerScaffold(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        navController.navigate(ROUTE_TRIPS) { popUpTo(ROUTE_TRIPS) { inclusive = true } }
+                        // The only deliberate escape hatch back to the trip
+                        // list -- Timeline is always present below whatever
+                        // screen this drawer was opened from (see class doc),
+                        // so popping up to it before pushing "trips" clears
+                        // this Trip's entire backstack rather than leaving it
+                        // dangling underneath.
+                        navController.navigate(ROUTE_TRIPS) { popUpTo(timelineRoute) { inclusive = true } }
                     },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
                 )

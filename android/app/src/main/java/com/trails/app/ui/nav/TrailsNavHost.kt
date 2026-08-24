@@ -111,7 +111,15 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable(ROUTE_TRIPS) {
             TripListScreen(
-                onOpenTrip = { tripId -> navController.navigate(tripRoute(tripId, TripTab.TIMELINE.route)) },
+                // User-requested: the system back button/gesture must never
+                // land on the trip list from inside a Trip -- popping
+                // "trips" off here as Timeline is pushed means Timeline
+                // itself has nothing left below it to fall back to.
+                onOpenTrip = { tripId ->
+                    navController.navigate(tripRoute(tripId, TripTab.TIMELINE.route)) {
+                        popUpTo(ROUTE_TRIPS) { inclusive = true }
+                    }
+                },
                 onAddTrip = { navController.navigate("trips/new/edit") },
                 onOpenOverview = { tripId -> navController.navigate("trip/$tripId/overview") },
                 autoOpenActiveTrip = autoOpenActiveTripPending,
