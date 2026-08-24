@@ -33,7 +33,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
-import com.trails.app.data.weatherTags
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
@@ -119,7 +118,14 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                 }
             }
 
-            val hasMore = idea.category != null || idea.locationAddress != null || idea.locationMapLink != null || idea.weatherTags.isNotEmpty()
+            // User-requested: Description shows always, not tucked behind
+            // "Read more" -- same "shown unconditionally in view mode" choice
+            // web's IdeaCard makes for this field.
+            idea.description?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
+            }
+
+            val hasMore = idea.category != null || idea.locationAddress != null || idea.locationMapLink != null
             if (hasMore) {
                 Text(
                     if (expanded) "Show less" else "Read more",
@@ -144,20 +150,6 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                             color = TrailsColors.BrandAccent,
                             modifier = Modifier.padding(top = 4.dp).clickable { com.trails.app.util.openExternalUrl(context, link) },
                         )
-                    }
-                    if (idea.weatherTags.isNotEmpty()) {
-                        Row(modifier = Modifier.padding(top = 6.dp)) {
-                            idea.weatherTags.forEach { tag ->
-                                Surface(
-                                    color = TrailsColors.SurfaceCool,
-                                    contentColor = TrailsColors.TextSoft,
-                                    shape = TrailsShapes.Pill,
-                                    modifier = Modifier.padding(end = 6.dp),
-                                ) {
-                                    Text(tag, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                                }
-                            }
-                        }
                     }
                 }
             }

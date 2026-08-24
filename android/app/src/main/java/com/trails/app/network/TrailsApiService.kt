@@ -17,6 +17,7 @@ import com.trails.app.network.dto.LinkDto
 import com.trails.app.network.dto.LinkRequest
 import com.trails.app.network.dto.LoginRequest
 import com.trails.app.network.dto.LoginResponse
+import com.trails.app.network.dto.MoveDirectionRequest
 import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.PhotoDto
 import com.trails.app.network.dto.SectionDto
@@ -154,6 +155,10 @@ interface TrailsApiService {
 
     @DELETE("api/v1/important-info/{id}")
     suspend fun deleteImportantInfo(@Path("id") id: String): Response<ResponseBody>
+
+    // User-requested manual reordering.
+    @PUT("api/v1/important-info/{id}/move")
+    suspend fun moveImportantInfo(@Path("id") id: String, @Body body: MoveDirectionRequest): ImportantInfoDto
 
     @GET("api/v1/ideas")
     suspend fun listIdeas(@Query("tripId") tripId: String): List<IdeaDto>

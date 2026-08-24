@@ -66,6 +66,7 @@ data class ImportantInfoRequest(
     val tripId: String,
     val title: String,
     val content: String? = null,
+    val emoji: String? = null,
     val locationName: String? = null,
     val locationAddress: String? = null,
     val locationLat: Double? = null,
@@ -83,9 +84,9 @@ data class IdeaRequest(
     val sectionId: String? = null,
     val title: String,
     val category: String? = null,
+    val description: String? = null,
     val priority: String,
     val weatherSuitability: String,
-    val weatherTags: List<String> = emptyList(),
     val locationName: String? = null,
     val locationAddress: String? = null,
     val locationLat: Double? = null,
@@ -232,6 +233,10 @@ data class BlogPostRequest(
     val startAt: String,
     val isPrivate: Boolean = false,
 )
+
+// User-requested manual reordering -- app/api/v1/important-info/[itemId]/move/route.ts.
+@Serializable
+data class MoveDirectionRequest(val direction: String)
 
 @Serializable
 data class LinkRequest(val ownerType: String, val ownerId: String, val url: String, val label: String? = null)

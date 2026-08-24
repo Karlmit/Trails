@@ -15,12 +15,15 @@ export interface LinkDTO {
 interface LinkListProps {
   ownerType: string;
   ownerId: string;
+  // See TagList.tsx's identical prop -- owner's own view-vs-edit-mode
+  // toggle, unrelated to Guest access (still never mounted for a Guest).
+  readOnly?: boolean;
 }
 
-// FR-15/FR-16/FR-26, spec-tags-links-photos: same self-fetching shape and
-// no-`readOnly`-prop reasoning as TagList.tsx (see that file's comment) --
-// mounted on every owning entity's detail/edit view, never for a Guest.
-export function LinkList({ ownerType, ownerId }: LinkListProps) {
+// FR-15/FR-16/FR-26, spec-tags-links-photos: same self-fetching shape as
+// TagList.tsx -- mounted on every owning entity's detail/edit view, never
+// for a Guest.
+export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps) {
   const router = useRouter();
   const [links, setLinks] = useState<LinkDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +114,10 @@ export function LinkList({ ownerType, ownerId }: LinkListProps) {
     }
   }
 
+  // User-requested compactness: a read-only mount with nothing to show
+  // renders nothing at all.
+  if (readOnly && !loading && links.length === 0) return null;
+
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
@@ -130,52 +137,56 @@ export function LinkList({ ownerType, ownerId }: LinkListProps) {
               <a href={link.url} target="_blank" rel="noreferrer">
                 {link.label || link.url}
               </a>
-              <button
-                type="button"
-                className="btn-danger"
-                style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
-                onClick={() => handleDelete(link)}
-                disabled={deletingIds.has(link.id)}
-              >
-                {deletingIds.has(link.id) ? 'Removing…' : 'Remove'}
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="btn-danger"
+                  style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
+                  onClick={() => handleDelete(link)}
+                  disabled={deletingIds.has(link.id)}
+                >
+                  {deletingIds.has(link.id) ? 'Removing…' : 'Remove'}
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <form onSubmit={handleAdd} className="row" style={{ gap: 'var(--space-2)' }}>
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…"
-          maxLength={2048}
-          aria-label="New link URL"
-          style={{
-            border: '1px solid #d6dbde',
-            borderRadius: 'var(--radius-input)',
-            padding: '0.4rem 0.8rem',
-            fontSize: '0.9rem',
-            flex: 1,
-          }}
-        />
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Label (optional)"
-          maxLength={200}
-          aria-label="New link label"
-          style={{
-            border: '1px solid #d6dbde',
-            borderRadius: 'var(--radius-input)',
-            padding: '0.4rem 0.8rem',
-            fontSize: '0.9rem',
-          }}
-        />
-        <button type="submit" className="btn btn-outline" disabled={submitting || !url.trim()}>
-          {submitting ? 'Adding…' : 'Add'}
-        </button>
-      </form>
+      {!readOnly && (
+        <form onSubmit={handleAdd} className="row" style={{ gap: 'var(--space-2)' }}>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+            maxLength={2048}
+            aria-label="New link URL"
+            style={{
+              border: '1px solid #d6dbde',
+              borderRadius: 'var(--radius-input)',
+              padding: '0.4rem 0.8rem',
+              fontSize: '0.9rem',
+              flex: 1,
+            }}
+          />
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Label (optional)"
+            maxLength={200}
+            aria-label="New link label"
+            style={{
+              border: '1px solid #d6dbde',
+              borderRadius: 'var(--radius-input)',
+              padding: '0.4rem 0.8rem',
+              fontSize: '0.9rem',
+            }}
+          />
+          <button type="submit" className="btn btn-outline" disabled={submitting || !url.trim()}>
+            {submitting ? 'Adding…' : 'Add'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

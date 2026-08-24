@@ -113,6 +113,7 @@ fun ImportantInfoDto.toEntity() = ImportantInfoEntity(
     tripId = tripId,
     title = title,
     content = content,
+    emoji = emoji,
     locationName = locationName,
     locationAddress = locationAddress,
     locationLat = locationLat,
@@ -122,6 +123,7 @@ fun ImportantInfoDto.toEntity() = ImportantInfoEntity(
     contactPhone = contactPhone,
     contactEmail = contactEmail,
     isPrivate = isPrivate,
+    sortOrder = sortOrder,
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
@@ -132,9 +134,9 @@ fun IdeaDto.toEntity() = IdeaEntity(
     sectionId = sectionId,
     title = title,
     category = category,
+    description = description,
     priority = priority,
     weatherSuitability = weatherSuitability,
-    weatherTagsCsv = weatherTags.joinToString(","),
     locationName = locationName,
     locationAddress = locationAddress,
     locationLat = locationLat,
@@ -171,6 +173,3 @@ fun PhotoDto.toEntity(localPath: String? = null) = PhotoEntity(
     createdAt = createdAt,
     localPath = localPath,
 )
-
-val IdeaEntity.weatherTags: List<String>
-    get() = if (weatherTagsCsv.isBlank()) emptyList() else weatherTagsCsv.split(",")

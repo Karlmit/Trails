@@ -1,27 +1,27 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { serializeIdea } from '@/lib/serializers';
-import { distinctWeatherTags, filterIdeas, PRIORITY_LABELS } from '@/lib/ideas';
+import { distinctCategories, filterIdeas, PRIORITY_LABELS } from '@/lib/ideas';
 import { isUuid } from '@/lib/uuid';
 import { IdeaForm } from '@/components/IdeaForm';
 import { IdeaCard } from '@/components/IdeaCard';
 
 interface PageProps {
   params: Promise<{ tripId: string }>;
-  searchParams: Promise<{ priority?: string; weatherTag?: string }>;
+  searchParams: Promise<{ priority?: string; sectionId?: string; category?: string }>;
 }
 
-// FR-16/FR-17, spec-ideas: list + create + priority/weather-tag filters.
-// The filter control is a plain `<form method="get">` (native browser
-// navigation via query string, no client JS) -- the Trip's Ideas render as
-// a Server Component reading Prisma directly (architecture's read path),
-// filtered by `filterIdeas` (lib/ideas.ts, the same pure predicate
-// GET /api/v1/ideas applies) against `?priority=&weatherTag=`.
+// FR-16/FR-17, spec-ideas: list + create + priority/Section/Category
+// filters. The filter control is a plain `<form method="get">` (native
+// browser navigation via query string, no client JS) -- the Trip's Ideas
+// render as a Server Component reading Prisma directly (architecture's read
+// path), filtered by `filterIdeas` (lib/ideas.ts, the same pure predicate
+// GET /api/v1/ideas applies) against `?priority=&sectionId=&category=`.
 export default async function IdeasPage({ params, searchParams }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
-  const { priority, weatherTag } = await searchParams;
+  const { priority, sectionId, category } = await searchParams;
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
@@ -47,11 +47,11 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
     ...serializeIdea(idea),
     primaryPhotoId: primaryPhotoByIdeaId.get(idea.id) ?? null,
   }));
-  const tagOptions = distinctWeatherTags(allIdeas);
+  const categoryOptions = distinctCategories(allIdeas);
   // Default sort: grouped by the Trip's own Section order, unsectioned
   // Ideas last -- same "no-section-is-a-real-group, not scattered" choice
   // the Android app's Ideas list makes (see its own IdeasScreen comment).
-  const ideas = filterIdeas(allIdeas, { priority, weatherTag }).slice().sort((a, b) => {
+  const ideas = filterIdeas(allIdeas, { priority, sectionId, category }).slice().sort((a, b) => {
     const aIndex = a.sectionId ? sectionIndexById.get(a.sectionId) ?? UNSECTIONED_INDEX : UNSECTIONED_INDEX;
     const bIndex = b.sectionId ? sectionIndexById.get(b.sectionId) ?? UNSECTIONED_INDEX : UNSECTIONED_INDEX;
     return aIndex - bIndex;
@@ -79,12 +79,23 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="idea-filter-tag">Weather tag</label>
-          <select id="idea-filter-tag" name="weatherTag" defaultValue={weatherTag ?? ''}>
+          <label htmlFor="idea-filter-section">Section</label>
+          <select id="idea-filter-section" name="sectionId" defaultValue={sectionId ?? ''}>
             <option value="">All</option>
-            {tagOptions.map((tag) => (
-              <option key={tag} value={tag}>
-                {tag}
+            {trip.sections.map((section) => (
+              <option key={section.id} value={section.id}>
+                {section.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="idea-filter-category">Category</label>
+          <select id="idea-filter-category" name="category" defaultValue={category ?? ''}>
+            <option value="">All</option>
+            {categoryOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
@@ -92,7 +103,7 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
         <button type="submit" className="btn btn-outline">
           Filter
         </button>
-        {(priority || weatherTag) && (
+        {(priority || sectionId || category) && (
           <a href={`/trips/${tripId}/ideas`} className="text-soft">
             Clear filters
           </a>
@@ -100,7 +111,12 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
       </form>
 
       <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
-        <IdeaForm tripId={tripId} sections={trip.sections.map((s) => ({ id: s.id, name: s.name }))} />
+        <IdeaForm
+          mode="create"
+          tripId={tripId}
+          sections={trip.sections.map((s) => ({ id: s.id, name: s.name }))}
+          categoryOptions={categoryOptions}
+        />
       </div>
 
       {ideas.length === 0 ? (
@@ -110,12 +126,13 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
             : 'No Ideas match this filter.'}
         </div>
       ) : (
-        <div className="stack">
+        <div className="stack" style={{ gap: 'var(--space-2)' }}>
           {ideas.map((idea) => (
             <IdeaCard
               key={idea.id}
               idea={idea}
               sections={trip.sections.map((s) => ({ id: s.id, name: s.name }))}
+              categoryOptions={categoryOptions}
             />
           ))}
         </div>

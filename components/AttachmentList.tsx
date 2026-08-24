@@ -132,6 +132,10 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
     }
   }
 
+  // User-requested compactness: a read-only mount with nothing to show
+  // renders nothing at all.
+  if (readOnly && !loading && attachments.length === 0) return null;
+
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <div className="row-between">

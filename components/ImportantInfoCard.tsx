@@ -16,6 +16,7 @@ export interface ImportantInfoDTO {
   tripId: string;
   title: string;
   content: string | null;
+  emoji: string | null;
   locationName: string | null;
   locationAddress: string | null;
   locationMapLink: string | null;
@@ -23,6 +24,7 @@ export interface ImportantInfoDTO {
   contactPhone: string | null;
   contactEmail: string | null;
   isPrivate: boolean;
+  sortOrder: number;
   // spec-tags-links-photos: same Cover Photo id shape as IdeaCard's
   // primaryPhotoId (see that component's comment) --
   // app/(web)/trips/[tripId]/important-info/page.tsx attaches this.
@@ -35,12 +37,21 @@ export interface ImportantInfoDTO {
 // confirm dialog (spec's I/O matrix -- same optimistic-toggle,
 // in-flight-guard shape as ChecklistCard's item-checked toggle). A mounted
 // AttachmentList (ownerType="IMPORTANT_INFO") covers Attachments.
-export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDTO }) {
+export function ImportantInfoCard({
+  item: initialItem,
+  isFirst,
+  isLast,
+}: {
+  item: ImportantInfoDTO;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [togglingPrivate, setTogglingPrivate] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleTogglePrivate() {
@@ -93,6 +104,31 @@ export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDT
     }
   }
 
+  // User-requested manual reordering -- a lightweight list-level action,
+  // available directly from the view row rather than requiring Edit.
+  async function handleMove(direction: 'up' | 'down') {
+    if (moving) return;
+    setMoving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/v1/important-info/${item.id}/move`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.error?.message ?? 'Could not reorder this item.');
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError('Could not reach the server. Please try again.');
+    } finally {
+      setMoving(false);
+    }
+  }
+
   if (editing) {
     return (
       <ImportantInfoForm
@@ -109,12 +145,39 @@ export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDT
   }
 
   return (
-    <div className="card stack">
+    // User-requested compactness: tighter padding/gap than the default
+    // `.card`/`.stack` -- the main win is A3's hide-when-empty Tags/Links/
+    // Documents/Photos, this is a modest additional pass on top of that.
+    <div className="card stack" style={{ padding: 'var(--space-3)', gap: 'var(--space-2)' }}>
       {error && <div className="form-error-banner">{error}</div>}
 
       <div className="row-between">
-        <h3 style={{ margin: 0 }}>{item.title}</h3>
-        <div className="row" style={{ gap: 'var(--space-2)' }}>
+        <h3 style={{ margin: 0 }}>
+          {item.emoji || '📌'} {item.title}
+        </h3>
+        <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+          <div className="row" style={{ gap: 0 }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => handleMove('up')}
+              disabled={moving || isFirst}
+              aria-label="Move up"
+              title="Move up"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => handleMove('down')}
+              disabled={moving || isLast}
+              aria-label="Move down"
+              title="Move down"
+            >
+              ↓
+            </button>
+          </div>
           <label className="row" style={{ gap: 'var(--space-1)', alignItems: 'center', margin: 0 }}>
             <input
               type="checkbox"
@@ -178,11 +241,10 @@ export function ImportantInfoCard({ item: initialItem }: { item: ImportantInfoDT
         </div>
       )}
 
-      <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} />
-      <LinkList ownerType="IMPORTANT_INFO" ownerId={item.id} />
-      <PhotoGallery tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
-
-      <AttachmentList tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
+      <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} readOnly />
+      <LinkList ownerType="IMPORTANT_INFO" ownerId={item.id} readOnly />
+      <PhotoGallery tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} readOnly />
+      <AttachmentList tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} readOnly />
     </div>
   );
 }

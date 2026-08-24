@@ -57,7 +57,6 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
         title: 'Cooking class',
         priority: 'MUST_DO',
         weatherSuitability: 'INDOOR',
-        weatherTags: ['Rainy day'],
         estimatedExpenseAmount: 40,
         estimatedExpenseCurrency: 'USD',
       }, token),

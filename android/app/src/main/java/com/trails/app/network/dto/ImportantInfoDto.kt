@@ -8,6 +8,7 @@ data class ImportantInfoDto(
     val tripId: String,
     val title: String,
     val content: String? = null,
+    val emoji: String? = null,
     val locationName: String? = null,
     val locationAddress: String? = null,
     val locationLat: Double? = null,
@@ -17,6 +18,7 @@ data class ImportantInfoDto(
     val contactPhone: String? = null,
     val contactEmail: String? = null,
     val isPrivate: Boolean = false,
+    val sortOrder: Int = 0,
     val createdAt: String,
     val updatedAt: String,
 )

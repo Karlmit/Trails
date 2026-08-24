@@ -4,6 +4,7 @@ import com.trails.app.data.dao.ImportantInfoDao
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.ImportantInfoRequest
+import com.trails.app.network.dto.MoveDirectionRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -51,5 +52,15 @@ class ImportantInfoRepository @Inject constructor(
     suspend fun delete(itemId: String) {
         api.deleteImportantInfo(itemId)
         dao.deleteById(itemId)
+    }
+
+    // User-requested manual reordering -- the server swaps sortOrder between
+    // this item and whichever neighbor is in that direction, but the move
+    // response only describes this one row. A full re-sync (rather than
+    // upserting just the row returned) is what actually brings the
+    // neighbor's now-stale cached sortOrder back in line too.
+    suspend fun move(tripId: String, itemId: String, direction: String) {
+        api.moveImportantInfo(itemId, MoveDirectionRequest(direction))
+        syncTrip(tripId)
     }
 }

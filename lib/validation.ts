@@ -268,19 +268,14 @@ const ideaFieldsShape = {
   // violation.
   sectionId: z.string().uuid('sectionId must be a valid UUID').optional().nullable(),
   category: z.string().trim().max(200).optional().nullable(),
+  // User-requested optional free text -- same bound as ImportantInfo.content.
+  description: z.string().trim().max(5000).optional().nullable(),
   priority: z.enum(IDEA_PRIORITIES, {
     message: `priority must be one of: ${IDEA_PRIORITIES.join(', ')}`,
   }),
   weatherSuitability: z.enum(WEATHER_SUITABILITIES, {
     message: `weatherSuitability must be one of: ${WEATHER_SUITABILITIES.join(', ')}`,
   }),
-  // No `.default([])` here deliberately -- same reasoning as
-  // lib/entry-types/stay.schema.ts's `typeDetails` comment: `ideaUpdateSchema`
-  // below is this same shape run through `.partial()`, and a PATCH that
-  // omits `weatherTags` must leave the stored array untouched, not overwrite
-  // it with `[]`. Defaulting to `[]` on create happens in the Route Handler
-  // instead (app/api/v1/ideas/route.ts).
-  weatherTags: z.array(z.string().trim().min(1).max(50)).max(20).optional(),
   // AD-11: Idea is one of AD-11's Location-owning rows -- same shape/
   // validation as TimelineEntry's Location fields, reused directly rather
   // than redefined (unlike the expense fields above, which differ in name).

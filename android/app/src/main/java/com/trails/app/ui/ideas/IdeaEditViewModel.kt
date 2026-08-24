@@ -10,7 +10,6 @@ import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
-import com.trails.app.data.weatherTags
 import com.trails.app.network.dto.IdeaRequest
 import com.trails.app.network.dto.diffFields
 import com.trails.app.network.dto.jsonStringOrNull
@@ -29,7 +28,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -48,13 +46,10 @@ data class IdeaEditState(
     val sectionId: String? = null,
     val title: String = "",
     val category: String? = null,
+    // User-requested optional free text.
+    val description: String = "",
     val priority: String = "WOULD_LIKE",
     val weatherSuitability: String = "EITHER",
-    // No UI edits this any more (redundant with weatherSuitability, per
-    // user feedback) -- loaded from the existing Idea and resent unchanged
-    // on save so an old Idea's tags aren't silently wiped by an update that
-    // never meant to touch them.
-    val weatherTags: List<String> = emptyList(),
     val locationAddress: String = "",
     val locationMapLink: String = "",
     val estimatedExpenseAmount: String = "",
@@ -95,9 +90,9 @@ class IdeaEditViewModel @Inject constructor(
         "sectionId" to (s.sectionId?.let { JsonPrimitive(it) } ?: JsonNull),
         "title" to JsonPrimitive(s.title.trim()),
         "category" to (s.category?.let { JsonPrimitive(it) } ?: JsonNull),
+        "description" to jsonStringOrNull(s.description),
         "priority" to JsonPrimitive(s.priority),
         "weatherSuitability" to JsonPrimitive(s.weatherSuitability),
-        "weatherTags" to JsonArray(s.weatherTags.map { JsonPrimitive(it) }),
         // locationName always tracks title (see toRequest's comment) -- kept
         // in the diffed field set so a title-only edit still sends it.
         "locationName" to JsonPrimitive(s.title.trim()),
@@ -160,9 +155,9 @@ class IdeaEditViewModel @Inject constructor(
             sectionId = existing.sectionId,
             title = existing.title,
             category = existing.category,
+            description = existing.description.orEmpty(),
             priority = existing.priority,
             weatherSuitability = existing.weatherSuitability,
-            weatherTags = existing.weatherTags,
             locationAddress = existing.locationAddress.orEmpty(),
             locationMapLink = existing.locationMapLink.orEmpty(),
             estimatedExpenseAmount = existing.estimatedExpenseAmount?.toString().orEmpty(),
@@ -174,6 +169,7 @@ class IdeaEditViewModel @Inject constructor(
     fun onSectionChange(v: String?) { _state.value = _state.value.copy(sectionId = v) }
     fun onTitleChange(v: String) { _state.value = _state.value.copy(title = v) }
     fun onCategoryChange(v: String?) { _state.value = _state.value.copy(category = v) }
+    fun onDescriptionChange(v: String) { _state.value = _state.value.copy(description = v) }
     fun onPriorityChange(v: String) { _state.value = _state.value.copy(priority = v) }
     fun onWeatherSuitabilityChange(v: String) { _state.value = _state.value.copy(weatherSuitability = v) }
     fun onLocationAddressChange(v: String) { _state.value = _state.value.copy(locationAddress = v) }
@@ -280,9 +276,9 @@ class IdeaEditViewModel @Inject constructor(
         sectionId = current.sectionId,
         title = current.title.trim(),
         category = current.category,
+        description = current.description.trim().takeIf { it.isNotEmpty() },
         priority = current.priority,
         weatherSuitability = current.weatherSuitability,
-        weatherTags = current.weatherTags,
         // locationName removed from the form (redundant with Title, per
         // feedback) -- kept populated server-side from Title so anything
         // that reads Idea.locationName (e.g. a future Maps-link fallback)

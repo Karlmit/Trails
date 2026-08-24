@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const items = await prisma.importantInfo.findMany({
     where: { tripId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   });
 
   return NextResponse.json(items.map(serializeImportantInfo));
@@ -54,12 +54,23 @@ export async function POST(request: NextRequest) {
   const trip = await prisma.trip.findUnique({ where: { id: parsed.tripId } });
   if (!trip) return Errors.notFound('Trip not found');
 
+  // User-requested manual reordering -- new items land last, same "append"
+  // semantics a plain createdAt-ordered list already had.
+  const lastItem = await prisma.importantInfo.findFirst({
+    where: { tripId: parsed.tripId },
+    orderBy: { sortOrder: 'desc' },
+    select: { sortOrder: true },
+  });
+  const nextSortOrder = (lastItem?.sortOrder ?? -1) + 1;
+
   try {
     const item = await prisma.importantInfo.create({
       data: {
         tripId: parsed.tripId,
         title: parsed.title,
         content: parsed.content ?? null,
+        emoji: parsed.emoji ?? null,
+        sortOrder: nextSortOrder,
         locationName: parsed.locationName ?? null,
         locationAddress: parsed.locationAddress ?? null,
         locationLat: parsed.locationLat ?? null,

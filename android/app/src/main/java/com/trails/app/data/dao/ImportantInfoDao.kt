@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ImportantInfoDao {
-    @Query("SELECT * FROM important_info WHERE tripId = :tripId ORDER BY createdAt ASC")
+    @Query("SELECT * FROM important_info WHERE tripId = :tripId ORDER BY sortOrder ASC, createdAt ASC")
     fun observeForTrip(tripId: String): Flow<List<ImportantInfoEntity>>
 
     @Upsert

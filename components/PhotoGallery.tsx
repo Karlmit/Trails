@@ -201,6 +201,10 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
 
   void tripId; // kept for interface parity with AttachmentList's mount signature; not needed by any call here.
 
+  // User-requested compactness: a read-only mount with nothing to show
+  // renders nothing at all.
+  if (readOnly && !loading && photos.length === 0) return null;
+
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <div className="row-between">

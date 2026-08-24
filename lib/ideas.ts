@@ -1,34 +1,37 @@
-// FR-16: Ideas are filterable by Priority and by a single free-form weather
-// tag. Pure, DB-free function so it's unit-testable on its own (per this
-// spec's Tasks: "unit for filtering") -- both the GET /api/v1/ideas Route
-// Handler and the Ideas page's server-rendered `?priority=&weatherTag=`
-// filter form call this, so the predicate is defined exactly once.
+// FR-16: Ideas are filterable by Priority, Section, and Category. Pure,
+// DB-free function so it's unit-testable on its own (per this spec's Tasks:
+// "unit for filtering") -- both the GET /api/v1/ideas Route Handler and the
+// Ideas page's server-rendered `?priority=&sectionId=&category=` filter form
+// call this, so the predicate is defined exactly once.
 
 export interface IdeaFilterInput {
   priority: string;
-  weatherTags: string[];
+  sectionId?: string | null;
+  category?: string | null;
 }
 
 export interface IdeaFilters {
   priority?: string | null;
-  weatherTag?: string | null;
+  sectionId?: string | null;
+  category?: string | null;
 }
 
 export function filterIdeas<T extends IdeaFilterInput>(ideas: T[], filters: IdeaFilters): T[] {
   return ideas.filter((idea) => {
     if (filters.priority && idea.priority !== filters.priority) return false;
-    if (filters.weatherTag && !idea.weatherTags.includes(filters.weatherTag)) return false;
+    if (filters.sectionId && idea.sectionId !== filters.sectionId) return false;
+    if (filters.category && idea.category !== filters.category) return false;
     return true;
   });
 }
 
-/** Every distinct weather tag across a Trip's Ideas, sorted, for building the filter form's tag options. */
-export function distinctWeatherTags(ideas: { weatherTags: string[] }[]): string[] {
-  const tags = new Set<string>();
+/** Every distinct Category across a Trip's Ideas, sorted, for building the filter form's/create form's options. */
+export function distinctCategories(ideas: { category: string | null }[]): string[] {
+  const categories = new Set<string>();
   for (const idea of ideas) {
-    for (const tag of idea.weatherTags) tags.add(tag);
+    if (idea.category) categories.add(idea.category);
   }
-  return [...tags].sort((a, b) => a.localeCompare(b));
+  return [...categories].sort((a, b) => a.localeCompare(b));
 }
 
 // Display labels, same split-from-schema-logic convention as

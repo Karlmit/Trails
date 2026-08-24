@@ -22,17 +22,18 @@ export async function GET(request: NextRequest) {
   if (!isUuid(tripId)) return Errors.validation('tripId query parameter must be a valid UUID');
 
   const priority = request.nextUrl.searchParams.get('priority');
-  const weatherTag = request.nextUrl.searchParams.get('weatherTag');
+  const sectionId = request.nextUrl.searchParams.get('sectionId');
+  const category = request.nextUrl.searchParams.get('category');
 
   const ideas = await prisma.idea.findMany({
     where: { tripId },
     orderBy: { createdAt: 'asc' },
   });
 
-  // FR-16: filter by Priority and/or a single weather tag -- an empty
-  // result (no match) is a normal, non-error outcome, not filtered here as
-  // an error case.
-  const filtered = filterIdeas(ideas.map(serializeIdea), { priority, weatherTag });
+  // FR-16: filter by Priority/Section/Category -- an empty result (no
+  // match) is a normal, non-error outcome, not filtered here as an error
+  // case.
+  const filtered = filterIdeas(ideas.map(serializeIdea), { priority, sectionId, category });
 
   return NextResponse.json(filtered);
 }
@@ -75,13 +76,9 @@ export async function POST(request: NextRequest) {
         sectionId: parsed.sectionId ?? null,
         title: parsed.title,
         category: parsed.category ?? null,
+        description: parsed.description ?? null,
         priority: parsed.priority,
         weatherSuitability: parsed.weatherSuitability,
-        // Route-level default (undefined -> []), same pattern as
-        // toEntryCreateData's `typeDetails` default -- see the schema
-        // comment in lib/validation.ts for why `.default([])` isn't used
-        // on the shared field shape itself.
-        weatherTags: parsed.weatherTags ?? [],
         locationName: parsed.locationName ?? null,
         locationAddress: parsed.locationAddress ?? null,
         locationLat: parsed.locationLat ?? null,

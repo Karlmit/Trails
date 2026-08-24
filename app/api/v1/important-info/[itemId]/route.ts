@@ -56,6 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       data: {
         ...(parsed.title !== undefined && { title: parsed.title }),
         ...(parsed.content !== undefined && { content: parsed.content }),
+        ...(parsed.emoji !== undefined && { emoji: parsed.emoji }),
         ...(parsed.locationName !== undefined && { locationName: parsed.locationName }),
         ...(parsed.locationAddress !== undefined && { locationAddress: parsed.locationAddress }),
         ...(parsed.locationLat !== undefined && { locationLat: parsed.locationLat }),

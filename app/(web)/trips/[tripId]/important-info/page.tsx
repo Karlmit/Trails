@@ -18,7 +18,7 @@ export default async function ImportantInfoPage({ params }: PageProps) {
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    include: { importantInfo: { orderBy: { createdAt: 'asc' } } },
+    include: { importantInfo: { orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] } },
   });
   if (!trip) notFound();
 
@@ -54,9 +54,14 @@ export default async function ImportantInfoPage({ params }: PageProps) {
       {items.length === 0 ? (
         <div className="empty-state">No Important Info yet. Add one above.</div>
       ) : (
-        <div className="stack">
-          {items.map((item) => (
-            <ImportantInfoCard key={item.id} item={item} />
+        <div className="stack" style={{ gap: 'var(--space-2)' }}>
+          {items.map((item, index) => (
+            <ImportantInfoCard
+              key={item.id}
+              item={item}
+              isFirst={index === 0}
+              isLast={index === items.length - 1}
+            />
           ))}
         </div>
       )}

@@ -3,6 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { ImportantInfoDTO } from '@/components/ImportantInfoCard';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
+import { AttachmentList } from '@/components/AttachmentList';
 
 interface ImportantInfoFormProps {
   tripId: string;
@@ -24,6 +28,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   const [open, setOpen] = useState(mode === 'edit');
   const [title, setTitle] = useState(item?.title ?? '');
   const [content, setContent] = useState(item?.content ?? '');
+  const [emoji, setEmoji] = useState(item?.emoji ?? '');
   const [locationName, setLocationName] = useState(item?.locationName ?? '');
   const [locationAddress, setLocationAddress] = useState(item?.locationAddress ?? '');
   const [locationMapLink, setLocationMapLink] = useState(item?.locationMapLink ?? '');
@@ -37,6 +42,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   function reset() {
     setTitle('');
     setContent('');
+    setEmoji('');
     setLocationName('');
     setLocationAddress('');
     setLocationMapLink('');
@@ -54,6 +60,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
     const body: Record<string, unknown> = {
       title,
       content: content || null,
+      emoji: emoji.trim() || null,
       locationName: locationName || null,
       locationAddress: locationAddress || null,
       locationMapLink: locationMapLink || null,
@@ -105,8 +112,13 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card stack">
-      {error && <div className="form-error-banner">{error}</div>}
+    // Tags/Links/Documents/Photos below are siblings of this <form>, not
+    // children of it -- each mounts its own <form> for its "Add" control,
+    // and a <form> nested inside another <form> is invalid HTML (silent
+    // hydration mismatch in production, a loud React warning in dev).
+    <div className="stack">
+      <form onSubmit={handleSubmit} className="card stack">
+        {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
         <label htmlFor="important-info-title">Title</label>
@@ -127,6 +139,18 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
           onChange={(e) => setContent(e.target.value)}
           rows={5}
           maxLength={5000}
+        />
+      </div>
+
+      <div className="field">
+        <label htmlFor="important-info-emoji">Emoji (optional)</label>
+        <input
+          id="important-info-emoji"
+          value={emoji}
+          onChange={(e) => setEmoji(e.target.value)}
+          maxLength={16}
+          placeholder="📌"
+          style={{ maxWidth: '80px' }}
         />
       </div>
 
@@ -161,6 +185,21 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
           Cancel
         </button>
       </div>
-    </form>
+      </form>
+
+      {/* User-requested: Tags/Links/Documents/Photos are only addable once
+          this item exists (Tag/Link/Attachment/Photo all need a real
+          ownerId to attach to) -- create mode never offers these. Siblings
+          of the <form> above, not nested inside it (see the comment at
+          this component's return). */}
+      {mode === 'edit' && item && (
+        <>
+          <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} />
+          <LinkList ownerType="IMPORTANT_INFO" ownerId={item.id} />
+          <PhotoGallery tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
+          <AttachmentList tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
+        </>
+      )}
+    </div>
   );
 }

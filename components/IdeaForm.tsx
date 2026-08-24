@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import type { IdeaDTO } from '@/components/IdeaCard';
 
 const PRIORITIES = [
   { value: 'MUST_DO', label: 'Must do' },
@@ -15,31 +16,54 @@ const WEATHER_SUITABILITIES = [
   { value: 'EITHER', label: 'Either' },
 ] as const;
 
-// FR-16, spec-ideas: create an Idea. Same toggle-open inline-form pattern as
-// SectionManager (open a `.card` form, POST, close + router.refresh on
-// success) -- no new UI pattern introduced for the create step itself.
+interface IdeaFormProps {
+  tripId: string;
+  sections: { id: string; name: string }[];
+  categoryOptions: string[];
+  mode?: 'create' | 'edit';
+  idea?: IdeaDTO;
+  onSaved?: (idea: IdeaDTO) => void;
+  onCancel?: () => void;
+}
+
+// FR-16/FR-17, spec-ideas: create + edit an Idea in one component (same
+// dual-mode shape as ImportantInfoForm, since Ideas now have a genuine
+// "Edit" path too -- create mode manages its own toggle-open state
+// (SectionManager's pattern); edit mode is controlled by its parent
+// (IdeaCard), same as ImportantInfoForm mounted from ImportantInfoCard.
 //
-// Tags and Links are deliberately NOT offered here -- user-reported: "Not
-// possible to add Tags and Links when not editing Idea." Both are only
-// addable from IdeaCard once the Idea actually exists (TagList/LinkList
-// there), unlike Entry/Idea's other create forms which stage Links before
-// the first save. A previous version of this form did stage Links the same
-// way; that staging was removed specifically for Ideas per that feedback.
-export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id: string; name: string }[] }) {
+// User-requested: Tags/Links/Photos are only addable once the Idea exists
+// (IdeaCard's edit mode mounts TagList/LinkList/PhotoGallery there, not
+// here) -- same constraint ImportantInfoForm already has, since a Tag/Link/
+// Photo needs a real ownerId to attach to.
+export function IdeaForm({
+  tripId,
+  sections,
+  categoryOptions,
+  mode = 'create',
+  idea,
+  onSaved,
+  onCancel,
+}: IdeaFormProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [sectionId, setSectionId] = useState('');
-  const [category, setCategory] = useState('');
-  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]['value']>('WOULD_LIKE');
-  const [weatherSuitability, setWeatherSuitability] =
-    useState<(typeof WEATHER_SUITABILITIES)[number]['value']>('EITHER');
-  const [weatherTags, setWeatherTags] = useState('');
-  const [locationName, setLocationName] = useState('');
-  const [locationAddress, setLocationAddress] = useState('');
-  const [locationMapLink, setLocationMapLink] = useState('');
-  const [estimatedExpenseAmount, setEstimatedExpenseAmount] = useState('');
-  const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState('');
+  const [open, setOpen] = useState(mode === 'edit');
+  const [title, setTitle] = useState(idea?.title ?? '');
+  const [sectionId, setSectionId] = useState(idea?.sectionId ?? '');
+  const [category, setCategory] = useState(idea?.category ?? '');
+  const [description, setDescription] = useState(idea?.description ?? '');
+  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]['value']>(
+    (idea?.priority as (typeof PRIORITIES)[number]['value']) ?? 'WOULD_LIKE',
+  );
+  const [weatherSuitability, setWeatherSuitability] = useState<(typeof WEATHER_SUITABILITIES)[number]['value']>(
+    (idea?.weatherSuitability as (typeof WEATHER_SUITABILITIES)[number]['value']) ?? 'EITHER',
+  );
+  const [locationName, setLocationName] = useState(idea?.locationName ?? '');
+  const [locationAddress, setLocationAddress] = useState(idea?.locationAddress ?? '');
+  const [locationMapLink, setLocationMapLink] = useState(idea?.locationMapLink ?? '');
+  const [estimatedExpenseAmount, setEstimatedExpenseAmount] = useState(
+    idea?.estimatedExpenseAmount != null ? String(idea.estimatedExpenseAmount) : '',
+  );
+  const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState(idea?.estimatedExpenseCurrency ?? '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,9 +71,9 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
     setTitle('');
     setSectionId('');
     setCategory('');
+    setDescription('');
     setPriority('WOULD_LIKE');
     setWeatherSuitability('EITHER');
-    setWeatherTags('');
     setLocationName('');
     setLocationAddress('');
     setLocationMapLink('');
@@ -63,16 +87,12 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
     setSubmitting(true);
 
     const body: Record<string, unknown> = {
-      tripId,
       title,
       sectionId: sectionId || null,
       category: category || null,
+      description: description || null,
       priority,
       weatherSuitability,
-      weatherTags: weatherTags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
       locationName: locationName || null,
       locationAddress: locationAddress || null,
       locationMapLink: locationMapLink || null,
@@ -86,20 +106,30 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
     }
 
     try {
-      const response = await fetch('/api/v1/ideas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const response =
+        mode === 'create'
+          ? await fetch('/api/v1/ideas', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tripId, ...body }),
+            })
+          : await fetch(`/api/v1/ideas/${idea!.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(responseBody?.error?.message ?? 'Could not create this Idea.');
+        setError(responseBody?.error?.message ?? 'Could not save this Idea.');
         return;
       }
 
-      reset();
-      setOpen(false);
+      if (mode === 'create') {
+        reset();
+        setOpen(false);
+      }
+      onSaved?.(responseBody as IdeaDTO);
       router.refresh();
     } catch {
       setError('Could not reach the server. Please try again.');
@@ -108,7 +138,7 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
     }
   }
 
-  if (!open) {
+  if (mode === 'create' && !open) {
     return (
       <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
         + Add Idea
@@ -145,7 +175,28 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
 
       <div className="field">
         <label htmlFor="idea-category">Category</label>
-        <input id="idea-category" value={category} onChange={(e) => setCategory(e.target.value)} />
+        <input
+          id="idea-category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          list="idea-category-options"
+        />
+        <datalist id="idea-category-options">
+          {categoryOptions.map((option) => (
+            <option key={option} value={option} />
+          ))}
+        </datalist>
+      </div>
+
+      <div className="field">
+        <label htmlFor="idea-description">Description</label>
+        <textarea
+          id="idea-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          maxLength={5000}
+        />
       </div>
 
       <div className="row">
@@ -177,16 +228,6 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
             ))}
           </select>
         </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="idea-weather-tags">Weather tags</label>
-        <input
-          id="idea-weather-tags"
-          value={weatherTags}
-          onChange={(e) => setWeatherTags(e.target.value)}
-          placeholder="Rainy day, Sunny weather"
-        />
       </div>
 
       <div className="field">
@@ -238,10 +279,21 @@ export function IdeaForm({ tripId, sections }: { tripId: string; sections: { id:
       </div>
 
       <div className="row">
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Adding…' : 'Add Idea'}
+        <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
+          {submitting ? 'Saving…' : mode === 'create' ? 'Add Idea' : 'Save'}
         </button>
-        <button type="button" className="btn btn-dark-outline" onClick={() => setOpen(false)}>
+        <button
+          type="button"
+          className="btn btn-dark-outline"
+          onClick={() => {
+            if (mode === 'create') {
+              reset();
+              setOpen(false);
+            } else {
+              onCancel?.();
+            }
+          }}
+        >
           Cancel
         </button>
       </div>

@@ -14,6 +14,9 @@ const importantInfoFieldsShape = {
   // (rendered with `white-space: pre-wrap` via the shared `.text-multiline`
   // class -- see components/ImportantInfoCard.tsx).
   content: z.string().trim().max(5000).optional().nullable(),
+  // User-requested: free text via the device's own emoji keyboard, same
+  // shape as Checklist.emoji -- no enum restriction.
+  emoji: z.string().trim().max(16).optional().nullable(),
   // AD-11: Important Info is one of AD-11's Location-owning rows -- same
   // shape/validation as TimelineEntry/Idea's Location fields, reused
   // directly rather than redefined.

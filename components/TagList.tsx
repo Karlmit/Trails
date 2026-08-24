@@ -14,18 +14,20 @@ export interface TagDTO {
 interface TagListProps {
   ownerType: string;
   ownerId: string;
+  // User-requested: Idea/ImportantInfo's own list views show Tags read-only
+  // and only when non-empty, never an "Add" affordance -- adding one is
+  // only possible from that item's edit form. Unrelated to the Guest
+  // question below: a Guest never sees this component mounted at all
+  // (spec's "Never" boundary, "No Tags/Links Guest-facing surface"), this
+  // is purely the signed-in owner's own view-vs-edit-mode toggle.
+  readOnly?: boolean;
 }
 
 // FR-15/FR-16/FR-26, spec-tags-links-photos: reusable, generic over
 // ownerType/ownerId, mounted on every owning entity's detail/edit view
 // (EntryDetailPanel, BlogPostDetailPanel, IdeaCard, ImportantInfoCard) --
-// same self-fetching shape as AttachmentList.tsx. No `readOnly` prop: spec's
-// "Never" boundary ("No Tags/Links Guest-facing surface") means the parent
-// simply never mounts this component at all for a Guest, rather than this
-// component hiding its own affordances -- same contrast the spec itself
-// draws against PhotoGallery, which genuinely does render read-only for a
-// Guest.
-export function TagList({ ownerType, ownerId }: TagListProps) {
+// same self-fetching shape as AttachmentList.tsx.
+export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) {
   const router = useRouter();
   const [tags, setTags] = useState<TagDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,10 @@ export function TagList({ ownerType, ownerId }: TagListProps) {
     }
   }
 
+  // User-requested compactness: a read-only mount with nothing to show
+  // renders nothing at all -- no label, no "No tags yet." placeholder.
+  if (readOnly && !loading && tags.length === 0) return null;
+
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
@@ -130,46 +136,50 @@ export function TagList({ ownerType, ownerId }: TagListProps) {
           {tags.map((tag) => (
             <span key={tag.id} className="tag-chip">
               {tag.text}
-              <button
-                type="button"
-                onClick={() => handleDelete(tag)}
-                disabled={deletingIds.has(tag.id)}
-                aria-label={`Remove tag ${tag.text}`}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  marginLeft: '0.4rem',
-                  padding: 0,
-                  color: 'inherit',
-                  fontSize: '0.9em',
-                }}
-              >
-                ×
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(tag)}
+                  disabled={deletingIds.has(tag.id)}
+                  aria-label={`Remove tag ${tag.text}`}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    marginLeft: '0.4rem',
+                    padding: 0,
+                    color: 'inherit',
+                    fontSize: '0.9em',
+                  }}
+                >
+                  ×
+                </button>
+              )}
             </span>
           ))}
         </div>
       )}
 
-      <form onSubmit={handleAdd} className="row" style={{ gap: 'var(--space-2)' }}>
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Add a tag…"
-          maxLength={50}
-          aria-label="New tag text"
-          style={{
-            border: '1px solid #d6dbde',
-            borderRadius: 'var(--radius-input)',
-            padding: '0.4rem 0.8rem',
-            fontSize: '0.9rem',
-          }}
-        />
-        <button type="submit" className="btn btn-outline" disabled={submitting || !text.trim()}>
-          {submitting ? 'Adding…' : 'Add'}
-        </button>
-      </form>
+      {!readOnly && (
+        <form onSubmit={handleAdd} className="row" style={{ gap: 'var(--space-2)' }}>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Add a tag…"
+            maxLength={50}
+            aria-label="New tag text"
+            style={{
+              border: '1px solid #d6dbde',
+              borderRadius: 'var(--radius-input)',
+              padding: '0.4rem 0.8rem',
+              fontSize: '0.9rem',
+            }}
+          />
+          <button type="submit" className="btn btn-outline" disabled={submitting || !text.trim()}>
+            {submitting ? 'Adding…' : 'Add'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

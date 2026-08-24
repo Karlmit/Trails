@@ -61,13 +61,11 @@ describe.skipIf(!hasTestDatabase)('ideas route', () => {
         title: 'Cooking class',
         priority: 'MUST_DO',
         weatherSuitability: 'INDOOR',
-        weatherTags: ['Rainy day'],
       }, token),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.title).toBe('Cooking class');
-    expect(body.weatherTags).toEqual(['Rainy day']);
 
     const listRes = await listIdeas(
       jsonRequest(`http://localhost/api/v1/ideas?tripId=${tripId}`, 'GET', undefined, token),
@@ -163,33 +161,33 @@ describe.skipIf(!hasTestDatabase)('ideas route', () => {
         jsonRequest('http://localhost/api/v1/ideas', 'POST', {
           tripId,
           title: 'Cooking class',
+          category: 'Food',
           priority: 'MUST_DO',
           weatherSuitability: 'INDOOR',
-          weatherTags: ['Rainy day'],
         }, token),
       );
       await createIdea(
         jsonRequest('http://localhost/api/v1/ideas', 'POST', {
           tripId,
           title: 'Beach club',
+          category: 'Sights',
           priority: 'WOULD_LIKE',
           weatherSuitability: 'OUTDOOR',
-          weatherTags: ['Sunny weather'],
         }, token),
       );
     });
 
-    it('filters to only the matching Idea by weather tag', async () => {
+    it('filters to only the matching Idea by category', async () => {
       const res = await listIdeas(
-        jsonRequest(`http://localhost/api/v1/ideas?tripId=${tripId}&weatherTag=Rainy%20day`, 'GET', undefined, token),
+        jsonRequest(`http://localhost/api/v1/ideas?tripId=${tripId}&category=Food`, 'GET', undefined, token),
       );
       const body = await res.json();
       expect(body.map((i: { title: string }) => i.title)).toEqual(['Cooking class']);
     });
 
-    it('returns an empty list (not an error) when no Idea matches the tag', async () => {
+    it('returns an empty list (not an error) when no Idea matches the category', async () => {
       const res = await listIdeas(
-        jsonRequest(`http://localhost/api/v1/ideas?tripId=${tripId}&weatherTag=Snowy`, 'GET', undefined, token),
+        jsonRequest(`http://localhost/api/v1/ideas?tripId=${tripId}&category=Nonexistent`, 'GET', undefined, token),
       );
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -207,7 +205,6 @@ describe.skipIf(!hasTestDatabase)('ideas route', () => {
           title: 'Cooking class',
           priority: 'MUST_DO',
           weatherSuitability: 'INDOOR',
-          weatherTags: ['Rainy day'],
           estimatedExpenseAmount: 40,
           estimatedExpenseCurrency: 'USD',
         }, token),

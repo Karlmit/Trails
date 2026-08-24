@@ -10,12 +10,13 @@ import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class ImportantInfoViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    repository: ImportantInfoRepository,
+    private val repository: ImportantInfoRepository,
     syncScheduler: SyncScheduler,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
@@ -31,5 +32,10 @@ class ImportantInfoViewModel @Inject constructor(
 
     init {
         refresh()
+    }
+
+    // User-requested manual reordering.
+    fun move(itemId: String, direction: String) {
+        viewModelScope.launch { runCatching { repository.move(tripId, itemId, direction) } }
     }
 }

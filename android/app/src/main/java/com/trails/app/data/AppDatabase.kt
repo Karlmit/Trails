@@ -39,7 +39,7 @@ import com.trails.app.data.entity.TripEntity
         AttachmentEntity::class,
         PhotoEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

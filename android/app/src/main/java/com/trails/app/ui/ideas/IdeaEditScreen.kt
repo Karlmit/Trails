@@ -40,6 +40,7 @@ import com.trails.app.ui.components.DropdownField
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.LinksEditor
+import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
@@ -123,6 +124,7 @@ fun IdeaEditScreen(
                 onAddOption = viewModel::addCategoryOption,
                 onRemoveOption = viewModel::removeCategoryOption,
             )
+            MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
             DropdownField(
                 label = "Priority",
                 options = IDEA_PRIORITIES,

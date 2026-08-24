@@ -11,14 +11,12 @@ data class IdeaEntity(
     val sectionId: String?,
     val title: String,
     val category: String?,
+    // User-requested optional free text, same shape as
+    // ImportantInfoEntity.content -- shown always in the list view, only
+    // addable/changeable from the edit screen.
+    val description: String? = null,
     val priority: String,
     val weatherSuitability: String,
-    // Stored as a comma-joined string -- Idea.weatherTags is a small,
-    // free-form array with no querying need of its own (unlike typeDetails,
-    // which at least has a JSON-parse call site); a TypeConverter would be
-    // overkill for "split on a delimiter that these tags never contain."
-    // Use IdeaEntity.weatherTags (data/Mappers.kt) to read it back as a list.
-    val weatherTagsCsv: String,
     val locationName: String?,
     val locationAddress: String?,
     val locationLat: Double?,

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PRIORITY_LABELS, WEATHER_SUITABILITY_LABELS } from '@/lib/ideas';
+import { IdeaForm } from '@/components/IdeaForm';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
@@ -21,9 +22,9 @@ export interface IdeaDTO {
   sectionId?: string | null;
   title: string;
   category: string | null;
+  description: string | null;
   priority: string;
   weatherSuitability: string;
-  weatherTags: string[];
   locationName: string | null;
   locationAddress: string | null;
   locationMapLink: string | null;
@@ -36,36 +37,24 @@ export interface IdeaDTO {
   primaryPhotoId?: string | null;
 }
 
-// FR-16/FR-17, spec-ideas: a single Idea's list-item, with a delete action
-// (same fetch+confirm+router.refresh pattern as SectionManager's per-item
-// delete) and the "Convert to Entry" entry point into
-// /trips/[tripId]/ideas/[ideaId]/convert.
-export function IdeaCard({ idea, sections }: { idea: IdeaDTO; sections: { id: string; name: string }[] }) {
+// FR-16/FR-17, spec-ideas: a single Idea's list-item, same view<->edit
+// toggle pattern as ImportantInfoCard (edit mode swaps in IdeaForm).
+// User-requested: Section reassignment, Delete, and Tags/Links/Photos are
+// only available while editing -- the view row is read-only except for the
+// Edit button and the "Convert to Entry" action.
+export function IdeaCard({
+  idea,
+  sections,
+  categoryOptions,
+}: {
+  idea: IdeaDTO;
+  sections: { id: string; name: string }[];
+  categoryOptions: string[];
+}) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  async function handleSectionChange(nextSectionId: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/v1/ideas/${idea.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionId: nextSectionId || null }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not update this Idea.');
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError('Could not reach the server. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function handleDelete() {
     if (!confirm(`Delete "${idea.title}"? This cannot be undone.`)) return;
@@ -86,15 +75,43 @@ export function IdeaCard({ idea, sections }: { idea: IdeaDTO; sections: { id: st
     }
   }
 
+  if (editing) {
+    return (
+      <div className="stack">
+        <IdeaForm
+          mode="edit"
+          idea={idea}
+          tripId={idea.tripId}
+          sections={sections}
+          categoryOptions={categoryOptions}
+          onCancel={() => setEditing(false)}
+        />
+        {error && <div className="form-error-banner">{error}</div>}
+        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
+          {busy ? 'Deleting…' : 'Delete Idea'}
+        </button>
+        <TagList ownerType="IDEA" ownerId={idea.id} />
+        <LinkList ownerType="IDEA" ownerId={idea.id} />
+        <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
+      </div>
+    );
+  }
+
   return (
-    <div className="card stack">
+    // User-requested compactness: see ImportantInfoCard.tsx's identical comment.
+    <div className="card stack" style={{ padding: 'var(--space-3)', gap: 'var(--space-2)' }}>
       {error && <div className="form-error-banner">{error}</div>}
 
       <div className="row-between">
         <h3 style={{ margin: 0 }}>{idea.title}</h3>
-        <span className={`badge ${PRIORITY_BADGE_CLASS[idea.priority] ?? 'badge-priority-maybe'}`}>
-          {PRIORITY_LABELS[idea.priority] ?? idea.priority}
-        </span>
+        <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+          <span className={`badge ${PRIORITY_BADGE_CLASS[idea.priority] ?? 'badge-priority-maybe'}`}>
+            {PRIORITY_LABELS[idea.priority] ?? idea.priority}
+          </span>
+          <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        </div>
       </div>
 
       {idea.primaryPhotoId && (
@@ -112,28 +129,16 @@ export function IdeaCard({ idea, sections }: { idea: IdeaDTO; sections: { id: st
       )}
 
       <div className="row" style={{ gap: 'var(--space-2)' }}>
+        {idea.sectionId && (
+          <span className="text-soft">{sections.find((s) => s.id === idea.sectionId)?.name}</span>
+        )}
         {idea.category && <span className="text-soft">{idea.category}</span>}
         <span className="text-soft">
           {WEATHER_SUITABILITY_LABELS[idea.weatherSuitability] ?? idea.weatherSuitability}
         </span>
       </div>
 
-      <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor={`idea-section-${idea.id}`}>Section</label>
-        <select
-          id={`idea-section-${idea.id}`}
-          value={idea.sectionId ?? ''}
-          onChange={(e) => handleSectionChange(e.target.value)}
-          disabled={busy}
-        >
-          <option value="">No Section</option>
-          {sections.map((section) => (
-            <option key={section.id} value={section.id}>
-              {section.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {idea.description && <p className="text-soft text-multiline" style={{ margin: 0 }}>{idea.description}</p>}
 
       {(idea.locationName || idea.locationAddress) && (
         <div className="text-soft">
@@ -150,34 +155,19 @@ export function IdeaCard({ idea, sections }: { idea: IdeaDTO; sections: { id: st
         </div>
       )}
 
-      {idea.weatherTags.length > 0 && (
-        <div className="row" style={{ gap: 'var(--space-1)' }}>
-          {idea.weatherTags.map((tag) => (
-            <span key={tag} className="tag-chip">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
       {idea.estimatedExpenseAmount != null && idea.estimatedExpenseCurrency && (
         <div className="text-soft">
           Est. {idea.estimatedExpenseAmount} {idea.estimatedExpenseCurrency}
         </div>
       )}
 
-      <div className="row" style={{ gap: 'var(--space-2)' }}>
-        <Link href={`/trips/${idea.tripId}/ideas/${idea.id}/convert`} className="btn btn-primary">
-          Convert to Entry
-        </Link>
-        <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-          {busy ? 'Deleting…' : 'Delete'}
-        </button>
-      </div>
+      <Link href={`/trips/${idea.tripId}/ideas/${idea.id}/convert`} className="btn btn-primary">
+        Convert to Entry
+      </Link>
 
-      <TagList ownerType="IDEA" ownerId={idea.id} />
-      <LinkList ownerType="IDEA" ownerId={idea.id} />
-      <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
+      <TagList ownerType="IDEA" ownerId={idea.id} readOnly />
+      <LinkList ownerType="IDEA" ownerId={idea.id} readOnly />
+      <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} readOnly />
     </div>
   );
 }

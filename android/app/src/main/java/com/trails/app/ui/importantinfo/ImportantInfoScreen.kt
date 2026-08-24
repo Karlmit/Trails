@@ -1,16 +1,23 @@
 package com.trails.app.ui.importantinfo
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,23 +47,55 @@ fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = 
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
+            // Already ordered by sortOrder (ImportantInfoDao.observeForTrip)
+            // -- index here is exactly what decides isFirst/isLast for the
+            // move buttons.
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                items(items, key = { it.id }) { item -> ImportantInfoCard(item, onClick = { onOpenItem(item.id) }) }
+                itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+                    ImportantInfoCard(
+                        item,
+                        isFirst = index == 0,
+                        isLast = index == items.size - 1,
+                        onClick = { onOpenItem(item.id) },
+                        onMove = { direction -> viewModel.move(item.id, direction) },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ImportantInfoCard(item: ImportantInfoEntity, onClick: () -> Unit) {
+private fun ImportantInfoCard(
+    item: ImportantInfoEntity,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onClick: () -> Unit,
+    onMove: (String) -> Unit,
+) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         shape = TrailsShapes.Card,
         colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("📌 ${item.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${item.emoji?.takeIf { it.isNotBlank() } ?: "📌"} ${item.title}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TrailsColors.Text,
+                    modifier = Modifier.weight(1f).clickable(onClick = onClick),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+                    IconButton(onClick = { onMove("up") }, enabled = !isFirst) {
+                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", tint = if (isFirst) TrailsColors.TextSoft else TrailsColors.Brand)
+                    }
+                    IconButton(onClick = { onMove("down") }, enabled = !isLast) {
+                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", tint = if (isLast) TrailsColors.TextSoft else TrailsColors.Brand)
+                    }
+                }
+            }
             item.content?.let {
                 Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text, modifier = Modifier.padding(top = 6.dp))
             }

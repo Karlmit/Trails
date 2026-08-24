@@ -177,11 +177,12 @@ model Idea {
 
   title              String
   category           String?
+  // User-requested optional free text, same shape/bound as
+  // ImportantInfo.content -- shown always in the list view, only
+  // addable/changeable from the edit form.
+  description        String?
   priority           IdeaPriority
   weatherSuitability WeatherSuitability @map("weather_suitability")
-  // Free-form tags (e.g. "Rainy day"), distinct from AD-4's still-deferred
-  // polymorphic Tag table -- a plain array column owned entirely by Idea.
-  weatherTags        String[]           @default([]) @map("weather_tags")
 
   // AD-11: Location is always embedded plain columns, never a shared
   // entity -- same shape as TimelineEntry's Location fields (lib/entry-
@@ -455,6 +456,11 @@ model ImportantInfo {
   title   String
   content String?
 
+  // User-requested: same free-text-via-device-keyboard emoji as
+  // Checklist.emoji -- nullable, clients fall back to a generic glyph
+  // (📌) when unset.
+  emoji String? @db.VarChar(16)
+
   locationName    String?  @map("location_name")
   locationAddress String?  @map("location_address")
   locationLat     Decimal? @map("location_lat") @db.Decimal(9, 6)
@@ -471,6 +477,13 @@ model ImportantInfo {
   // surface exists yet for this flag to exclude an item from). See
   // spec-important-info.md's disclosed "isPrivate" note.
   isPrivate Boolean @default(false) @map("is_private")
+
+  // User-requested manual reordering -- ties (all-zero on pre-existing
+  // rows, or two items created in the same request) fall back to
+  // createdAt so the list stays deterministic either way. Swapped in
+  // pairs by app/api/v1/important-info/[itemId]/move, never renumbered
+  // wholesale, so this is intentionally sparse/non-contiguous over time.
+  sortOrder Int @default(0) @map("sort_order")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

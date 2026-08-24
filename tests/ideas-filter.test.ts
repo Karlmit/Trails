@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { distinctWeatherTags, filterIdeas } from '@/lib/ideas';
+import { distinctCategories, filterIdeas } from '@/lib/ideas';
 
 // FR-16, spec-ideas: "unit for filtering" -- pure, DB-free.
 describe('filterIdeas', () => {
   const ideas = [
-    { id: '1', priority: 'MUST_DO', weatherTags: ['Rainy day'] },
-    { id: '2', priority: 'WOULD_LIKE', weatherTags: ['Sunny weather'] },
-    { id: '3', priority: 'MAYBE', weatherTags: ['Rainy day', 'Sunny weather'] },
-    { id: '4', priority: 'MAYBE', weatherTags: [] },
+    { id: '1', priority: 'MUST_DO', sectionId: 'sec-1', category: 'Food' },
+    { id: '2', priority: 'WOULD_LIKE', sectionId: 'sec-2', category: 'Sights' },
+    { id: '3', priority: 'MAYBE', sectionId: 'sec-1', category: 'Food' },
+    { id: '4', priority: 'MAYBE', sectionId: null, category: null },
   ];
 
   it('returns every Idea when no filters are given', () => {
@@ -19,38 +19,39 @@ describe('filterIdeas', () => {
     expect(result.map((i) => i.id)).toEqual(['3', '4']);
   });
 
-  it('filters by weather tag only', () => {
-    const result = filterIdeas(ideas, { weatherTag: 'Rainy day' });
+  it('filters by sectionId only', () => {
+    const result = filterIdeas(ideas, { sectionId: 'sec-1' });
     expect(result.map((i) => i.id)).toEqual(['1', '3']);
   });
 
-  it('filters by both priority and weather tag combined', () => {
-    const result = filterIdeas(ideas, { priority: 'MAYBE', weatherTag: 'Rainy day' });
+  it('filters by category only', () => {
+    const result = filterIdeas(ideas, { category: 'Food' });
+    expect(result.map((i) => i.id)).toEqual(['1', '3']);
+  });
+
+  it('filters by priority, sectionId, and category combined', () => {
+    const result = filterIdeas(ideas, { priority: 'MAYBE', sectionId: 'sec-1', category: 'Food' });
     expect(result.map((i) => i.id)).toEqual(['3']);
   });
 
   it('returns an empty array (not an error) when nothing matches', () => {
-    const result = filterIdeas(ideas, { weatherTag: 'Snowy' });
+    const result = filterIdeas(ideas, { category: 'Nonexistent' });
     expect(result).toEqual([]);
   });
 
-  it('ignores empty-string filter values (treated as "no filter")', () => {
-    const result = filterIdeas(ideas, { priority: '', weatherTag: '' });
+  it('ignores empty-string/null filter values (treated as "no filter")', () => {
+    const result = filterIdeas(ideas, { priority: '', sectionId: null, category: '' });
     expect(result).toHaveLength(4);
   });
 });
 
-describe('distinctWeatherTags', () => {
-  it('returns every distinct tag, sorted, with no duplicates', () => {
-    const ideas = [
-      { weatherTags: ['Rainy day', 'Sunny weather'] },
-      { weatherTags: ['Sunny weather'] },
-      { weatherTags: [] },
-    ];
-    expect(distinctWeatherTags(ideas)).toEqual(['Rainy day', 'Sunny weather']);
+describe('distinctCategories', () => {
+  it('returns every distinct category, sorted, with no duplicates', () => {
+    const ideas = [{ category: 'Sights' }, { category: 'Food' }, { category: 'Food' }, { category: null }];
+    expect(distinctCategories(ideas)).toEqual(['Food', 'Sights']);
   });
 
-  it('returns an empty array when no Idea has any tag', () => {
-    expect(distinctWeatherTags([{ weatherTags: [] }])).toEqual([]);
+  it('returns an empty array when no Idea has a category', () => {
+    expect(distinctCategories([{ category: null }])).toEqual([]);
   });
 });
