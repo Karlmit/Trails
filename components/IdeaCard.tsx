@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { PRIORITY_LABELS, WEATHER_SUITABILITY_LABELS } from '@/lib/ideas';
 import { IdeaForm } from '@/components/IdeaForm';
-import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
 
@@ -38,10 +37,12 @@ export interface IdeaDTO {
 }
 
 // FR-16/FR-17, spec-ideas: a single Idea's list-item, same view<->edit
-// toggle pattern as ImportantInfoCard (edit mode swaps in IdeaForm).
-// User-requested: Section reassignment, Delete, and Tags/Links/Photos are
-// only available while editing -- the view row is read-only except for the
-// Edit button and the "Convert to Entry" action.
+// toggle pattern as ImportantInfoCard (edit mode swaps in IdeaForm, which
+// itself now owns Links/Photos -- see that component). User-requested:
+// Section reassignment, Delete, and Links/Photos are only available while
+// editing -- the view row is read-only except for the Edit button and the
+// "Convert to Entry" action. Ideas have no Tags at all (user-requested
+// removal -- redundant with Category).
 export function IdeaCard({
   idea,
   sections,
@@ -87,12 +88,6 @@ export function IdeaCard({
           onCancel={() => setEditing(false)}
         />
         {error && <div className="form-error-banner">{error}</div>}
-        {/* Tags/Links/Photos before Delete -- same ordering
-            ImportantInfoForm uses (supplementary content stays near the
-            main form; the destructive action comes last). */}
-        <TagList ownerType="IDEA" ownerId={idea.id} />
-        <LinkList ownerType="IDEA" ownerId={idea.id} />
-        <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
         <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
           {busy ? 'Deleting…' : 'Delete Idea'}
         </button>
@@ -168,7 +163,6 @@ export function IdeaCard({
         Convert to Entry
       </Link>
 
-      <TagList ownerType="IDEA" ownerId={idea.id} readOnly />
       <LinkList ownerType="IDEA" ownerId={idea.id} readOnly />
       <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} readOnly />
     </div>

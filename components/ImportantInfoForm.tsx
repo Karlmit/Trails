@@ -112,12 +112,15 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   }
 
   return (
-    // Tags/Links/Documents/Photos below are siblings of this <form>, not
-    // children of it -- each mounts its own <form> for its "Add" control,
-    // and a <form> nested inside another <form> is invalid HTML (silent
-    // hydration mismatch in production, a loud React warning in dev).
-    <div className="stack">
-      <form onSubmit={handleSubmit} className="card stack">
+    // The outer div, not the <form>, carries the `.card` box styling --
+    // Tags/Links/Documents/Photos below each mount their own <form> for
+    // their "Add" control, and a <form> nested inside another <form> is
+    // invalid HTML (silent hydration mismatch in production, a loud React
+    // warning in dev). This way the whole thing -- fields, then Tags/
+    // Links/Documents/Photos -- still reads as one visual card, not a form
+    // with disconnected sections bolted on after it (user-reported).
+    <div className="card stack">
+      <form onSubmit={handleSubmit} className="stack">
         {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
@@ -189,9 +192,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
 
       {/* User-requested: Tags/Links/Documents/Photos are only addable once
           this item exists (Tag/Link/Attachment/Photo all need a real
-          ownerId to attach to) -- create mode never offers these. Siblings
-          of the <form> above, not nested inside it (see the comment at
-          this component's return). */}
+          ownerId to attach to) -- create mode never offers these. */}
       {mode === 'edit' && item && (
         <>
           <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} />

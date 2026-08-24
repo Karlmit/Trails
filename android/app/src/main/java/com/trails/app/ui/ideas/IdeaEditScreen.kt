@@ -44,7 +44,6 @@ import com.trails.app.ui.components.MultilineLabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
-import com.trails.app.ui.components.TagsEditor
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
@@ -202,9 +201,10 @@ fun IdeaEditScreen(
         }
 
         if (!isNew) {
+            // User-requested: Ideas have no Tags at all (redundant with
+            // Category).
             TrailsCard {
-                ScreenHeading(emoji = "🏷️", title = "Tags & links")
-                TagsEditor(tags = state.tags, onAdd = viewModel::addTag, onRemove = viewModel::removeTag)
+                ScreenHeading(emoji = "🔗", title = "Links")
                 LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
             }
 

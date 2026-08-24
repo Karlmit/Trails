@@ -14,7 +14,6 @@ import com.trails.app.network.dto.IdeaRequest
 import com.trails.app.network.dto.diffFields
 import com.trails.app.network.dto.jsonStringOrNull
 import com.trails.app.ui.components.LinkFieldItem
-import com.trails.app.ui.components.TagFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,7 +54,6 @@ data class IdeaEditState(
     val estimatedExpenseAmount: String = "",
     val estimatedExpenseCurrency: String = DEFAULT_CURRENCY,
     val links: List<LinkFieldItem> = emptyList(),
-    val tags: List<TagFieldItem> = emptyList(),
     val uploadingPhoto: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
@@ -132,18 +130,14 @@ class IdeaEditViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        // Links/Tags only ever load (and are only ever addable) once the
-        // Idea exists -- user-reported: "Not possible to add Tags and Links
-        // when not editing Idea." Unlike Entry/Idea's other resources, there
-        // is deliberately no staging-before-creation path here.
+        // Links only ever load (and are only ever addable) once the Idea
+        // exists -- user-reported: "Not possible to add Tags and Links when
+        // not editing Idea." Unlike Entry/Idea's other resources, there is
+        // deliberately no staging-before-creation path here.
         ideaId?.let { ownerId ->
             viewModelScope.launch {
                 runCatching { linksTagsRepository.listLinks(OWNER_TYPE, ownerId) }
                     .onSuccess { links -> _state.value = _state.value.copy(links = links.map { LinkFieldItem(it.id, it.url, it.label) }) }
-            }
-            viewModelScope.launch {
-                runCatching { linksTagsRepository.listTags(OWNER_TYPE, ownerId) }
-                    .onSuccess { tags -> _state.value = _state.value.copy(tags = tags.map { TagFieldItem(it.id, it.text) }) }
             }
         }
     }
@@ -201,23 +195,6 @@ class IdeaEditViewModel @Inject constructor(
             runCatching { linksTagsRepository.deleteLink(id) }
                 .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == id }) }
                 .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove link.") }
-        }
-    }
-
-    fun addTag(text: String) {
-        val ownerId = _state.value.ideaId ?: return
-        viewModelScope.launch {
-            runCatching { linksTagsRepository.createTag(OWNER_TYPE, ownerId, text) }
-                .onSuccess { created -> _state.value = _state.value.copy(tags = _state.value.tags + TagFieldItem(created.id, created.text)) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add tag.") }
-        }
-    }
-
-    fun removeTag(tag: TagFieldItem) {
-        viewModelScope.launch {
-            runCatching { linksTagsRepository.deleteTag(tag.id) }
-                .onSuccess { _state.value = _state.value.copy(tags = _state.value.tags.filterNot { it.id == tag.id }) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove tag.") }
         }
     }
 
@@ -321,8 +298,8 @@ class IdeaEditViewModel @Inject constructor(
             }.onSuccess { result ->
                 // Deliberately NOT navigating away here (state.saved isn't
                 // watched by the screen) -- creating an Idea must stay on
-                // this screen so Photos/Tags/Links become reachable right
-                // away, same choice ChecklistEditScreen makes for items.
+                // this screen so Photos/Links become reachable right away,
+                // same choice ChecklistEditScreen makes for items.
                 _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id)
             }.onFailure { e ->
                 _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Idea.")

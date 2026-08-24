@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { IdeaDTO } from '@/components/IdeaCard';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
 
 const PRIORITIES = [
   { value: 'MUST_DO', label: 'Must do' },
@@ -32,10 +34,11 @@ interface IdeaFormProps {
 // (SectionManager's pattern); edit mode is controlled by its parent
 // (IdeaCard), same as ImportantInfoForm mounted from ImportantInfoCard.
 //
-// User-requested: Tags/Links/Photos are only addable once the Idea exists
-// (IdeaCard's edit mode mounts TagList/LinkList/PhotoGallery there, not
-// here) -- same constraint ImportantInfoForm already has, since a Tag/Link/
-// Photo needs a real ownerId to attach to.
+// User-requested: Links/Photos are only addable once the Idea exists, and
+// live inside this same card as the rest of the form (not as separate
+// sibling sections IdeaCard bolts on afterward, which read as disconnected
+// "outside the form") -- same constraint/placement ImportantInfoForm uses,
+// since a Link/Photo needs a real ownerId to attach to.
 export function IdeaForm({
   tripId,
   sections,
@@ -147,7 +150,14 @@ export function IdeaForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card stack">
+    // The outer div, not the <form>, carries the `.card` box styling --
+    // LinkList/PhotoGallery below each render their own <form> for their
+    // "Add" control, and a <form> nested inside another <form> is invalid
+    // HTML (silent hydration mismatch in production, a loud React warning
+    // in dev). This way the whole thing -- fields, then Links/Photos --
+    // still reads as one visual card.
+    <div className="card stack">
+      <form onSubmit={handleSubmit} className="stack">
       {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
@@ -307,6 +317,14 @@ export function IdeaForm({
           Cancel
         </button>
       </div>
-    </form>
+      </form>
+
+      {mode === 'edit' && idea && (
+        <>
+          <LinkList ownerType="IDEA" ownerId={idea.id} />
+          <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
+        </>
+      )}
+    </div>
   );
 }
