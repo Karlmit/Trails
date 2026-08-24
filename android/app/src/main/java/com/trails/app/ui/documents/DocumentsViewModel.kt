@@ -9,7 +9,6 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.sync.SyncScheduler
 import com.trails.app.sync.TripRefresher
-import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,8 +18,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class DocumentRow(val attachment: AttachmentEntity, val ownerTitle: String)
-data class DocumentGroup(val label: String, val rows: List<DocumentRow>)
+// User-requested: "Group the documents by activity or how they been added"
+// -- each group is now the specific Timeline Entry/Important Info item a
+// document was actually attached to (not the broad entryType it used to
+// be grouped by), with that item's own title as the group's header, so
+// the per-row subtitle repeating it is no longer needed.
+data class DocumentGroup(val emoji: String, val label: String, val rows: List<AttachmentEntity>)
+
+private fun ownerEmoji(entryType: String) = when (entryType) {
+    "STAY" -> "🏨"
+    "TRANSPORT" -> "🚗"
+    "ACTIVITY" -> "🎟️"
+    else -> "📝"
+}
 
 @HiltViewModel
 class DocumentsViewModel @Inject constructor(
@@ -53,18 +63,24 @@ class DocumentsViewModel @Inject constructor(
     ) { attachments, entries, importantInfoItems ->
         val entryById = entries.associateBy { it.id }
         val infoById = importantInfoItems.associateBy { it.id }
-        val grouped = linkedMapOf<String, MutableList<DocumentRow>>()
+        // Grouped by the specific owning item (its id), not just its type --
+        // two different Stays must never merge into one "Stay" bucket.
+        val groupMeta = linkedMapOf<String, Pair<String, String>>()
+        val rowsByKey = linkedMapOf<String, MutableList<AttachmentEntity>>()
         attachments.forEach { attachment ->
-            val (label, title) = when (attachment.ownerType) {
-                "TIMELINE_ENTRY" -> entryById[attachment.ownerId]?.let {
-                    (ENTRY_TYPE_LABELS[it.entryType] ?: it.entryType) to it.title
-                }
-                "IMPORTANT_INFO" -> infoById[attachment.ownerId]?.let { "Important Info" to it.title }
+            val key = "${attachment.ownerType}:${attachment.ownerId}"
+            val meta = when (attachment.ownerType) {
+                "TIMELINE_ENTRY" -> entryById[attachment.ownerId]?.let { ownerEmoji(it.entryType) to it.title }
+                "IMPORTANT_INFO" -> infoById[attachment.ownerId]?.let { "📌" to it.title }
                 else -> null
             } ?: return@forEach
-            grouped.getOrPut(label) { mutableListOf() }.add(DocumentRow(attachment, title))
+            groupMeta.putIfAbsent(key, meta)
+            rowsByKey.getOrPut(key) { mutableListOf() }.add(attachment)
         }
-        grouped.map { (label, rows) -> DocumentGroup(label, rows) }
+        rowsByKey.map { (key, rows) ->
+            val (emoji, label) = groupMeta.getValue(key)
+            DocumentGroup(emoji, label, rows)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val downloadingIds: StateFlow<Set<String>> = downloading

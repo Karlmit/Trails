@@ -1,8 +1,6 @@
 package com.trails.app.ui.documents
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,10 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,8 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
+import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.openCachedFile
 
 /** Mirrors app/(web)/trips/[tripId]/documents/page.tsx -- tapping a row opens the on-device cached copy (offline works), downloading it first if the sync pass hasn't yet. */
@@ -49,36 +46,34 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            shape = TrailsShapes.Card,
-                            colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(group.label, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
-                                group.rows.forEach { row ->
-                                    val isDownloading = row.attachment.id in downloadingIds
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 10.dp)
-                                            .clickable(enabled = !isDownloading) {
-                                                viewModel.ensureCached(row.attachment) { path ->
-                                                    openCachedFile(context, path, row.attachment.mimeType)
-                                                }
-                                            },
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(row.attachment.originalFilename, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent)
-                                            Text(row.ownerTitle, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
-                                        }
-                                        if (isDownloading) {
-                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
-                                        } else {
-                                            Text(formatSize(row.attachment.sizeBytes), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
-                                        }
+                        TrailsCard(modifier = Modifier.padding(bottom = 12.dp)) {
+                            ScreenHeading(emoji = group.emoji, title = group.label)
+                            group.rows.forEachIndexed { index, attachment ->
+                                if (index > 0) {
+                                    HorizontalDivider(color = TrailsColors.HairlineOnLight)
+                                }
+                                val isDownloading = attachment.id in downloadingIds
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp)
+                                        .clickable(enabled = !isDownloading) {
+                                            viewModel.ensureCached(attachment) { path ->
+                                                openCachedFile(context, path, attachment.mimeType)
+                                            }
+                                        },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        attachment.originalFilename,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = TrailsColors.BrandAccent,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (isDownloading) {
+                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
+                                    } else {
+                                        Text(formatSize(attachment.sizeBytes), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
                                     }
                                 }
                             }
