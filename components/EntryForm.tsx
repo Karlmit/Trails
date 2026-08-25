@@ -111,6 +111,30 @@ function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
+// User-requested: an optional connecting itinerary for Transport --
+// mirrors lib/entry-types/transport.schema.ts's stopoverSchema exactly.
+// Deliberately plain strings straight from/to the DateTimeInput below, no
+// ISO/timezone conversion -- see that schema's own comment on why
+// stopover times are never transformed to a Date server-side either, so
+// there's no round-trip format mismatch to bridge here.
+interface StopoverDraft {
+  location: string;
+  arrivalAt: string;
+  departureAt: string;
+  flightNumber: string;
+}
+
+function stopoversFromTypeDetails(typeDetails: Record<string, unknown>): StopoverDraft[] {
+  const raw = typeDetails.stopovers;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item) => ({
+    location: str((item as Record<string, unknown>)?.location),
+    arrivalAt: str((item as Record<string, unknown>)?.arrivalAt),
+    departureAt: str((item as Record<string, unknown>)?.departureAt),
+    flightNumber: str((item as Record<string, unknown>)?.flightNumber),
+  }));
+}
+
 export function EntryForm({
   tripId,
   mode,
@@ -211,6 +235,17 @@ export function EntryForm({
   const [serviceNumber, setServiceNumber] = useState(str(typeDetails.serviceNumber));
   const [seat, setSeat] = useState(str(typeDetails.seat));
   const [baggageInfo, setBaggageInfo] = useState(str(typeDetails.baggageInfo));
+  const [stopovers, setStopovers] = useState<StopoverDraft[]>(() => stopoversFromTypeDetails(typeDetails));
+
+  function addStopover() {
+    setStopovers((current) => [...current, { location: '', arrivalAt: '', departureAt: '', flightNumber: '' }]);
+  }
+  function updateStopover(index: number, patch: Partial<StopoverDraft>) {
+    setStopovers((current) => current.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
+  function removeStopover(index: number) {
+    setStopovers((current) => current.filter((_, i) => i !== index));
+  }
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -333,6 +368,17 @@ export function EntryForm({
         serviceNumber: serviceNumber || null,
         seat: seat || null,
         baggageInfo: baggageInfo || null,
+        // A row added then left untouched (location still blank) is
+        // dropped silently rather than 400ing the whole save over an
+        // abandoned stopover the User never actually filled in.
+        stopovers: stopovers
+          .filter((s) => s.location.trim())
+          .map((s) => ({
+            location: s.location.trim(),
+            arrivalAt: s.arrivalAt,
+            departureAt: s.departureAt,
+            flightNumber: s.flightNumber.trim() || null,
+          })),
       };
       // spec-timeline-ux-and-timezone (correction): only Transport's own
       // schema accepts these fields -- every other type's `.strict()`
@@ -613,6 +659,71 @@ export function EntryForm({
               <label htmlFor="entry-baggage">Baggage info</label>
               <input id="entry-baggage" value={baggageInfo} onChange={(e) => setBaggageInfo(e.target.value)} />
             </div>
+          </div>
+
+          {/* User-requested: an optional connecting itinerary -- each
+              stopover is an intermediate landing, then the *next* leg's
+              own flight number (the first leg's number is Service number
+              above, unchanged). 0 stopovers is today's exact behavior. */}
+          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+            <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
+              Stopovers (optional)
+            </span>
+            {stopovers.map((stopover, index) => (
+              <div key={index} className="card stack" style={{ padding: 'var(--space-2)', gap: 'var(--space-2)' }}>
+                <div className="row-between">
+                  <span className="text-soft" style={{ fontSize: '0.85rem' }}>
+                    Stopover {index + 1}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
+                    onClick={() => removeStopover(index)}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="field">
+                  <label htmlFor={`entry-stopover-${index}-location`}>Location</label>
+                  <input
+                    id={`entry-stopover-${index}-location`}
+                    value={stopover.location}
+                    onChange={(e) => updateStopover(index, { location: e.target.value })}
+                    placeholder="e.g. Dubai (DXB)"
+                  />
+                </div>
+                <div className="row">
+                  <div className="field" style={{ flex: 1 }}>
+                    <label htmlFor={`entry-stopover-${index}-arrival`}>Arrival (this leg lands)</label>
+                    <DateTimeInput
+                      id={`entry-stopover-${index}-arrival`}
+                      value={stopover.arrivalAt}
+                      onChange={(value) => updateStopover(index, { arrivalAt: value })}
+                    />
+                  </div>
+                  <div className="field" style={{ flex: 1 }}>
+                    <label htmlFor={`entry-stopover-${index}-departure`}>Departure (next leg leaves)</label>
+                    <DateTimeInput
+                      id={`entry-stopover-${index}-departure`}
+                      value={stopover.departureAt}
+                      onChange={(value) => updateStopover(index, { departureAt: value })}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor={`entry-stopover-${index}-flight`}>Flight number (next leg)</label>
+                  <input
+                    id={`entry-stopover-${index}-flight`}
+                    value={stopover.flightNumber}
+                    onChange={(e) => updateStopover(index, { flightNumber: e.target.value })}
+                  />
+                </div>
+              </div>
+            ))}
+            <button type="button" className="btn btn-outline" onClick={addStopover}>
+              + Add stopover
+            </button>
           </div>
         </>
       )}

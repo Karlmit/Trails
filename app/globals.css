@@ -893,6 +893,10 @@ p {
   font-size: 0.78rem;
   line-height: 1.3rem;
   margin-top: 1px;
+  /* User-requested: Transport's own multi-line connecting-itinerary
+     subtitle (each flight/stopover joined with \n) -- every other
+     subtitle is a single line already, so this has no effect there. */
+  white-space: pre-line;
 }
 
 .entry-chip-blog-cta {

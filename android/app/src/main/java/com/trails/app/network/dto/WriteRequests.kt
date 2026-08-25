@@ -1,6 +1,7 @@
 package com.trails.app.network.dto
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 // Request bodies for create calls, plus PATCH bodies for the resources
 // that still need a fixed request shape (Checklist, Section, Trip, Blog
@@ -183,7 +184,11 @@ data class TransportEntryRequest(
     val notes: String? = null,
     val postTripNotes: String? = null,
     val isPrivate: Boolean = false,
-    val typeDetails: Map<String, String> = emptyMap(),
+    // User-requested: an optional connecting itinerary (stopovers, each
+    // with its own next-leg flight number) needs a nested JsonArray value
+    // -- unlike Stay/Activity's own typeDetails below, which stay flat
+    // Map<String, String> since neither needs anything richer.
+    val typeDetails: JsonObject = JsonObject(emptyMap()),
 )
 
 @Serializable

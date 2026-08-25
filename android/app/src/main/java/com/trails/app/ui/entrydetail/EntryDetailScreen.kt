@@ -131,6 +131,31 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                 state.typeDetails.forEach { (key, value) ->
                     if (value.isNotBlank()) Field(key, value)
                 }
+                // User-requested: an optional connecting itinerary for
+                // Transport -- see TransportStopovers.kt's own comment.
+                if (state.stopovers.isNotEmpty()) {
+                    Column {
+                        Text("ITINERARY", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        val firstFlightNumber = state.typeDetails["serviceNumber"]
+                        Text(
+                            if (!firstFlightNumber.isNullOrBlank()) "✈ $firstFlightNumber" else "✈ Flight 1",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TrailsColors.Text,
+                        )
+                        state.stopovers.forEachIndexed { index, stopover ->
+                            Text(
+                                "⏱ ${stopover.location} · ${formatStopoverDateTime(stopover.arrivalAt)} – ${formatStopoverDateTime(stopover.departureAt)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TrailsColors.TextSoft,
+                            )
+                            Text(
+                                stopover.flightNumber.takeIf { it.isNotBlank() }?.let { "✈ $it" } ?: "✈ Flight ${index + 2}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TrailsColors.Text,
+                            )
+                        }
+                    }
+                }
                 entry.notes?.let { Field("Notes", it) }
                 entry.postTripNotes?.let { Field("Post-trip notes", it) }
             }

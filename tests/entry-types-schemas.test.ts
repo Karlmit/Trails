@@ -296,6 +296,78 @@ describe('lib/entry-types/*.schema.ts', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    // User-requested: an optional connecting itinerary -- 0 stopovers is
+    // untouched (every test above omits typeDetails entirely and still
+    // passes), N stopovers describe N+1 legs (serviceNumber is leg 1,
+    // each stopover's own flightNumber is the next leg).
+    describe('typeDetails.stopovers', () => {
+      it('accepts a valid multi-stopover itinerary', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            serviceNumber: 'BA123',
+            stopovers: [
+              { location: 'Dubai (DXB)', arrivalAt: '2026-08-03T14:00', departureAt: '2026-08-03T15:30', flightNumber: 'EK456' },
+            ],
+          },
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.typeDetails?.stopovers).toHaveLength(1);
+          expect(result.data.typeDetails?.stopovers?.[0]?.flightNumber).toBe('EK456');
+        }
+      });
+
+      it('accepts an entry with no stopovers at all (0-stopover default)', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T10:00:00.000Z',
+          typeDetails: { serviceNumber: 'BA123' },
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.typeDetails?.stopovers).toBeUndefined();
+        }
+      });
+
+      it('rejects a stopover missing its location', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            stopovers: [{ location: '', arrivalAt: '2026-08-03T14:00', departureAt: '2026-08-03T15:30' }],
+          },
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('rejects a stopover whose departure is not later than its arrival', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            stopovers: [{ location: 'Dubai (DXB)', arrivalAt: '2026-08-03T15:30', departureAt: '2026-08-03T14:00' }],
+          },
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('rejects more than 10 stopovers', () => {
+        const stopovers = Array.from({ length: 11 }, (_, i) => ({
+          location: `Stop ${i}`,
+          arrivalAt: '2026-08-03T14:00',
+          departureAt: '2026-08-03T15:30',
+        }));
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: { stopovers },
+        });
+        expect(result.success).toBe(false);
+      });
+    });
   });
 
   describe('activityCreateSchema (FR-13)', () => {

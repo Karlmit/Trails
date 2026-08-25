@@ -21,9 +21,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 private const val OWNER_TYPE = "TIMELINE_ENTRY"
@@ -85,6 +86,9 @@ data class EntryEditState(
     val serviceNumber: String = "",
     val seat: String = "",
     val baggageInfo: String = "",
+    // User-requested: an optional connecting itinerary -- see
+    // TransportStopovers.kt's own doc comment.
+    val stopovers: List<StopoverDraft> = emptyList(),
     val links: List<LinkFieldItem> = emptyList(),
     val saving: Boolean = false,
     val error: String? = null,
@@ -146,7 +150,7 @@ class EntryEditViewModel @Inject constructor(
 
     private fun loadFrom(existing: TimelineEntryEntity) {
         if (_state.value.title.isNotEmpty() || _state.value.locationName.isNotEmpty()) return
-        val typeDetails = parseTypeDetails(existing.typeDetailsJson)
+        val typeDetails = parseFlatTypeDetails(existing.typeDetailsJson)
         _state.value = _state.value.copy(
             entryType = existing.entryType,
             subtype = existing.subtype ?: subtypesFor(existing.entryType).firstOrNull().orEmpty(),
@@ -179,16 +183,11 @@ class EntryEditViewModel @Inject constructor(
             serviceNumber = typeDetails["serviceNumber"].orEmpty(),
             seat = typeDetails["seat"].orEmpty(),
             baggageInfo = typeDetails["baggageInfo"].orEmpty(),
+            stopovers = parseStopovers(existing.typeDetailsJson),
         )
         originalFields = fieldsOf(_state.value)
     }
 
-    private fun parseTypeDetails(json: String?): Map<String, String> {
-        if (json.isNullOrBlank()) return emptyMap()
-        return runCatching {
-            (Json.parseToJsonElement(json) as JsonObject).entries.associate { (k, v) -> k to v.jsonPrimitive.content }
-        }.getOrDefault(emptyMap())
-    }
 
     fun onEntryTypeChange(v: String) {
         _state.value = _state.value.copy(entryType = v, subtype = subtypesFor(v).firstOrNull().orEmpty())
@@ -223,6 +222,18 @@ class EntryEditViewModel @Inject constructor(
     fun onServiceNumberChange(v: String) { _state.value = _state.value.copy(serviceNumber = v) }
     fun onSeatChange(v: String) { _state.value = _state.value.copy(seat = v) }
     fun onBaggageInfoChange(v: String) { _state.value = _state.value.copy(baggageInfo = v) }
+
+    fun addStopover() {
+        _state.value = _state.value.copy(stopovers = _state.value.stopovers + StopoverDraft())
+    }
+    fun updateStopover(index: Int, patch: StopoverDraft) {
+        _state.value = _state.value.copy(
+            stopovers = _state.value.stopovers.mapIndexed { i, s -> if (i == index) patch else s },
+        )
+    }
+    fun removeStopover(index: Int) {
+        _state.value = _state.value.copy(stopovers = _state.value.stopovers.filterIndexed { i, _ -> i != index })
+    }
 
     fun addLink(url: String, label: String?) {
         val ownerId = _state.value.entryId
@@ -261,6 +272,21 @@ class EntryEditViewModel @Inject constructor(
         ).filterValues { it.isNotEmpty() }
         else -> emptyMap()
     }
+
+    // TRANSPORT only -- see TransportEntryRequest.typeDetails's own
+    // comment on why this needs a real JsonObject rather than the flat
+    // Map<String, String> [typeDetailsFor] returns for Stay/Activity.
+    private fun transportTypeDetailsFor(current: EntryEditState): JsonObject = JsonObject(
+        buildMap {
+            put("terminal", current.terminal.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("gate", current.gate.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("platform", current.platform.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("serviceNumber", current.serviceNumber.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("seat", current.seat.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("baggageInfo", current.baggageInfo.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("stopovers", stopoversToJsonArray(current.stopovers))
+        },
+    )
 
     private fun toRequest(current: EntryEditState): TimelineEntryWriteRequest = when (current.entryType) {
         "NOTE" -> TimelineEntryWriteRequest.Note(
@@ -330,7 +356,7 @@ class EntryEditViewModel @Inject constructor(
                 notes = current.notes.trim().takeIf { it.isNotEmpty() },
                 postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
                 isPrivate = current.isPrivate,
-                typeDetails = typeDetailsFor(current),
+                typeDetails = transportTypeDetailsFor(current),
             ),
         )
         else -> TimelineEntryWriteRequest.Activity(

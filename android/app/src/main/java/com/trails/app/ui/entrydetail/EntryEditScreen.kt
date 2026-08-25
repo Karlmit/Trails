@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import com.trails.app.ui.timeline.graph.subtypeLabel
 
@@ -44,6 +46,19 @@ private fun entryTypeEmoji(entryType: String) = when (entryType) {
     "TRANSPORT" -> "🚗"
     "ACTIVITY" -> "🎟️"
     else -> "📝"
+}
+
+// DateTimePickerField needs a full `Instant.parse`-able string (seconds +
+// trailing "Z") -- a stopover created on the *web* app instead stores a
+// bare `YYYY-MM-DDTHH:mm` (see TransportStopovers.kt's own comment on why
+// stopover times are never normalized server-side). Silently falls back
+// to "now" otherwise, which would then overwrite the real stored value
+// the moment this field is saved -- append seconds+Z first so editing a
+// web-created stopover here round-trips correctly.
+private fun asPickerInstant(value: String): String {
+    if (value.isEmpty()) return value
+    return runCatching { java.time.Instant.parse(value); value }
+        .getOrElse { "${value}:00Z".takeIf { runCatching { java.time.Instant.parse(it) }.isSuccess } ?: value }
 }
 
 @Composable
@@ -167,6 +182,41 @@ fun EntryEditScreen(
             LabeledField(label = "Service number", value = state.serviceNumber, onValueChange = viewModel::onServiceNumberChange)
             LabeledField(label = "Seat", value = state.seat, onValueChange = viewModel::onSeatChange)
             LabeledField(label = "Baggage info", value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
+
+            // User-requested: an optional connecting itinerary -- each
+            // stopover is an intermediate landing, then the *next* leg's
+            // own flight number (the first leg's number is Service number
+            // above, unchanged). 0 stopovers is today's exact behavior.
+            Text("STOPOVERS (OPTIONAL)", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+            state.stopovers.forEachIndexed { index, stopover ->
+                TrailsCard {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Stopover ${index + 1}", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+                        TextButton(onClick = { viewModel.removeStopover(index) }) { Text("Remove") }
+                    }
+                    LabeledField(
+                        label = "Location",
+                        value = stopover.location,
+                        onValueChange = { viewModel.updateStopover(index, stopover.copy(location = it)) },
+                    )
+                    DateTimePickerField(
+                        label = "Arrival (this leg lands)",
+                        isoDateTime = asPickerInstant(stopover.arrivalAt),
+                        onDateTimeChange = { viewModel.updateStopover(index, stopover.copy(arrivalAt = it)) },
+                    )
+                    DateTimePickerField(
+                        label = "Departure (next leg leaves)",
+                        isoDateTime = asPickerInstant(stopover.departureAt),
+                        onDateTimeChange = { viewModel.updateStopover(index, stopover.copy(departureAt = it)) },
+                    )
+                    LabeledField(
+                        label = "Flight number (next leg)",
+                        value = stopover.flightNumber,
+                        onValueChange = { viewModel.updateStopover(index, stopover.copy(flightNumber = it)) },
+                    )
+                }
+            }
+            TextButton(onClick = viewModel::addStopover) { Text("+ Add stopover") }
         }
 
         LabeledField(label = "Contact name", value = state.contactName, onValueChange = viewModel::onContactNameChange)

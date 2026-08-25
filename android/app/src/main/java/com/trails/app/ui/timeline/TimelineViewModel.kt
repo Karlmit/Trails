@@ -65,7 +65,7 @@ class TimelineViewModel @Inject constructor(
             val layout = layoutTimelineEntries(
                 days,
                 entries.map {
-                    EntryForLayout(it.id, it.entryType, it.subtype, it.title, it.startAt, it.endAt, it.startTimezone, it.endTimezone)
+                    EntryForLayout(it.id, it.entryType, it.subtype, it.title, it.startAt, it.endAt, it.startTimezone, it.endTimezone, it.typeDetailsJson)
                 },
             )
             TimelineUiState(trip = trip, sections = sortedSections, layout = layout, todayKey = todayKey, isSyncing = syncing)

@@ -105,6 +105,12 @@ export interface EntryForLayout {
   // to recover the traveler's intended day/clock time for this leg.
   startTimezone: string | null;
   endTimezone: string | null;
+  // User-requested: Transport's optional connecting itinerary (stopovers +
+  // per-leg flight numbers) needs to reach the Timeline's start-day label --
+  // every other Entry Type's typeDetails is unused here. Untyped on
+  // purpose, same as TimelineEntry.typeDetails itself (a schemaless Json
+  // column) -- the Timeline page's own dayLineLabel narrows it.
+  typeDetails?: unknown;
 }
 
 /**
@@ -128,6 +134,8 @@ export interface TimelineDayLine {
   endAt: Date | null;
   startTimezone: string | null;
   endTimezone: string | null;
+  // See EntryForLayout's identical comment -- carried through unchanged.
+  typeDetails?: unknown;
 }
 
 /**
@@ -222,6 +230,7 @@ export function layoutTimelineEntries(days: TimelineDay[], entries: EntryForLayo
         endAt: entry.endAt,
         startTimezone: entry.startTimezone,
         endTimezone: entry.endTimezone,
+        typeDetails: entry.typeDetails,
       });
     }
 

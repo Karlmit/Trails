@@ -1,9 +1,14 @@
 package com.trails.app.ui.timeline.graph
 
+import com.trails.app.ui.entrydetail.formatStopoverClock
+import com.trails.app.ui.entrydetail.parseStopovers
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 /** lib/trip-status.ts::entryEndpointClockTime -- zone null reads literal wall-clock digits, no conversion. */
 fun entryClockTime(isoDateTime: String, zone: String?): Pair<Int, Int> {
@@ -63,6 +68,27 @@ private fun stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: String): S
     return parts.joinToString(" · ")
 }
 
+// User-requested: an optional connecting itinerary -- shown as a
+// multi-line subtitle on the departure day only (the arrival day keeps
+// its own plain "Title · Arrival HH:MM" line, unchanged). Mirrors
+// app/(web)/trips/[tripId]/timeline/page.tsx::transportItinerarySubtitle.
+private fun transportItinerarySubtitle(typeDetailsJson: String?): String? {
+    val stopovers = parseStopovers(typeDetailsJson)
+    if (stopovers.isEmpty()) return null
+
+    val firstFlightNumber = runCatching {
+        val root = Json.parseToJsonElement(typeDetailsJson!!).jsonObject
+        (root["serviceNumber"] as? JsonPrimitive)?.content
+    }.getOrNull()
+
+    val lines = mutableListOf(if (!firstFlightNumber.isNullOrBlank()) "✈ $firstFlightNumber" else "✈ Flight 1")
+    stopovers.forEachIndexed { index, stopover ->
+        lines += "⏱ ${stopover.location} · ${formatStopoverClock(stopover.arrivalAt)}–${formatStopoverClock(stopover.departureAt)}"
+        lines += if (stopover.flightNumber.isNotBlank()) "✈ ${stopover.flightNumber}" else "✈ Flight ${index + 2}"
+    }
+    return lines.joinToString("\n")
+}
+
 /** lib/(web)/trips/[tripId]/timeline/page.tsx::dayLineLabel */
 fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
     if (line.entryType == "STAY") {
@@ -84,7 +110,7 @@ fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
             } else {
                 "${line.title} · Departure"
             }
-            return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false)
+            return DayLineLabel(hidden = false, title = title, subtitle = transportItinerarySubtitle(line.typeDetailsJson), showSubtype = false)
         }
         if (line.isEnd && line.endAt != null) {
             val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)

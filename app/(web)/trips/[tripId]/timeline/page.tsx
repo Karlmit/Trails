@@ -110,6 +110,38 @@ function stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: string): stri
   return parts.join(' · ');
 }
 
+// User-requested: an optional connecting itinerary -- shown as a
+// multi-line subtitle on the departure day only (the arrival day keeps
+// its own plain "Title · Arrival HH:MM" line, unchanged). Deliberately a
+// plain string literal parse, not a real Date/zone conversion -- see
+// lib/entry-types/transport.schema.ts's own comment on why stopover times
+// are never transformed server-side either.
+function formatStopoverClock(value: string): string {
+  const match = /T(\d{2}):(\d{2})/.exec(value);
+  return match ? `${match[1]}:${match[2]}` : value;
+}
+
+interface StopoverForTimeline {
+  location: string;
+  arrivalAt: string;
+  departureAt: string;
+  flightNumber: string | null;
+}
+
+function transportItinerarySubtitle(typeDetails: unknown): string | null {
+  const details = typeDetails as { serviceNumber?: unknown; stopovers?: unknown } | null | undefined;
+  const stopovers = Array.isArray(details?.stopovers) ? (details.stopovers as StopoverForTimeline[]) : [];
+  if (stopovers.length === 0) return null;
+
+  const firstFlightNumber = typeof details?.serviceNumber === 'string' ? details.serviceNumber : null;
+  const lines = [firstFlightNumber ? `✈ ${firstFlightNumber}` : '✈ Flight 1'];
+  stopovers.forEach((stopover, index) => {
+    lines.push(`⏱ ${stopover.location} · ${formatStopoverClock(stopover.arrivalAt)}–${formatStopoverClock(stopover.departureAt)}`);
+    lines.push(stopover.flightNumber ? `✈ ${stopover.flightNumber}` : `✈ Flight ${index + 2}`);
+  });
+  return lines.join('\n');
+}
+
 function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel {
   if (line.entryType === 'STAY') {
     if (!line.isStart && !line.isEnd) {
@@ -124,7 +156,7 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel
       const title = hasTime
         ? `${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
         : `${line.title} · Departure`;
-      return { hidden: false, title, subtitle: null, showSubtype: false };
+      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails), showSubtype: false };
     }
     if (line.isEnd && line.endAt) {
       const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
@@ -221,6 +253,7 @@ export default async function TimelinePage({ params }: PageProps) {
     endAt: entry.endAt,
     startTimezone: entry.startTimezone,
     endTimezone: entry.endTimezone,
+    typeDetails: entry.typeDetails,
   }));
   const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
 

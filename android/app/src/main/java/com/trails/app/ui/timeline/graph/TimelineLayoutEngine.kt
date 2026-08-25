@@ -22,6 +22,12 @@ data class EntryForLayout(
     val endAt: String?,
     val startTimezone: String?,
     val endTimezone: String?,
+    // User-requested: Transport's optional connecting itinerary needs to
+    // reach the Timeline's start-day label -- every other Entry Type's
+    // typeDetails is unused here. Raw JSON, same as
+    // TimelineEntryEntity.typeDetailsJson itself -- the Timeline's own
+    // dayLineLabel parses it on demand (TimelineFormat.kt).
+    val typeDetailsJson: String? = null,
 )
 
 data class TimelineDay(val dateKey: String, val sectionIndex: Int?, val isToday: Boolean)
@@ -37,6 +43,8 @@ data class TimelineDayLine(
     val endAt: String?,
     val startTimezone: String?,
     val endTimezone: String?,
+    // See EntryForLayout's identical comment -- carried through unchanged.
+    val typeDetailsJson: String? = null,
 )
 
 data class TimelineBranchSegment(
@@ -126,6 +134,7 @@ fun layoutTimelineEntries(days: List<TimelineDay>, entries: List<EntryForLayout>
                     endAt = entry.endAt,
                     startTimezone = entry.startTimezone,
                     endTimezone = entry.endTimezone,
+                    typeDetailsJson = entry.typeDetailsJson,
                 ),
             )
         }

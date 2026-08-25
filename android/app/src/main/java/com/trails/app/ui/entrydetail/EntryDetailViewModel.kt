@@ -18,14 +18,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 data class EntryDetailUiState(
     val entry: TimelineEntryEntity? = null,
     val typeDetails: Map<String, String> = emptyMap(),
+    // User-requested: Transport's optional connecting itinerary -- see
+    // TransportStopovers.kt's own doc comment.
+    val stopovers: List<StopoverDraft> = emptyList(),
     val attachments: List<AttachmentEntity> = emptyList(),
     val photos: List<PhotoEntity> = emptyList(),
 )
@@ -78,15 +78,12 @@ class EntryDetailViewModel @Inject constructor(
         documentsRepository.observeAttachmentsForOwner("TIMELINE_ENTRY", entryId),
         documentsRepository.observePhotosForOwner("TIMELINE_ENTRY", entryId),
     ) { entry, attachments, photos ->
-        EntryDetailUiState(entry = entry, typeDetails = parseTypeDetails(entry?.typeDetailsJson), attachments = attachments, photos = photos)
+        EntryDetailUiState(
+            entry = entry,
+            typeDetails = parseFlatTypeDetails(entry?.typeDetailsJson),
+            stopovers = parseStopovers(entry?.typeDetailsJson),
+            attachments = attachments,
+            photos = photos,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EntryDetailUiState())
-
-    private fun parseTypeDetails(json: String?): Map<String, String> {
-        if (json.isNullOrBlank()) return emptyMap()
-        return runCatching {
-            (Json.parseToJsonElement(json) as JsonObject)
-                .entries
-                .associate { (key, value) -> key to value.jsonPrimitive.content }
-        }.getOrDefault(emptyMap())
-    }
 }
