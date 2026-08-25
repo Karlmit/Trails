@@ -23,9 +23,9 @@ import javax.inject.Inject
 data class EntryDetailUiState(
     val entry: TimelineEntryEntity? = null,
     val typeDetails: Map<String, String> = emptyMap(),
-    // User-requested: Transport's optional connecting itinerary -- see
-    // TransportStopovers.kt's own doc comment.
-    val stopovers: List<StopoverDraft> = emptyList(),
+    // User-requested redesign: every leg of a Transport entry -- see
+    // TransportFlights.kt's own doc comment.
+    val flights: List<FlightDraft> = emptyList(),
     val attachments: List<AttachmentEntity> = emptyList(),
     val photos: List<PhotoEntity> = emptyList(),
 )
@@ -81,7 +81,7 @@ class EntryDetailViewModel @Inject constructor(
         EntryDetailUiState(
             entry = entry,
             typeDetails = parseFlatTypeDetails(entry?.typeDetailsJson),
-            stopovers = parseStopovers(entry?.typeDetailsJson),
+            flights = parseFlights(entry?.typeDetailsJson),
             attachments = attachments,
             photos = photos,
         )

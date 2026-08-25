@@ -94,7 +94,7 @@ describe('stripEntryFieldsForGuest', () => {
     const transportEntry = {
       ...FULL_ENTRY,
       entryType: 'TRANSPORT',
-      typeDetails: { seat: '14A', gate: 'B12', terminal: 'T2', serviceNumber: 'LH400', baggageInfo: 'Carousel 3' },
+      typeDetails: { baggageInfo: 'Carousel 3', flights: [{ seat: '14A', gate: 'B12', terminal: 'T2', flightNumber: 'LH400' }] },
     };
     expect(stripEntryFieldsForGuest(transportEntry).typeDetails).toEqual({});
   });

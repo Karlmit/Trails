@@ -111,28 +111,101 @@ function str(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-// User-requested: an optional connecting itinerary for Transport --
-// mirrors lib/entry-types/transport.schema.ts's stopoverSchema exactly.
+// User-requested redesign: every leg of a Transport entry -- including the
+// first -- is one uniform Flight, mirroring
+// lib/entry-types/transport.schema.ts's transportFlightLegSchema exactly.
 // Deliberately plain strings straight from/to the DateTimeInput below, no
-// ISO/timezone conversion -- see that schema's own comment on why
-// stopover times are never transformed to a Date server-side either, so
-// there's no round-trip format mismatch to bridge here.
-interface StopoverDraft {
-  location: string;
-  arrivalAt: string;
+// ISO conversion -- see that schema's own comment on why flight times are
+// never transformed to a Date server-side either, so there's no round-trip
+// format mismatch to bridge here.
+interface FlightDraft {
+  departureLocation: string;
   departureAt: string;
+  departureTimezone: string;
+  arrivalLocation: string;
+  arrivalAt: string;
+  arrivalTimezone: string;
   flightNumber: string;
+  terminal: string;
+  gate: string;
+  platform: string;
+  seat: string;
 }
 
-function stopoversFromTypeDetails(typeDetails: Record<string, unknown>): StopoverDraft[] {
-  const raw = typeDetails.stopovers;
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => ({
-    location: str((item as Record<string, unknown>)?.location),
-    arrivalAt: str((item as Record<string, unknown>)?.arrivalAt),
-    departureAt: str((item as Record<string, unknown>)?.departureAt),
-    flightNumber: str((item as Record<string, unknown>)?.flightNumber),
-  }));
+function blankFlight(tripTimezone: string): FlightDraft {
+  return {
+    departureLocation: '',
+    departureAt: '',
+    departureTimezone: tripTimezone,
+    arrivalLocation: '',
+    arrivalAt: '',
+    arrivalTimezone: tripTimezone,
+    flightNumber: '',
+    terminal: '',
+    gate: '',
+    platform: '',
+    seat: '',
+  };
+}
+
+function flightsFromSeed(seed: Partial<EntryDTO> | undefined, tripTimezone: string): FlightDraft[] {
+  const typeDetails = seed?.typeDetails ?? {};
+  const raw = typeDetails.flights;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((item) => {
+      const obj = (item ?? {}) as Record<string, unknown>;
+      return {
+        departureLocation: str(obj.departureLocation),
+        departureAt: str(obj.departureAt),
+        departureTimezone: str(obj.departureTimezone) || tripTimezone,
+        arrivalLocation: str(obj.arrivalLocation),
+        arrivalAt: str(obj.arrivalAt),
+        arrivalTimezone: str(obj.arrivalTimezone) || tripTimezone,
+        flightNumber: str(obj.flightNumber),
+        terminal: str(obj.terminal),
+        gate: str(obj.gate),
+        platform: str(obj.platform),
+        seat: str(obj.seat),
+      };
+    });
+  }
+  // An entry saved before the Flights redesign (plain top-level Departure/
+  // Arrival + flat terminal/gate/platform/serviceNumber/seat, no `flights`
+  // array yet) -- synthesize exactly one Flight from those. There's no
+  // per-flight location data to recover from that old shape, so both stay
+  // blank rather than guessing.
+  if (seed?.entryType === 'TRANSPORT' && seed?.startAt) {
+    return [
+      {
+        departureLocation: '',
+        departureAt: toDateTimeLocal(seed.startAt, seed.startTimezone ?? null),
+        departureTimezone: seed.startTimezone ?? tripTimezone,
+        arrivalLocation: '',
+        arrivalAt: seed.endAt ? toDateTimeLocal(seed.endAt, seed.endTimezone ?? null) : '',
+        arrivalTimezone: seed.endTimezone ?? tripTimezone,
+        flightNumber: str(typeDetails.serviceNumber),
+        terminal: str(typeDetails.terminal),
+        gate: str(typeDetails.gate),
+        platform: str(typeDetails.platform),
+        seat: str(typeDetails.seat),
+      },
+    ];
+  }
+  return [blankFlight(tripTimezone)];
+}
+
+// Read-only, computed display of the gap between one Flight's arrival and
+// the next Flight's departure -- no longer separately entered data. Plain
+// literal-clock-time comparison (no timezone math): a layover's own
+// arrival and the next leg's departure happen at the same real airport in
+// the overwhelming common case.
+function stopoverGapLabel(prev: FlightDraft, next: FlightDraft): string {
+  const location = prev.arrivalLocation.trim() || next.departureLocation.trim();
+  const fmt = (value: string) => {
+    const { hour, minute } = splitDateTime(value);
+    return hour && minute ? `${hour}:${minute}` : '?';
+  };
+  return `⏱ Stopover${location ? ` at ${location}` : ''}: ${fmt(prev.arrivalAt)}–${fmt(next.departureAt)}`;
 }
 
 export function EntryForm({
@@ -154,12 +227,6 @@ export function EntryForm({
   const [subtype, setSubtype] = useState(seed?.subtype ?? '');
   const [title, setTitle] = useState(seed?.title ?? '');
   const [description, setDescription] = useState(seed?.description ?? '');
-  // spec-timeline-ux-and-timezone (correction): Transport-only pickers,
-  // defaulting to the Trip's own timezone -- "it should default to the
-  // Trip's timezone, but a few times we need to define it" (e.g. a
-  // flight's departure and arrival airports in different real zones).
-  const [startTimezone, setStartTimezone] = useState(seed?.startTimezone ?? tripTimezone);
-  const [endTimezone, setEndTimezone] = useState(seed?.endTimezone ?? tripTimezone);
   const [startAt, setStartAt] = useState(
     seed?.startAt
       ? toDateTimeLocal(seed.startAt, seed.startTimezone ?? null)
@@ -229,22 +296,17 @@ export function EntryForm({
 
   const typeDetails = seed?.typeDetails ?? {};
   const [roomInfo, setRoomInfo] = useState(str(typeDetails.roomInfo));
-  const [terminal, setTerminal] = useState(str(typeDetails.terminal));
-  const [gate, setGate] = useState(str(typeDetails.gate));
-  const [platform, setPlatform] = useState(str(typeDetails.platform));
-  const [serviceNumber, setServiceNumber] = useState(str(typeDetails.serviceNumber));
-  const [seat, setSeat] = useState(str(typeDetails.seat));
   const [baggageInfo, setBaggageInfo] = useState(str(typeDetails.baggageInfo));
-  const [stopovers, setStopovers] = useState<StopoverDraft[]>(() => stopoversFromTypeDetails(typeDetails));
+  const [flights, setFlights] = useState<FlightDraft[]>(() => flightsFromSeed(seed, tripTimezone));
 
-  function addStopover() {
-    setStopovers((current) => [...current, { location: '', arrivalAt: '', departureAt: '', flightNumber: '' }]);
+  function addFlight() {
+    setFlights((current) => [...current, blankFlight(tripTimezone)]);
   }
-  function updateStopover(index: number, patch: Partial<StopoverDraft>) {
-    setStopovers((current) => current.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  function updateFlight(index: number, patch: Partial<FlightDraft>) {
+    setFlights((current) => current.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   }
-  function removeStopover(index: number) {
-    setStopovers((current) => current.filter((_, i) => i !== index));
+  function removeFlight(index: number) {
+    setFlights((current) => current.filter((_, i) => i !== index));
   }
 
   const [error, setError] = useState<string | null>(null);
@@ -260,8 +322,10 @@ export function EntryForm({
   // fields at all -- hidden here, and never sent to the API for this type.
   const showLocation = entryType !== 'NOTE';
   const showBookingExpense = entryType !== 'NOTE';
-  const showEnd = entryType !== 'NOTE';
-  const endRequired = entryType === 'STAY' || entryType === 'TRANSPORT';
+  // Transport no longer shows a top-level End input at all -- Flight 1's
+  // own arrival becomes the entry's endAt (computed in handleSubmit).
+  const showEnd = entryType !== 'NOTE' && entryType !== 'TRANSPORT';
+  const endRequired = entryType === 'STAY';
   const subtypeOptions = SUBTYPES_BY_ENTRY_TYPE[entryType] ?? [];
   // spec-entry-fields-datepickers: Stay/Transport/Activity no longer show a
   // separate Title input (showLocation is exactly this 3-type set within
@@ -273,7 +337,18 @@ export function EntryForm({
     event.preventDefault();
     setError(null);
 
-    if (!startAt) {
+    // Transport's own startAt/endAt are no longer directly editable --
+    // they're computed from the first/last Flight that actually has both
+    // of its own times set, matching what the User can see on-screen.
+    const validFlights = entryType === 'TRANSPORT' ? flights.filter((f) => f.departureAt && f.arrivalAt) : [];
+    if (entryType === 'TRANSPORT' && validFlights.length === 0) {
+      setError('At least one Flight needs both a departure and arrival date/time.');
+      return;
+    }
+    const effectiveStartAt = entryType === 'TRANSPORT' ? validFlights[0].departureAt : startAt;
+    const effectiveEndAt = entryType === 'TRANSPORT' ? validFlights[validFlights.length - 1].arrivalAt : endAt;
+
+    if (!effectiveStartAt) {
       setError('A start date/time is required.');
       return;
     }
@@ -281,8 +356,8 @@ export function EntryForm({
       setError('Please choose an Entry Subtype.');
       return;
     }
-    if (endRequired && !endAt) {
-      setError(entryType === 'STAY' ? 'Check-out is required.' : 'Arrival is required.');
+    if (endRequired && !effectiveEndAt) {
+      setError('Check-out is required.');
       return;
     }
     if (titleFromLocation && !locationName.trim()) {
@@ -306,12 +381,16 @@ export function EntryForm({
       // digits the traveler just typed. `dateTimeField` (lib/validation.ts)
       // treats an unzoned datetime string as UTC, so sending it as-is
       // stores exactly what was typed, with zero timezone involved.
-      startAt,
+      startAt: effectiveStartAt,
       notes: notes || null,
       postTripNotes: postTripNotes || null,
     };
 
-    if (showEnd) {
+    if (entryType === 'TRANSPORT') {
+      // Always sent, never gated by `showEnd` (Transport no longer renders
+      // that field at all) -- Flight 1's own arrival is always required.
+      body.endAt = effectiveEndAt;
+    } else if (showEnd) {
       // Send `endAt` whenever this type shows the field at all -- both a
       // new literal value and an explicit clear (`null`) so blanking the
       // field on edit actually clears it server-side instead of leaving
@@ -362,35 +441,33 @@ export function EntryForm({
       body.typeDetails = { roomInfo: roomInfo || null };
     } else if (entryType === 'TRANSPORT') {
       body.typeDetails = {
-        terminal: terminal || null,
-        gate: gate || null,
-        platform: platform || null,
-        serviceNumber: serviceNumber || null,
-        seat: seat || null,
         baggageInfo: baggageInfo || null,
-        // A row added then left untouched (location still blank) is
-        // dropped silently rather than 400ing the whole save over an
-        // abandoned stopover the User never actually filled in.
-        stopovers: stopovers
-          .filter((s) => s.location.trim())
-          .map((s) => ({
-            location: s.location.trim(),
-            arrivalAt: s.arrivalAt,
-            departureAt: s.departureAt,
-            flightNumber: s.flightNumber.trim() || null,
-          })),
+        flights: validFlights.map((f) => ({
+          departureLocation: f.departureLocation.trim() || null,
+          departureAt: f.departureAt,
+          departureTimezone: f.departureTimezone || tripTimezone,
+          arrivalLocation: f.arrivalLocation.trim() || null,
+          arrivalAt: f.arrivalAt,
+          arrivalTimezone: f.arrivalTimezone || tripTimezone,
+          flightNumber: f.flightNumber.trim() || null,
+          terminal: f.terminal.trim() || null,
+          gate: f.gate.trim() || null,
+          platform: f.platform.trim() || null,
+          seat: f.seat.trim() || null,
+        })),
       };
       // spec-timeline-ux-and-timezone (correction): only Transport's own
       // schema accepts these fields -- every other type's `.strict()`
       // schema would 400 on an unexpected key, so this must stay inside
-      // the TRANSPORT branch. Sent as the picker's own IANA string (never
-      // `''`, which TimezoneSelect emits only mid-typing before a
+      // the TRANSPORT branch. The entry's own startTimezone/endTimezone
+      // now come from Flight 1's departure and the last Flight's arrival
+      // (never `''`, which TimezoneSelect emits only mid-typing before a
       // selection commits -- falls back to the Trip's own timezone so an
       // in-progress, uncommitted edit never accidentally submits a blank
       // zone); the Route Handler computes the real UTC instant from this
       // plus the literal `startAt`/`endAt` above.
-      body.startTimezone = startTimezone || tripTimezone;
-      body.endTimezone = endTimezone || tripTimezone;
+      body.startTimezone = validFlights[0].departureTimezone || tripTimezone;
+      body.endTimezone = validFlights[validFlights.length - 1].arrivalTimezone || tripTimezone;
     }
 
     if (mode === 'create') {
@@ -487,104 +564,82 @@ export function EntryForm({
         />
       </div>
 
-      <div className="row">
-        <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="entry-start">
-            {entryType === 'TRANSPORT' ? 'Departure' : entryType === 'STAY' ? 'Check-in' : 'Start'}
-          </label>
-          <DateTimeInput
-            id="entry-start"
-            value={startAt}
-            // User-reported: "Check-in/out time should not be mandatory"
-            // -- every type can save with just a date, no specific time
-            // (not just Activity, per the original "Big Buddha" ask).
-            timeRequired={false}
-            onChange={(value) => {
-              setStartAt(value);
-              // spec-entry-fields-datepickers: End auto-follows Start until
-              // the User explicitly picks their own End.
-              if (!autoEndDate.touched()) setEndAt(value);
-            }}
-            required
-          />
-        </div>
-        {showEnd && (
-          <div className="field" style={{ flex: 1 }}>
-            <label htmlFor="entry-end">
-              {entryType === 'TRANSPORT' ? 'Arrival' : entryType === 'STAY' ? 'Check-out' : 'End (optional)'}
-            </label>
-            <DateTimeInput
-              id="entry-end"
-              value={endAt}
-              onChange={(value) => {
-                // review-caught: only a genuinely complete End value counts
-                // as a deliberate choice -- DateTimeInput collapses an
-                // incomplete/abandoned selection (e.g. an hour picked but no
-                // date yet) to '', which must not permanently disarm
-                // auto-fill.
-                if (value) autoEndDate.markTouched();
-                // User-reported: an overnight Check-out/Arrival time (e.g.
-                // a flight departing 22:00, landing 02:00) is the single
-                // most common reason End ends up <= Start -- the End date
-                // auto-filled to match Start's and the User only meant to
-                // pick a *time*, not realizing they also needed to bump the
-                // date forward. Silently roll the date forward one day
-                // whenever that exact shape occurs (End's date is still the
-                // untouched auto-filled Start date, and the time picked
-                // makes End <= Start) -- this is never wrong: a same-day
-                // End that's genuinely earlier than Start is otherwise
-                // always just a data-entry mistake, not a valid state
-                // (Stay/Transport/Activity all require End later than, or
-                // for Activity only, equal to, Start). A deliberate
-                // same-day End that's *later* than Start (a day-use booking,
-                // a same-day round-trip) never reaches this branch at all,
-                // since only value <= startAt triggers it.
-                // Activity alone allows End to equal Start (a point-in-time
-                // Activity) -- only a strictly-earlier End is ever invalid
-                // there; every other type requires strictly later.
-                const wouldBeInvalid = startAt
-                  ? entryType === 'ACTIVITY'
-                    ? value < startAt
-                    : value <= startAt
-                  : false;
-                if (value && wouldBeInvalid) {
-                  const { date, hour, minute } = splitDateTime(value);
-                  if (date === splitDateTime(startAt).date) {
-                    const nextDay = new Date(`${date}T00:00:00.000Z`);
-                    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-                    // timeRequired: false, matching the DateTimeInput below
-                    // -- a date-only End (no specific time picked) must
-                    // still roll forward as a bare date, not collapse to
-                    // '' for lacking an hour/minute it was never given.
-                    setEndAt(combineDateTime(nextDay.toISOString().slice(0, 10), hour, minute, false));
-                    return;
-                  }
-                }
-                setEndAt(value);
-              }}
-              required={endRequired}
-              timeRequired={false}
-            />
-          </div>
-        )}
-      </div>
-
-      {entryType === 'TRANSPORT' && (
-        // spec-timeline-ux-and-timezone (correction): "it should default to
-        // the Trip's timezone, but a few times we need to define it -- for
-        // example flights, as some flights start in one timezone and end up
-        // in another." Both default to the Trip's own timezone (seeded
-        // above) and are only ever shown for Transport -- every other type
-        // implicitly uses the Trip's timezone with no picker at all.
+      {entryType !== 'TRANSPORT' && (
         <div className="row">
           <div className="field" style={{ flex: 1 }}>
-            <label htmlFor="entry-start-timezone">Departure timezone</label>
-            <TimezoneSelect id="entry-start-timezone" initialValue={startTimezone} onChange={setStartTimezone} required />
+            <label htmlFor="entry-start">{entryType === 'STAY' ? 'Check-in' : 'Start'}</label>
+            <DateTimeInput
+              id="entry-start"
+              value={startAt}
+              // User-reported: "Check-in/out time should not be mandatory"
+              // -- every type can save with just a date, no specific time
+              // (not just Activity, per the original "Big Buddha" ask).
+              timeRequired={false}
+              onChange={(value) => {
+                setStartAt(value);
+                // spec-entry-fields-datepickers: End auto-follows Start until
+                // the User explicitly picks their own End.
+                if (!autoEndDate.touched()) setEndAt(value);
+              }}
+              required
+            />
           </div>
-          <div className="field" style={{ flex: 1 }}>
-            <label htmlFor="entry-end-timezone">Arrival timezone</label>
-            <TimezoneSelect id="entry-end-timezone" initialValue={endTimezone} onChange={setEndTimezone} required />
-          </div>
+          {showEnd && (
+            <div className="field" style={{ flex: 1 }}>
+              <label htmlFor="entry-end">{entryType === 'STAY' ? 'Check-out' : 'End (optional)'}</label>
+              <DateTimeInput
+                id="entry-end"
+                value={endAt}
+                onChange={(value) => {
+                  // review-caught: only a genuinely complete End value counts
+                  // as a deliberate choice -- DateTimeInput collapses an
+                  // incomplete/abandoned selection (e.g. an hour picked but no
+                  // date yet) to '', which must not permanently disarm
+                  // auto-fill.
+                  if (value) autoEndDate.markTouched();
+                  // User-reported: an overnight Check-out time is the single
+                  // most common reason End ends up <= Start -- the End date
+                  // auto-filled to match Start's and the User only meant to
+                  // pick a *time*, not realizing they also needed to bump the
+                  // date forward. Silently roll the date forward one day
+                  // whenever that exact shape occurs (End's date is still the
+                  // untouched auto-filled Start date, and the time picked
+                  // makes End <= Start) -- this is never wrong: a same-day
+                  // End that's genuinely earlier than Start is otherwise
+                  // always just a data-entry mistake, not a valid state
+                  // (Stay/Activity both require End later than, or for
+                  // Activity only, equal to, Start). A deliberate same-day
+                  // End that's *later* than Start (a day-use booking) never
+                  // reaches this branch at all, since only value <= startAt
+                  // triggers it.
+                  // Activity alone allows End to equal Start (a point-in-time
+                  // Activity) -- only a strictly-earlier End is ever invalid
+                  // there; every other type requires strictly later.
+                  const wouldBeInvalid = startAt
+                    ? entryType === 'ACTIVITY'
+                      ? value < startAt
+                      : value <= startAt
+                    : false;
+                  if (value && wouldBeInvalid) {
+                    const { date, hour, minute } = splitDateTime(value);
+                    if (date === splitDateTime(startAt).date) {
+                      const nextDay = new Date(`${date}T00:00:00.000Z`);
+                      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+                      // timeRequired: false, matching the DateTimeInput below
+                      // -- a date-only End (no specific time picked) must
+                      // still roll forward as a bare date, not collapse to
+                      // '' for lacking an hour/minute it was never given.
+                      setEndAt(combineDateTime(nextDay.toISOString().slice(0, 10), hour, minute, false));
+                      return;
+                    }
+                  }
+                  setEndAt(value);
+                }}
+                required={endRequired}
+                timeRequired={false}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -628,102 +683,155 @@ export function EntryForm({
 
       {entryType === 'TRANSPORT' && (
         <>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-terminal">Terminal</label>
-              <input id="entry-terminal" value={terminal} onChange={(e) => setTerminal(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-gate">Gate</label>
-              <input id="entry-gate" value={gate} onChange={(e) => setGate(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-platform">Platform</label>
-              <input id="entry-platform" value={platform} onChange={(e) => setPlatform(e.target.value)} />
-            </div>
-          </div>
-          <div className="row">
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-service-number">Service number</label>
-              <input
-                id="entry-service-number"
-                value={serviceNumber}
-                onChange={(e) => setServiceNumber(e.target.value)}
-              />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-seat">Seat</label>
-              <input id="entry-seat" value={seat} onChange={(e) => setSeat(e.target.value)} />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-baggage">Baggage info</label>
-              <input id="entry-baggage" value={baggageInfo} onChange={(e) => setBaggageInfo(e.target.value)} />
-            </div>
-          </div>
-
-          {/* User-requested: an optional connecting itinerary -- each
-              stopover is an intermediate landing, then the *next* leg's
-              own flight number (the first leg's number is Service number
-              above, unchanged). 0 stopovers is today's exact behavior. */}
+          {/* User-requested redesign: every leg -- including the first --
+              is one uniform Flight card, instead of a full-fields first
+              leg plus bare-bones stopovers for the rest. The gap between
+              two Flights is shown as a computed, read-only line rather
+              than separately entered data. */}
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-              Stopovers (optional)
+              Flights
             </span>
-            {stopovers.map((stopover, index) => (
-              <div key={index} className="card stack" style={{ padding: 'var(--space-2)', gap: 'var(--space-2)' }}>
-                <div className="row-between">
-                  <span className="text-soft" style={{ fontSize: '0.85rem' }}>
-                    Stopover {index + 1}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn-danger"
-                    style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
-                    onClick={() => removeStopover(index)}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="field">
-                  <label htmlFor={`entry-stopover-${index}-location`}>Location</label>
-                  <input
-                    id={`entry-stopover-${index}-location`}
-                    value={stopover.location}
-                    onChange={(e) => updateStopover(index, { location: e.target.value })}
-                    placeholder="e.g. Dubai (DXB)"
-                  />
-                </div>
-                <div className="row">
-                  <div className="field" style={{ flex: 1 }}>
-                    <label htmlFor={`entry-stopover-${index}-arrival`}>Arrival (this leg lands)</label>
-                    <DateTimeInput
-                      id={`entry-stopover-${index}-arrival`}
-                      value={stopover.arrivalAt}
-                      onChange={(value) => updateStopover(index, { arrivalAt: value })}
-                    />
+            {flights.map((flight, index) => (
+              <div key={index} className="stack" style={{ gap: 'var(--space-2)' }}>
+                <div className="card stack" style={{ padding: 'var(--space-2)', gap: 'var(--space-2)' }}>
+                  <div className="row-between">
+                    <span className="text-soft" style={{ fontSize: '0.85rem' }}>
+                      Flight {index + 1}
+                    </span>
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
+                        onClick={() => removeFlight(index)}
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
-                  <div className="field" style={{ flex: 1 }}>
-                    <label htmlFor={`entry-stopover-${index}-departure`}>Departure (next leg leaves)</label>
-                    <DateTimeInput
-                      id={`entry-stopover-${index}-departure`}
-                      value={stopover.departureAt}
-                      onChange={(value) => updateStopover(index, { departureAt: value })}
-                    />
+                  <div className="row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-dep-location`}>Departure location</label>
+                      <input
+                        id={`entry-flight-${index}-dep-location`}
+                        value={flight.departureLocation}
+                        onChange={(e) => updateFlight(index, { departureLocation: e.target.value })}
+                        placeholder="e.g. Stockholm (ARN)"
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-arr-location`}>Arrival location</label>
+                      <input
+                        id={`entry-flight-${index}-arr-location`}
+                        value={flight.arrivalLocation}
+                        onChange={(e) => updateFlight(index, { arrivalLocation: e.target.value })}
+                        placeholder="e.g. Phuket (HKT)"
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-departure`}>Departure</label>
+                      <DateTimeInput
+                        id={`entry-flight-${index}-departure`}
+                        value={flight.departureAt}
+                        timeRequired={false}
+                        onChange={(value) => updateFlight(index, { departureAt: value })}
+                        required
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-arrival`}>Arrival</label>
+                      <DateTimeInput
+                        id={`entry-flight-${index}-arrival`}
+                        value={flight.arrivalAt}
+                        timeRequired={false}
+                        onChange={(value) => updateFlight(index, { arrivalAt: value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-dep-tz`}>Departure timezone</label>
+                      <TimezoneSelect
+                        id={`entry-flight-${index}-dep-tz`}
+                        initialValue={flight.departureTimezone}
+                        onChange={(value) => updateFlight(index, { departureTimezone: value })}
+                        required
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-arr-tz`}>Arrival timezone</label>
+                      <TimezoneSelect
+                        id={`entry-flight-${index}-arr-tz`}
+                        initialValue={flight.arrivalTimezone}
+                        onChange={(value) => updateFlight(index, { arrivalTimezone: value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-number`}>Flight number</label>
+                      <input
+                        id={`entry-flight-${index}-number`}
+                        value={flight.flightNumber}
+                        onChange={(e) => updateFlight(index, { flightNumber: e.target.value })}
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-terminal`}>Terminal</label>
+                      <input
+                        id={`entry-flight-${index}-terminal`}
+                        value={flight.terminal}
+                        onChange={(e) => updateFlight(index, { terminal: e.target.value })}
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-gate`}>Gate</label>
+                      <input
+                        id={`entry-flight-${index}-gate`}
+                        value={flight.gate}
+                        onChange={(e) => updateFlight(index, { gate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="row">
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-platform`}>Platform</label>
+                      <input
+                        id={`entry-flight-${index}-platform`}
+                        value={flight.platform}
+                        onChange={(e) => updateFlight(index, { platform: e.target.value })}
+                      />
+                    </div>
+                    <div className="field" style={{ flex: 1 }}>
+                      <label htmlFor={`entry-flight-${index}-seat`}>Seat</label>
+                      <input
+                        id={`entry-flight-${index}-seat`}
+                        value={flight.seat}
+                        onChange={(e) => updateFlight(index, { seat: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="field">
-                  <label htmlFor={`entry-stopover-${index}-flight`}>Flight number (next leg)</label>
-                  <input
-                    id={`entry-stopover-${index}-flight`}
-                    value={stopover.flightNumber}
-                    onChange={(e) => updateStopover(index, { flightNumber: e.target.value })}
-                  />
-                </div>
+                {index < flights.length - 1 && (
+                  <div className="text-soft" style={{ fontSize: '0.85rem' }}>
+                    {stopoverGapLabel(flight, flights[index + 1])}
+                  </div>
+                )}
               </div>
             ))}
-            <button type="button" className="btn btn-outline" onClick={addStopover}>
-              + Add stopover
+            <button type="button" className="btn btn-outline" onClick={addFlight}>
+              + Add flight
             </button>
+          </div>
+
+          <div className="field">
+            <label htmlFor="entry-baggage">Baggage info</label>
+            <input id="entry-baggage" value={baggageInfo} onChange={(e) => setBaggageInfo(e.target.value)} />
           </div>
         </>
       )}

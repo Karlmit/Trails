@@ -184,10 +184,10 @@ data class TransportEntryRequest(
     val notes: String? = null,
     val postTripNotes: String? = null,
     val isPrivate: Boolean = false,
-    // User-requested: an optional connecting itinerary (stopovers, each
-    // with its own next-leg flight number) needs a nested JsonArray value
-    // -- unlike Stay/Activity's own typeDetails below, which stay flat
-    // Map<String, String> since neither needs anything richer.
+    // User-requested: every leg of the journey is its own Flight, needing
+    // a nested JsonArray value -- unlike Stay/Activity's own typeDetails
+    // below, which stay flat Map<String, String> since neither needs
+    // anything richer.
     val typeDetails: JsonObject = JsonObject(emptyMap()),
 )
 

@@ -27,52 +27,62 @@ export const TRANSPORT_MODES = [
   'TRANSPORT_OTHER',
 ] as const;
 
-// User-requested: an optional connecting itinerary -- 0 stopovers is
-// today's exact single-leg behavior (serviceNumber above is that one
-// flight's number); each stopover here represents landing at an
-// intermediate airport, waiting out the layover, then departing again on
-// the *next* leg, whose own number is this stopover's `flightNumber` (the
-// first leg's number stays the top-level `serviceNumber`, unchanged).
-// Deliberately no per-stopover timezone -- same "literal digits, not an
-// authoritative instant" treatment every other unzoned datetime field
-// already gets; only the entry's own startTimezone/endTimezone are ever
-// real instants. Not FLIGHT-only: trains/buses can have connections too.
+// User-requested redesign: every leg of the journey -- including the
+// first -- is one uniform Flight, instead of a full-fields "first flight"
+// plus bare-bones "stopovers" for the rest. The entry's own top-level
+// startAt/endAt/startTimezone/endTimezone (below) are computed by the
+// *client* from flights[0].departureAt and flights[last].arrivalAt (and
+// their timezones) -- this schema doesn't need to know that; it just
+// validates the flights array and the (unchanged) top-level pair
+// separately. A "stopover" is no longer entered data at all -- it's the
+// display of the gap between one flight's arrival and the next flight's
+// departure, computed client-side at render time. Not FLIGHT-only: trains/
+// buses can have connections too.
 //
-// `arrivalAt`/`departureAt` deliberately stay plain validated strings, NOT
+// `departureAt`/`arrivalAt` deliberately stay plain validated strings, NOT
 // `dateTimeField` -- that transforms to a real `Date`, and this whole
 // object round-trips through `typeDetails` (a schemaless Json column,
 // lib/entry-types/index.ts's `parsed.typeDetails as Prisma.InputJsonValue`
 // cast, no runtime serialization step of its own) rather than a real
 // Prisma column, so a nested Date here would be an untested edge case for
 // no benefit -- every other typeDetails field is already a plain string.
-const stopoverDateTimeField = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+const flightDateTimeField = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: 'Must be a valid date/time',
 });
 
-const transportStopoverSchema = z
+const transportFlightLegSchema = z
   .object({
-    location: z.string().trim().min(1, 'Stopover location is required').max(200),
-    arrivalAt: stopoverDateTimeField,
-    departureAt: stopoverDateTimeField,
+    departureLocation: z.string().trim().max(200).optional().nullable(),
+    departureAt: flightDateTimeField,
+    departureTimezone: entryTimezoneField,
+    arrivalLocation: z.string().trim().max(200).optional().nullable(),
+    arrivalAt: flightDateTimeField,
+    arrivalTimezone: entryTimezoneField,
     flightNumber: z.string().trim().max(100).optional().nullable(),
+    terminal: z.string().trim().max(100).optional().nullable(),
+    gate: z.string().trim().max(50).optional().nullable(),
+    platform: z.string().trim().max(50).optional().nullable(),
+    seat: z.string().trim().max(50).optional().nullable(),
   })
   .strict()
-  .refine((data) => new Date(data.departureAt).getTime() > new Date(data.arrivalAt).getTime(), {
-    message: 'Stopover departure must be later than its arrival',
-    path: ['departureAt'],
-  });
+  // Same relaxation as transportCreateSchema's own order check below: skip
+  // whenever this leg declares a real timezone on either end, since a
+  // long-haul flight's literal arrival clock time can read earlier than
+  // its departure's.
+  .refine(
+    (data) => (data.departureTimezone || data.arrivalTimezone ? true : new Date(data.arrivalAt).getTime() > new Date(data.departureAt).getTime()),
+    {
+      message: 'Arrival must be later than departure',
+      path: ['arrivalAt'],
+    },
+  );
 
 // AD-1: type-only fields for Transport, validated by exactly this schema.
 const transportTypeDetailsSchema = z
   .object({
-    terminal: z.string().trim().max(100).optional().nullable(),
-    gate: z.string().trim().max(50).optional().nullable(),
-    platform: z.string().trim().max(50).optional().nullable(),
-    serviceNumber: z.string().trim().max(100).optional().nullable(),
-    seat: z.string().trim().max(50).optional().nullable(),
     baggageInfo: z.string().trim().max(500).optional().nullable(),
-    // No realistic itinerary needs more than this many connections.
-    stopovers: z.array(transportStopoverSchema).max(10).optional(),
+    // No realistic itinerary needs more than this many legs.
+    flights: z.array(transportFlightLegSchema).min(1, 'At least one flight is required').max(10),
   })
   .strict();
 

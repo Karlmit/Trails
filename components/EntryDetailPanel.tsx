@@ -33,24 +33,31 @@ function hasNoSpecificTime(date: string, zone: string | null): boolean {
   return hour === 0 && minute === 0;
 }
 
-interface StopoverDTO {
-  location: string;
-  arrivalAt: string;
+interface FlightDTO {
+  departureLocation: string | null;
   departureAt: string;
+  departureTimezone: string | null;
+  arrivalLocation: string | null;
+  arrivalAt: string;
+  arrivalTimezone: string | null;
   flightNumber: string | null;
+  terminal: string | null;
+  gate: string | null;
+  platform: string | null;
+  seat: string | null;
 }
 
-// User-requested: an optional connecting itinerary for Transport
-// (lib/entry-types/transport.schema.ts's `stopovers`). Its `arrivalAt`/
-// `departureAt` are deliberately plain, never converted to a real Date
-// server-side (that schema's own comment) -- but the *client* that wrote
-// them isn't necessarily this one: the Android app's own date-time picker
-// emits a full `Instant.toString()` (seconds + trailing "Z"), while this
-// web form's DateTimeInput emits bare `YYYY-MM-DDTHH:mm`. Both are valid
-// literal-digit representations of the same moment, so parsing pulls the
-// digits out with a regex rather than assuming either exact shape (a naive
-// string-append here previously broke on the Android-authored shape).
-function formatStopoverTime(value: string): string {
+// User-requested redesign: every leg of a Transport entry
+// (lib/entry-types/transport.schema.ts's `flights`) is one uniform Flight.
+// `departureAt`/`arrivalAt` are deliberately plain, never converted to a
+// real Date server-side (that schema's own comment) -- but the *client*
+// that wrote them isn't necessarily this one: the Android app's own
+// date-time picker emits a full `Instant.toString()` (seconds + trailing
+// "Z"), while this web form's DateTimeInput emits bare `YYYY-MM-DDTHH:mm`.
+// Both are valid literal-digit representations of the same moment, so
+// parsing pulls the digits out with a regex rather than assuming either
+// exact shape.
+function formatFlightTime(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
   if (!match) return value;
   const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00Z`);
@@ -63,6 +70,16 @@ function formatStopoverTime(value: string): string {
     hour12: false,
     timeZone: 'UTC',
   }).format(date);
+}
+
+function flightDetailsLine(flight: FlightDTO): string | null {
+  const parts = [
+    flight.terminal && `Terminal ${flight.terminal}`,
+    flight.gate && `Gate ${flight.gate}`,
+    flight.platform && `Platform ${flight.platform}`,
+    flight.seat && `Seat ${flight.seat}`,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 // FR-11-FR-15: view/edit/delete a single Entry. Same view<->edit toggle
@@ -208,29 +225,39 @@ export function EntryDetailPanel({
         </dl>
 
         {entry.entryType === 'TRANSPORT' &&
-          Array.isArray(entry.typeDetails?.stopovers) &&
-          (entry.typeDetails.stopovers as StopoverDTO[]).length > 0 && (
+          Array.isArray(entry.typeDetails?.flights) &&
+          (entry.typeDetails.flights as FlightDTO[]).length > 1 && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
                 Itinerary
               </dt>
-              <dd className="stack" style={{ margin: 0, gap: 'var(--space-1)' }}>
+              <dd className="stack" style={{ margin: 0, gap: 'var(--space-2)' }}>
                 {(() => {
-                  const stopovers = entry.typeDetails.stopovers as StopoverDTO[];
-                  const firstFlightNumber = typeof entry.typeDetails.serviceNumber === 'string' ? entry.typeDetails.serviceNumber : null;
-                  return (
-                    <>
-                      <div>{firstFlightNumber ? `✈ ${firstFlightNumber}` : '✈ Flight 1'}</div>
-                      {stopovers.map((stopover, index) => (
-                        <div key={index}>
-                          <div className="text-soft">
-                            ⏱ {stopover.location} · {formatStopoverTime(stopover.arrivalAt)} – {formatStopoverTime(stopover.departureAt)}
-                          </div>
-                          <div>{stopover.flightNumber ? `✈ ${stopover.flightNumber}` : `✈ Flight ${index + 2}`}</div>
-                        </div>
-                      ))}
-                    </>
-                  );
+                  const flights = entry.typeDetails.flights as FlightDTO[];
+                  return flights.map((flight, index) => (
+                    <div key={index} className="stack" style={{ gap: 'var(--space-1)' }}>
+                      <div>
+                        ✈ {flight.flightNumber || `Flight ${index + 1}`}
+                        {flightDetailsLine(flight) && <span className="text-soft"> · {flightDetailsLine(flight)}</span>}
+                      </div>
+                      <div className="text-soft">
+                        {[flight.departureLocation, formatFlightTime(flight.departureAt)].filter(Boolean).join(' ')}
+                        {' → '}
+                        {[flight.arrivalLocation, formatFlightTime(flight.arrivalAt)].filter(Boolean).join(' ')}
+                      </div>
+                      {index < flights.length - 1 &&
+                        (() => {
+                          const next = flights[index + 1];
+                          const location = flight.arrivalLocation || next.departureLocation;
+                          return (
+                            <div className="text-soft">
+                              ⏱ Stopover{location ? ` at ${location}` : ''}: {formatFlightTime(flight.arrivalAt)} –{' '}
+                              {formatFlightTime(next.departureAt)}
+                            </div>
+                          );
+                        })()}
+                    </div>
+                  ));
                 })()}
               </dd>
             </div>

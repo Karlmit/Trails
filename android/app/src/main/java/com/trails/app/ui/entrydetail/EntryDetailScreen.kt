@@ -131,28 +131,43 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                 state.typeDetails.forEach { (key, value) ->
                     if (value.isNotBlank()) Field(key, value)
                 }
-                // User-requested: an optional connecting itinerary for
-                // Transport -- see TransportStopovers.kt's own comment.
-                if (state.stopovers.isNotEmpty()) {
+                // User-requested redesign: every leg -- including the
+                // first -- is one uniform Flight; a single Flight is
+                // today's exact plain behavior, so this only shows once
+                // there's a real itinerary to break down. See
+                // TransportFlights.kt's own comment.
+                if (state.flights.size > 1) {
                     Column {
                         Text("ITINERARY", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
-                        val firstFlightNumber = state.typeDetails["serviceNumber"]
-                        Text(
-                            if (!firstFlightNumber.isNullOrBlank()) "✈ $firstFlightNumber" else "✈ Flight 1",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TrailsColors.Text,
-                        )
-                        state.stopovers.forEachIndexed { index, stopover ->
+                        state.flights.forEachIndexed { index, flight ->
                             Text(
-                                "⏱ ${stopover.location} · ${formatStopoverDateTime(stopover.arrivalAt)} – ${formatStopoverDateTime(stopover.departureAt)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TrailsColors.TextSoft,
-                            )
-                            Text(
-                                stopover.flightNumber.takeIf { it.isNotBlank() }?.let { "✈ $it" } ?: "✈ Flight ${index + 2}",
+                                flight.flightNumber.takeIf { it.isNotBlank() }?.let { "✈ $it" } ?: "✈ Flight ${index + 1}",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = TrailsColors.Text,
                             )
+                            val details = listOfNotNull(
+                                flight.terminal.takeIf { it.isNotBlank() }?.let { "Terminal $it" },
+                                flight.gate.takeIf { it.isNotBlank() }?.let { "Gate $it" },
+                                flight.platform.takeIf { it.isNotBlank() }?.let { "Platform $it" },
+                                flight.seat.takeIf { it.isNotBlank() }?.let { "Seat $it" },
+                            ).joinToString(" · ")
+                            val departure = listOf(flight.departureLocation, formatStopoverDateTime(flight.departureAt)).filter { it.isNotBlank() }.joinToString(" ")
+                            val arrival = listOf(flight.arrivalLocation, formatStopoverDateTime(flight.arrivalAt)).filter { it.isNotBlank() }.joinToString(" ")
+                            Text(
+                                "$departure → $arrival",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TrailsColors.TextSoft,
+                            )
+                            if (details.isNotEmpty()) {
+                                Text(details, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+                            }
+                            if (index < state.flights.lastIndex) {
+                                Text(
+                                    stopoverGapLabel(flight, state.flights[index + 1]),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TrailsColors.TextSoft,
+                                )
+                            }
                         }
                     }
                 }

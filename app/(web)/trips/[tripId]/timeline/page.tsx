@@ -110,34 +110,39 @@ function stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: string): stri
   return parts.join(' · ');
 }
 
-// User-requested: an optional connecting itinerary -- shown as a
-// multi-line subtitle on the departure day only (the arrival day keeps
-// its own plain "Title · Arrival HH:MM" line, unchanged). Deliberately a
-// plain string literal parse, not a real Date/zone conversion -- see
-// lib/entry-types/transport.schema.ts's own comment on why stopover times
-// are never transformed server-side either.
+// User-requested redesign: every leg -- including the first -- is one
+// uniform Flight, shown as a multi-line subtitle on the departure day
+// only (the arrival day keeps its own plain "Title · Arrival HH:MM" line,
+// unchanged). Deliberately a plain string literal parse, not a real
+// Date/zone conversion -- see lib/entry-types/transport.schema.ts's own
+// comment on why flight times are never transformed server-side either.
 function formatStopoverClock(value: string): string {
   const match = /T(\d{2}):(\d{2})/.exec(value);
   return match ? `${match[1]}:${match[2]}` : value;
 }
 
-interface StopoverForTimeline {
-  location: string;
-  arrivalAt: string;
+interface FlightForTimeline {
+  departureLocation: string | null;
   departureAt: string;
+  arrivalLocation: string | null;
+  arrivalAt: string;
   flightNumber: string | null;
 }
 
 function transportItinerarySubtitle(typeDetails: unknown): string | null {
-  const details = typeDetails as { serviceNumber?: unknown; stopovers?: unknown } | null | undefined;
-  const stopovers = Array.isArray(details?.stopovers) ? (details.stopovers as StopoverForTimeline[]) : [];
-  if (stopovers.length === 0) return null;
+  const details = typeDetails as { flights?: unknown } | null | undefined;
+  const flights = Array.isArray(details?.flights) ? (details.flights as FlightForTimeline[]) : [];
+  // A single Flight is today's exact plain behavior -- no breakdown needed.
+  if (flights.length <= 1) return null;
 
-  const firstFlightNumber = typeof details?.serviceNumber === 'string' ? details.serviceNumber : null;
-  const lines = [firstFlightNumber ? `✈ ${firstFlightNumber}` : '✈ Flight 1'];
-  stopovers.forEach((stopover, index) => {
-    lines.push(`⏱ ${stopover.location} · ${formatStopoverClock(stopover.arrivalAt)}–${formatStopoverClock(stopover.departureAt)}`);
-    lines.push(stopover.flightNumber ? `✈ ${stopover.flightNumber}` : `✈ Flight ${index + 2}`);
+  const lines: string[] = [];
+  flights.forEach((flight, index) => {
+    if (index > 0) {
+      const prev = flights[index - 1];
+      const location = prev.arrivalLocation || flight.departureLocation;
+      lines.push(`⏱ ${location ? `${location} · ` : ''}${formatStopoverClock(prev.arrivalAt)}–${formatStopoverClock(flight.departureAt)}`);
+    }
+    lines.push(flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`);
   });
   return lines.join('\n');
 }

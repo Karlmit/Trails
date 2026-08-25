@@ -297,73 +297,87 @@ describe('lib/entry-types/*.schema.ts', () => {
       expect(result.success).toBe(false);
     });
 
-    // User-requested: an optional connecting itinerary -- 0 stopovers is
-    // untouched (every test above omits typeDetails entirely and still
-    // passes), N stopovers describe N+1 legs (serviceNumber is leg 1,
-    // each stopover's own flightNumber is the next leg).
-    describe('typeDetails.stopovers', () => {
-      it('accepts a valid multi-stopover itinerary', () => {
+    // User-requested redesign: every leg -- including the first -- is one
+    // uniform Flight; a "stopover" is just the computed display of the
+    // gap between two adjacent Flights, not its own entered data.
+    describe('typeDetails.flights', () => {
+      it('accepts a valid multi-flight itinerary', () => {
         const result = transportCreateSchema.safeParse({
           ...base,
           endAt: '2026-08-03T20:00:00.000Z',
           typeDetails: {
-            serviceNumber: 'BA123',
-            stopovers: [
-              { location: 'Dubai (DXB)', arrivalAt: '2026-08-03T14:00', departureAt: '2026-08-03T15:30', flightNumber: 'EK456' },
+            flights: [
+              { departureAt: '2026-08-03T10:00', arrivalAt: '2026-08-03T12:00', flightNumber: 'BA123' },
+              { departureAt: '2026-08-03T15:30', arrivalAt: '2026-08-03T20:00', flightNumber: 'EK456' },
             ],
           },
         });
         expect(result.success).toBe(true);
         if (result.success) {
-          expect(result.data.typeDetails?.stopovers).toHaveLength(1);
-          expect(result.data.typeDetails?.stopovers?.[0]?.flightNumber).toBe('EK456');
+          expect(result.data.typeDetails?.flights).toHaveLength(2);
+          expect(result.data.typeDetails?.flights?.[1]?.flightNumber).toBe('EK456');
         }
       });
 
-      it('accepts an entry with no stopovers at all (0-stopover default)', () => {
+      it('rejects typeDetails with no flights at all', () => {
         const result = transportCreateSchema.safeParse({
           ...base,
           endAt: '2026-08-03T10:00:00.000Z',
-          typeDetails: { serviceNumber: 'BA123' },
+          typeDetails: { flights: [] },
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('rejects a flight missing its departure or arrival time', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            flights: [{ departureAt: '2026-08-03T14:00', arrivalAt: '' }],
+          },
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('rejects a flight whose arrival is not later than its own departure, with no timezone set', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            flights: [{ departureAt: '2026-08-03T15:30', arrivalAt: '2026-08-03T14:00' }],
+          },
+        });
+        expect(result.success).toBe(false);
+      });
+
+      it('accepts a flight whose literal arrival reads earlier than departure when either zone is set', () => {
+        const result = transportCreateSchema.safeParse({
+          ...base,
+          endAt: '2026-08-03T20:00:00.000Z',
+          typeDetails: {
+            flights: [
+              {
+                departureAt: '2026-08-03T22:00',
+                departureTimezone: 'Europe/Stockholm',
+                arrivalAt: '2026-08-04T06:00',
+                arrivalTimezone: 'Asia/Bangkok',
+              },
+            ],
+          },
         });
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.typeDetails?.stopovers).toBeUndefined();
-        }
       });
 
-      it('rejects a stopover missing its location', () => {
-        const result = transportCreateSchema.safeParse({
-          ...base,
-          endAt: '2026-08-03T20:00:00.000Z',
-          typeDetails: {
-            stopovers: [{ location: '', arrivalAt: '2026-08-03T14:00', departureAt: '2026-08-03T15:30' }],
-          },
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it('rejects a stopover whose departure is not later than its arrival', () => {
-        const result = transportCreateSchema.safeParse({
-          ...base,
-          endAt: '2026-08-03T20:00:00.000Z',
-          typeDetails: {
-            stopovers: [{ location: 'Dubai (DXB)', arrivalAt: '2026-08-03T15:30', departureAt: '2026-08-03T14:00' }],
-          },
-        });
-        expect(result.success).toBe(false);
-      });
-
-      it('rejects more than 10 stopovers', () => {
-        const stopovers = Array.from({ length: 11 }, (_, i) => ({
-          location: `Stop ${i}`,
-          arrivalAt: '2026-08-03T14:00',
-          departureAt: '2026-08-03T15:30',
+      it('rejects more than 10 flights', () => {
+        const flights = Array.from({ length: 11 }, (_, i) => ({
+          departureAt: '2026-08-03T14:00',
+          arrivalAt: '2026-08-03T15:30',
+          flightNumber: `Flight ${i}`,
         }));
         const result = transportCreateSchema.safeParse({
           ...base,
           endAt: '2026-08-03T20:00:00.000Z',
-          typeDetails: { stopovers },
+          typeDetails: { flights },
         });
         expect(result.success).toBe(false);
       });

@@ -1,14 +1,11 @@
 package com.trails.app.ui.timeline.graph
 
 import com.trails.app.ui.entrydetail.formatStopoverClock
-import com.trails.app.ui.entrydetail.parseStopovers
+import com.trails.app.ui.entrydetail.parseFlights
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 
 /** lib/trip-status.ts::entryEndpointClockTime -- zone null reads literal wall-clock digits, no conversion. */
 fun entryClockTime(isoDateTime: String, zone: String?): Pair<Int, Int> {
@@ -68,23 +65,24 @@ private fun stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: String): S
     return parts.joinToString(" · ")
 }
 
-// User-requested: an optional connecting itinerary -- shown as a
-// multi-line subtitle on the departure day only (the arrival day keeps
-// its own plain "Title · Arrival HH:MM" line, unchanged). Mirrors
+// User-requested redesign: every leg -- including the first -- is one
+// uniform Flight, shown as a multi-line subtitle on the departure day only
+// (the arrival day keeps its own plain "Title · Arrival HH:MM" line,
+// unchanged). Mirrors
 // app/(web)/trips/[tripId]/timeline/page.tsx::transportItinerarySubtitle.
 private fun transportItinerarySubtitle(typeDetailsJson: String?): String? {
-    val stopovers = parseStopovers(typeDetailsJson)
-    if (stopovers.isEmpty()) return null
+    val flights = parseFlights(typeDetailsJson)
+    // A single Flight is today's exact plain behavior -- no breakdown needed.
+    if (flights.size <= 1) return null
 
-    val firstFlightNumber = runCatching {
-        val root = Json.parseToJsonElement(typeDetailsJson!!).jsonObject
-        (root["serviceNumber"] as? JsonPrimitive)?.content
-    }.getOrNull()
-
-    val lines = mutableListOf(if (!firstFlightNumber.isNullOrBlank()) "✈ $firstFlightNumber" else "✈ Flight 1")
-    stopovers.forEachIndexed { index, stopover ->
-        lines += "⏱ ${stopover.location} · ${formatStopoverClock(stopover.arrivalAt)}–${formatStopoverClock(stopover.departureAt)}"
-        lines += if (stopover.flightNumber.isNotBlank()) "✈ ${stopover.flightNumber}" else "✈ Flight ${index + 2}"
+    val lines = mutableListOf<String>()
+    flights.forEachIndexed { index, flight ->
+        if (index > 0) {
+            val prev = flights[index - 1]
+            val location = prev.arrivalLocation.ifBlank { flight.departureLocation }
+            lines += "⏱ ${if (location.isNotBlank()) "$location · " else ""}${formatStopoverClock(prev.arrivalAt)}–${formatStopoverClock(flight.departureAt)}"
+        }
+        lines += if (flight.flightNumber.isNotBlank()) "✈ ${flight.flightNumber}" else "✈ Flight ${index + 1}"
     }
     return lines.joinToString("\n")
 }

@@ -49,12 +49,12 @@ private fun entryTypeEmoji(entryType: String) = when (entryType) {
 }
 
 // DateTimePickerField needs a full `Instant.parse`-able string (seconds +
-// trailing "Z") -- a stopover created on the *web* app instead stores a
-// bare `YYYY-MM-DDTHH:mm` (see TransportStopovers.kt's own comment on why
-// stopover times are never normalized server-side). Silently falls back
+// trailing "Z") -- a Flight created on the *web* app instead stores a
+// bare `YYYY-MM-DDTHH:mm` (see TransportFlights.kt's own comment on why
+// flight times are never normalized server-side). Silently falls back
 // to "now" otherwise, which would then overwrite the real stored value
 // the moment this field is saved -- append seconds+Z first so editing a
-// web-created stopover here round-trips correctly.
+// web-created Flight here round-trips correctly.
 private fun asPickerInstant(value: String): String {
     if (value.isEmpty()) return value
     return runCatching { java.time.Instant.parse(value); value }
@@ -124,17 +124,18 @@ fun EntryEditScreen(
         }
         MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
 
-        DateTimePickerField(label = if (isTransport) "Departure" else "Start", isoDateTime = state.startAt, onDateTimeChange = viewModel::onStartAtChange)
-        if (!isNote) {
-            DateTimePickerField(
-                label = if (isTransport) "Arrival" else if (isStay) "Check-out" else "End (optional)",
-                isoDateTime = state.endAt.ifBlank { state.startAt },
-                onDateTimeChange = viewModel::onEndAtChange,
-            )
-        }
-        if (isTransport) {
-            LabeledField(label = "Departure timezone (IANA, optional)", value = state.startTimezone, onValueChange = viewModel::onStartTimezoneChange)
-            LabeledField(label = "Arrival timezone (IANA, optional)", value = state.endTimezone, onValueChange = viewModel::onEndTimezoneChange)
+        // Transport no longer shows a top-level Departure/Arrival picker at
+        // all -- Flight 1's own departure/arrival (below) becomes the
+        // entry's own startAt/endAt (computed in EntryEditViewModel).
+        if (!isTransport) {
+            DateTimePickerField(label = "Start", isoDateTime = state.startAt, onDateTimeChange = viewModel::onStartAtChange)
+            if (!isNote) {
+                DateTimePickerField(
+                    label = if (isStay) "Check-out" else "End (optional)",
+                    isoDateTime = state.endAt.ifBlank { state.startAt },
+                    onDateTimeChange = viewModel::onEndAtChange,
+                )
+            }
         }
 
         if (!isNote) {
@@ -176,47 +177,87 @@ fun EntryEditScreen(
             LabeledField(label = "Room info", value = state.roomInfo, onValueChange = viewModel::onRoomInfoChange)
         }
         if (isTransport) {
-            LabeledField(label = "Terminal", value = state.terminal, onValueChange = viewModel::onTerminalChange)
-            LabeledField(label = "Gate", value = state.gate, onValueChange = viewModel::onGateChange)
-            LabeledField(label = "Platform", value = state.platform, onValueChange = viewModel::onPlatformChange)
-            LabeledField(label = "Service number", value = state.serviceNumber, onValueChange = viewModel::onServiceNumberChange)
-            LabeledField(label = "Seat", value = state.seat, onValueChange = viewModel::onSeatChange)
-            LabeledField(label = "Baggage info", value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
-
-            // User-requested: an optional connecting itinerary -- each
-            // stopover is an intermediate landing, then the *next* leg's
-            // own flight number (the first leg's number is Service number
-            // above, unchanged). 0 stopovers is today's exact behavior.
-            Text("STOPOVERS (OPTIONAL)", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
-            state.stopovers.forEachIndexed { index, stopover ->
+            // User-requested redesign: every leg -- including the first --
+            // is one uniform Flight card, instead of a full-fields first
+            // leg plus bare-bones stopovers for the rest. The gap between
+            // two Flights is shown as a computed, read-only line rather
+            // than separately entered data.
+            Text("FLIGHTS", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+            state.flights.forEachIndexed { index, flight ->
                 TrailsCard {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Stopover ${index + 1}", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
-                        TextButton(onClick = { viewModel.removeStopover(index) }) { Text("Remove") }
+                        Text("Flight ${index + 1}", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+                        if (index > 0) {
+                            TextButton(onClick = { viewModel.removeFlight(index) }) { Text("Remove") }
+                        }
                     }
                     LabeledField(
-                        label = "Location",
-                        value = stopover.location,
-                        onValueChange = { viewModel.updateStopover(index, stopover.copy(location = it)) },
+                        label = "Departure location",
+                        value = flight.departureLocation,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(departureLocation = it)) },
                     )
                     DateTimePickerField(
-                        label = "Arrival (this leg lands)",
-                        isoDateTime = asPickerInstant(stopover.arrivalAt),
-                        onDateTimeChange = { viewModel.updateStopover(index, stopover.copy(arrivalAt = it)) },
-                    )
-                    DateTimePickerField(
-                        label = "Departure (next leg leaves)",
-                        isoDateTime = asPickerInstant(stopover.departureAt),
-                        onDateTimeChange = { viewModel.updateStopover(index, stopover.copy(departureAt = it)) },
+                        label = "Departure",
+                        isoDateTime = asPickerInstant(flight.departureAt),
+                        onDateTimeChange = { viewModel.updateFlight(index, flight.copy(departureAt = it)) },
                     )
                     LabeledField(
-                        label = "Flight number (next leg)",
-                        value = stopover.flightNumber,
-                        onValueChange = { viewModel.updateStopover(index, stopover.copy(flightNumber = it)) },
+                        label = "Departure timezone (IANA, optional)",
+                        value = flight.departureTimezone,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(departureTimezone = it)) },
+                    )
+                    LabeledField(
+                        label = "Arrival location",
+                        value = flight.arrivalLocation,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(arrivalLocation = it)) },
+                    )
+                    DateTimePickerField(
+                        label = "Arrival",
+                        isoDateTime = asPickerInstant(flight.arrivalAt),
+                        onDateTimeChange = { viewModel.updateFlight(index, flight.copy(arrivalAt = it)) },
+                    )
+                    LabeledField(
+                        label = "Arrival timezone (IANA, optional)",
+                        value = flight.arrivalTimezone,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(arrivalTimezone = it)) },
+                    )
+                    LabeledField(
+                        label = "Flight number",
+                        value = flight.flightNumber,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(flightNumber = it)) },
+                    )
+                    LabeledField(
+                        label = "Terminal",
+                        value = flight.terminal,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(terminal = it)) },
+                    )
+                    LabeledField(
+                        label = "Gate",
+                        value = flight.gate,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(gate = it)) },
+                    )
+                    LabeledField(
+                        label = "Platform",
+                        value = flight.platform,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(platform = it)) },
+                    )
+                    LabeledField(
+                        label = "Seat",
+                        value = flight.seat,
+                        onValueChange = { viewModel.updateFlight(index, flight.copy(seat = it)) },
+                    )
+                }
+                if (index < state.flights.lastIndex) {
+                    Text(
+                        stopoverGapLabel(flight, state.flights[index + 1]),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.TextSoft,
                     )
                 }
             }
-            TextButton(onClick = viewModel::addStopover) { Text("+ Add stopover") }
+            TextButton(onClick = viewModel::addFlight) { Text("+ Add flight") }
+
+            LabeledField(label = "Baggage info", value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
         }
 
         LabeledField(label = "Contact name", value = state.contactName, onValueChange = viewModel::onContactNameChange)

@@ -352,8 +352,8 @@ export function stripEntryFieldsForGuest<
     contactEmail: null,
     notes: null,
     postTripNotes: null,
-    // A Stay's roomInfo or a Transport's seat/gate/terminal/serviceNumber/
-    // baggageInfo are type-specific fields carried in this bag -- not one
+    // A Stay's roomInfo or a Transport's flights/baggageInfo are
+    // type-specific fields carried in this bag -- not one
     // of the 13 named fields above, but just as out-of-scope for a Guest
     // (Intent: only Title/dates/Location/Photos are Guest-visible). Reset
     // to `{}` rather than `null` so it stays indistinguishable from an

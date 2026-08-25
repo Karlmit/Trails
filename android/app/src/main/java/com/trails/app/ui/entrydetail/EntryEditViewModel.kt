@@ -80,15 +80,13 @@ data class EntryEditState(
     val isPrivate: Boolean = false,
     // typeDetails, flattened -- only the keys relevant to [entryType] are ever read/sent.
     val roomInfo: String = "",
-    val terminal: String = "",
-    val gate: String = "",
-    val platform: String = "",
-    val serviceNumber: String = "",
-    val seat: String = "",
     val baggageInfo: String = "",
-    // User-requested: an optional connecting itinerary -- see
-    // TransportStopovers.kt's own doc comment.
-    val stopovers: List<StopoverDraft> = emptyList(),
+    // User-requested redesign: every leg of a Transport entry -- including
+    // the first -- is one uniform Flight (see TransportFlights.kt's own
+    // doc comment). Defaults to one blank Flight (rather than an empty
+    // list) so a brand-new Transport entry always has a card to fill in,
+    // matching the web form's own default.
+    val flights: List<FlightDraft> = listOf(FlightDraft()),
     val links: List<LinkFieldItem> = emptyList(),
     val saving: Boolean = false,
     val error: String? = null,
@@ -151,6 +149,30 @@ class EntryEditViewModel @Inject constructor(
     private fun loadFrom(existing: TimelineEntryEntity) {
         if (_state.value.title.isNotEmpty() || _state.value.locationName.isNotEmpty()) return
         val typeDetails = parseFlatTypeDetails(existing.typeDetailsJson)
+        // An entry saved before the Flights redesign (plain top-level
+        // Departure/Arrival + flat terminal/gate/platform/serviceNumber/
+        // seat, no `flights` array yet) -- synthesize exactly one Flight
+        // from those instead. There's no per-flight location data to
+        // recover from that old shape, so both stay blank.
+        val flights = parseFlights(existing.typeDetailsJson).ifEmpty {
+            if (existing.entryType == "TRANSPORT") {
+                listOf(
+                    FlightDraft(
+                        departureAt = existing.startAt,
+                        departureTimezone = existing.startTimezone.orEmpty(),
+                        arrivalAt = existing.endAt.orEmpty(),
+                        arrivalTimezone = existing.endTimezone.orEmpty(),
+                        flightNumber = typeDetails["serviceNumber"].orEmpty(),
+                        terminal = typeDetails["terminal"].orEmpty(),
+                        gate = typeDetails["gate"].orEmpty(),
+                        platform = typeDetails["platform"].orEmpty(),
+                        seat = typeDetails["seat"].orEmpty(),
+                    ),
+                )
+            } else {
+                emptyList()
+            }
+        }
         _state.value = _state.value.copy(
             entryType = existing.entryType,
             subtype = existing.subtype ?: subtypesFor(existing.entryType).firstOrNull().orEmpty(),
@@ -177,13 +199,8 @@ class EntryEditViewModel @Inject constructor(
             postTripNotes = existing.postTripNotes.orEmpty(),
             isPrivate = existing.isPrivate,
             roomInfo = typeDetails["roomInfo"].orEmpty(),
-            terminal = typeDetails["terminal"].orEmpty(),
-            gate = typeDetails["gate"].orEmpty(),
-            platform = typeDetails["platform"].orEmpty(),
-            serviceNumber = typeDetails["serviceNumber"].orEmpty(),
-            seat = typeDetails["seat"].orEmpty(),
             baggageInfo = typeDetails["baggageInfo"].orEmpty(),
-            stopovers = parseStopovers(existing.typeDetailsJson),
+            flights = flights,
         )
         originalFields = fieldsOf(_state.value)
     }
@@ -216,23 +233,18 @@ class EntryEditViewModel @Inject constructor(
     fun onPostTripNotesChange(v: String) { _state.value = _state.value.copy(postTripNotes = v) }
     fun onIsPrivateChange(v: Boolean) { _state.value = _state.value.copy(isPrivate = v) }
     fun onRoomInfoChange(v: String) { _state.value = _state.value.copy(roomInfo = v) }
-    fun onTerminalChange(v: String) { _state.value = _state.value.copy(terminal = v) }
-    fun onGateChange(v: String) { _state.value = _state.value.copy(gate = v) }
-    fun onPlatformChange(v: String) { _state.value = _state.value.copy(platform = v) }
-    fun onServiceNumberChange(v: String) { _state.value = _state.value.copy(serviceNumber = v) }
-    fun onSeatChange(v: String) { _state.value = _state.value.copy(seat = v) }
     fun onBaggageInfoChange(v: String) { _state.value = _state.value.copy(baggageInfo = v) }
 
-    fun addStopover() {
-        _state.value = _state.value.copy(stopovers = _state.value.stopovers + StopoverDraft())
+    fun addFlight() {
+        _state.value = _state.value.copy(flights = _state.value.flights + FlightDraft())
     }
-    fun updateStopover(index: Int, patch: StopoverDraft) {
+    fun updateFlight(index: Int, patch: FlightDraft) {
         _state.value = _state.value.copy(
-            stopovers = _state.value.stopovers.mapIndexed { i, s -> if (i == index) patch else s },
+            flights = _state.value.flights.mapIndexed { i, f -> if (i == index) patch else f },
         )
     }
-    fun removeStopover(index: Int) {
-        _state.value = _state.value.copy(stopovers = _state.value.stopovers.filterIndexed { i, _ -> i != index })
+    fun removeFlight(index: Int) {
+        _state.value = _state.value.copy(flights = _state.value.flights.filterIndexed { i, _ -> i != index })
     }
 
     fun addLink(url: String, label: String?) {
@@ -262,29 +274,22 @@ class EntryEditViewModel @Inject constructor(
 
     private fun typeDetailsFor(current: EntryEditState): Map<String, String> = when (current.entryType) {
         "STAY" -> mapOf("roomInfo" to current.roomInfo.trim()).filterValues { it.isNotEmpty() }
-        "TRANSPORT" -> mapOf(
-            "terminal" to current.terminal.trim(),
-            "gate" to current.gate.trim(),
-            "platform" to current.platform.trim(),
-            "serviceNumber" to current.serviceNumber.trim(),
-            "seat" to current.seat.trim(),
-            "baggageInfo" to current.baggageInfo.trim(),
-        ).filterValues { it.isNotEmpty() }
         else -> emptyMap()
     }
+
+    // Transport's own startAt/endAt are no longer directly editable --
+    // they're computed from the first/last Flight that actually has both
+    // of its own times set, matching what the User can see on-screen.
+    private fun validFlightsOf(current: EntryEditState): List<FlightDraft> =
+        current.flights.filter { it.departureAt.isNotBlank() && it.arrivalAt.isNotBlank() }
 
     // TRANSPORT only -- see TransportEntryRequest.typeDetails's own
     // comment on why this needs a real JsonObject rather than the flat
     // Map<String, String> [typeDetailsFor] returns for Stay/Activity.
     private fun transportTypeDetailsFor(current: EntryEditState): JsonObject = JsonObject(
         buildMap {
-            put("terminal", current.terminal.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("gate", current.gate.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("platform", current.platform.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("serviceNumber", current.serviceNumber.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("seat", current.seat.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
             put("baggageInfo", current.baggageInfo.trim().takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("stopovers", stopoversToJsonArray(current.stopovers))
+            put("flights", flightsToJsonArray(validFlightsOf(current)))
         },
     )
 
@@ -330,35 +335,40 @@ class EntryEditViewModel @Inject constructor(
                 typeDetails = typeDetailsFor(current),
             ),
         )
-        "TRANSPORT" -> TimelineEntryWriteRequest.Transport(
-            TransportEntryRequest(
-                tripId = tripId,
-                subtype = current.subtype,
-                title = current.locationName.trim(),
-                description = current.description.trim().takeIf { it.isNotEmpty() },
-                startAt = current.startAt,
-                endAt = current.endAt,
-                startTimezone = current.startTimezone.trim().takeIf { it.isNotEmpty() },
-                endTimezone = current.endTimezone.trim().takeIf { it.isNotEmpty() },
-                locationName = current.locationName.trim(),
-                locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
-                locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
-                bookingReference = current.bookingReference.trim().takeIf { it.isNotEmpty() },
-                website = current.website.trim().takeIf { it.isNotEmpty() },
-                bookedVia = current.bookedVia.trim().takeIf { it.isNotEmpty() },
-                expenseAmount = current.expenseAmount.toDoubleOrNull(),
-                expenseCurrency = current.expenseCurrency.trim().takeIf { it.isNotEmpty() },
-                expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { it.isNotEmpty() },
-                expensePaymentNote = current.expensePaymentNote.trim().takeIf { it.isNotEmpty() },
-                contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
-                contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
-                contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
-                notes = current.notes.trim().takeIf { it.isNotEmpty() },
-                postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
-                isPrivate = current.isPrivate,
-                typeDetails = transportTypeDetailsFor(current),
-            ),
-        )
+        "TRANSPORT" -> {
+            val validFlights = validFlightsOf(current)
+            val firstFlight = validFlights.firstOrNull() ?: FlightDraft()
+            val lastFlight = validFlights.lastOrNull() ?: firstFlight
+            TimelineEntryWriteRequest.Transport(
+                TransportEntryRequest(
+                    tripId = tripId,
+                    subtype = current.subtype,
+                    title = current.locationName.trim(),
+                    description = current.description.trim().takeIf { it.isNotEmpty() },
+                    startAt = firstFlight.departureAt,
+                    endAt = lastFlight.arrivalAt,
+                    startTimezone = firstFlight.departureTimezone.trim().takeIf { it.isNotEmpty() },
+                    endTimezone = lastFlight.arrivalTimezone.trim().takeIf { it.isNotEmpty() },
+                    locationName = current.locationName.trim(),
+                    locationAddress = current.locationAddress.trim().takeIf { it.isNotEmpty() },
+                    locationMapLink = current.locationMapLink.trim().takeIf { it.isNotEmpty() },
+                    bookingReference = current.bookingReference.trim().takeIf { it.isNotEmpty() },
+                    website = current.website.trim().takeIf { it.isNotEmpty() },
+                    bookedVia = current.bookedVia.trim().takeIf { it.isNotEmpty() },
+                    expenseAmount = current.expenseAmount.toDoubleOrNull(),
+                    expenseCurrency = current.expenseCurrency.trim().takeIf { it.isNotEmpty() },
+                    expensePaymentStatus = current.expensePaymentStatus.trim().takeIf { it.isNotEmpty() },
+                    expensePaymentNote = current.expensePaymentNote.trim().takeIf { it.isNotEmpty() },
+                    contactName = current.contactName.trim().takeIf { it.isNotEmpty() },
+                    contactPhone = current.contactPhone.trim().takeIf { it.isNotEmpty() },
+                    contactEmail = current.contactEmail.trim().takeIf { it.isNotEmpty() },
+                    notes = current.notes.trim().takeIf { it.isNotEmpty() },
+                    postTripNotes = current.postTripNotes.trim().takeIf { it.isNotEmpty() },
+                    isPrivate = current.isPrivate,
+                    typeDetails = transportTypeDetailsFor(current),
+                ),
+            )
+        }
         else -> TimelineEntryWriteRequest.Activity(
             ActivityEntryRequest(
                 tripId = tripId,
@@ -391,11 +401,21 @@ class EntryEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         val effectiveTitle = if (current.entryType == "NOTE") current.title else current.locationName
-        if (effectiveTitle.isBlank() || current.startAt.isBlank()) {
-            _state.value = current.copy(error = "Title/location and start date & time are required.")
+        if (effectiveTitle.isBlank()) {
+            _state.value = current.copy(error = "Title/location is required.")
             return
         }
-        if (current.entryType != "NOTE" && current.entryType != "ACTIVITY" && current.endAt.isBlank()) {
+        // Transport's own startAt/endAt are no longer directly editable --
+        // at least one Flight needs both of its own times set instead.
+        if (current.entryType == "TRANSPORT") {
+            if (validFlightsOf(current).isEmpty()) {
+                _state.value = current.copy(error = "At least one Flight needs both a departure and arrival date/time.")
+                return
+            }
+        } else if (current.startAt.isBlank()) {
+            _state.value = current.copy(error = "A start date & time is required.")
+            return
+        } else if (current.entryType != "NOTE" && current.entryType != "ACTIVITY" && current.endAt.isBlank()) {
             _state.value = current.copy(error = "An end date & time is required for ${current.entryType}.")
             return
         }
