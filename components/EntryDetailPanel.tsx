@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,7 +9,6 @@ import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
-import { ENTRY_TYPE_LABELS, subtypeLabel } from '@/lib/entry-types/labels';
 import { entryTypeColor } from '@/lib/entry-types/colors';
 import {
   entryEndpointClockTime,
@@ -59,12 +58,12 @@ interface FlightDTO {
 // Both are valid literal-digit representations of the same moment, so
 // parsing pulls the digits out with a regex rather than assuming either
 // exact shape.
-function formatFlightTime(value: string): string {
+function formatFlightTime(value: string, locale: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
   if (!match) return value;
   const date = new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -117,6 +116,8 @@ export function EntryDetailPanel({
 }) {
   const t = useTranslations('errors');
   const tEntries = useTranslations('tripEntries');
+  const tShared = useTranslations('shared');
+  const locale = useLocale();
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
   const [editing, setEditing] = useState(false);
@@ -169,11 +170,11 @@ export function EntryDetailPanel({
               className="badge"
               style={{ background: entryTypeColor(entry.entryType), color: '#fff' }}
             >
-              {ENTRY_TYPE_LABELS[entry.entryType]}
+              {tShared(`entryType.${entry.entryType}`)}
             </span>
             {entry.subtype && (
               <span className="text-soft" style={{ marginLeft: 'var(--space-2)' }}>
-                {subtypeLabel(entry.subtype)}
+                {tShared(`entrySubtype.${entry.subtype}`)}
               </span>
             )}
           </div>
@@ -207,10 +208,10 @@ export function EntryDetailPanel({
             </dt>
             <dd style={{ margin: 0 }}>
               {hasNoSpecificTime(entry.startAt, entry.startTimezone) ? (
-                formatEntryEndpointDateOnly(new Date(entry.startAt), entry.startTimezone)
+                formatEntryEndpointDateOnly(new Date(entry.startAt), entry.startTimezone, locale)
               ) : (
                 <>
-                  {formatEntryEndpointDateTime(new Date(entry.startAt), entry.startTimezone)}
+                  {formatEntryEndpointDateTime(new Date(entry.startAt), entry.startTimezone, locale)}
                   {timezoneDisclosure(entry.startTimezone, tripTimezone)}
                 </>
               )}
@@ -227,10 +228,10 @@ export function EntryDetailPanel({
               </dt>
               <dd style={{ margin: 0 }}>
                 {hasNoSpecificTime(entry.endAt, entry.endTimezone) ? (
-                  formatEntryEndpointDateOnly(new Date(entry.endAt), entry.endTimezone)
+                  formatEntryEndpointDateOnly(new Date(entry.endAt), entry.endTimezone, locale)
                 ) : (
                   <>
-                    {formatEntryEndpointDateTime(new Date(entry.endAt), entry.endTimezone)}
+                    {formatEntryEndpointDateTime(new Date(entry.endAt), entry.endTimezone, locale)}
                     {timezoneDisclosure(entry.endTimezone, tripTimezone)}
                   </>
                 )}
@@ -258,16 +259,16 @@ export function EntryDetailPanel({
                         )}
                       </div>
                       <div className="text-soft">
-                        {[flight.departureLocation, formatFlightTime(flight.departureAt)].filter(Boolean).join(' ')}
+                        {[flight.departureLocation, formatFlightTime(flight.departureAt, locale)].filter(Boolean).join(' ')}
                         {' → '}
-                        {[flight.arrivalLocation, formatFlightTime(flight.arrivalAt)].filter(Boolean).join(' ')}
+                        {[flight.arrivalLocation, formatFlightTime(flight.arrivalAt, locale)].filter(Boolean).join(' ')}
                       </div>
                       {index < flights.length - 1 &&
                         (() => {
                           const next = flights[index + 1];
                           const location = flight.arrivalLocation || next.departureLocation;
-                          const from = formatFlightTime(flight.arrivalAt);
-                          const to = formatFlightTime(next.departureAt);
+                          const from = formatFlightTime(flight.arrivalAt, locale);
+                          const to = formatFlightTime(next.departureAt, locale);
                           return (
                             <div className="text-soft">
                               {location
@@ -340,7 +341,15 @@ export function EntryDetailPanel({
             </dt>
             <dd style={{ margin: 0 }}>
               {entry.expenseAmount} {entry.expenseCurrency}
-              {entry.expensePaymentStatus ? ` · ${entry.expensePaymentStatus}` : ''}
+              {entry.expensePaymentStatus
+                ? ` · ${
+                    entry.expensePaymentStatus === 'Paid'
+                      ? tEntries('paymentStatusPaid')
+                      : entry.expensePaymentStatus === 'Unpaid'
+                        ? tEntries('paymentStatusUnpaid')
+                        : entry.expensePaymentStatus
+                  }`
+                : ''}
             </dd>
           </div>
         )}

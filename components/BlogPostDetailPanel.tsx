@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -53,6 +53,7 @@ export function BlogPostDetailPanel({
 }) {
   const t = useTranslations('errors');
   const tBlog = useTranslations('tripBlog');
+  const locale = useLocale();
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [busy, setBusy] = useState(false);
@@ -134,7 +135,7 @@ export function BlogPostDetailPanel({
               date" -- always date-only now, regardless of what's actually
               stored (a pre-existing post saved back when this field still
               carried a time shows just its date too). */}
-          <dd style={{ margin: 0 }}>{formatEntryEndpointDateOnly(new Date(post.startAt), null)}</dd>
+          <dd style={{ margin: 0 }}>{formatEntryEndpointDateOnly(new Date(post.startAt), null, locale)}</dd>
         </dl>
 
         {post.description && <RichTextView content={post.description} />}
@@ -147,7 +148,7 @@ export function BlogPostDetailPanel({
                 hydration, could disagree with the server's own locale/
                 timezone entirely). formatEntryDateTime is hydration-safe and
                 always 24-hour, same as every other timestamp in the app. */}
-            {tBlog('publishedAt', { time: formatEntryDateTime(post.publishedAt as string) })}
+            {tBlog('publishedAt', { time: formatEntryDateTime(post.publishedAt as string, locale) })}
           </p>
         )}
 

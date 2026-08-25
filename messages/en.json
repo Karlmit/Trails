@@ -62,7 +62,11 @@
     "createAccount": "Create account",
     "creating": "Creating…",
     "createAccountFailed": "Could not create this account.",
-    "networkError": "Could not reach the server. Please try again."
+    "networkError": "Could not reach the server. Please try again.",
+    "role": {
+      "ADMIN": "Admin",
+      "USER": "User"
+    }
   },
   "tripShell": {
     "travelMode": "Travel Mode",
@@ -281,7 +285,41 @@
     "photoGalleryPrivate": "Private",
     "photoGalleryWorking": "Working…",
     "photoGalleryDelete": "Delete",
-    "photoGalleryDeleteConfirm": "Delete this photo?"
+    "photoGalleryDeleteConfirm": "Delete this photo?",
+    "entryType": {
+      "STAY": "Stay",
+      "TRANSPORT": "Transport",
+      "ACTIVITY": "Activity",
+      "NOTE": "Note",
+      "BLOG_POST": "Blog Post"
+    },
+    "entrySubtype": {
+      "HOTEL": "Hotel",
+      "HOSTEL": "Hostel",
+      "RESORT": "Resort",
+      "APARTMENT": "Apartment",
+      "VILLA": "Villa",
+      "GUESTHOUSE": "Guesthouse",
+      "STAY_OTHER": "Other",
+      "FLIGHT": "Flight",
+      "TRAIN": "Train",
+      "FERRY": "Ferry",
+      "BUS": "Bus",
+      "CAR": "Car",
+      "TAXI": "Taxi",
+      "TRANSFER": "Transfer",
+      "TRANSPORT_OTHER": "Other",
+      "TOUR": "Tour",
+      "RESTAURANT": "Restaurant",
+      "ATTRACTION": "Attraction",
+      "EVENT": "Event",
+      "BEACH": "Beach",
+      "HIKE": "Hike",
+      "MUSEUM": "Museum",
+      "SHOPPING": "Shopping",
+      "NIGHTLIFE": "Nightlife",
+      "ACTIVITY_OTHER": "Other"
+    }
   },
   "tripBlog": {
     "heading": "Blog",
@@ -326,7 +364,8 @@
     "insertImage": "Insert image",
     "slashImageTitle": "Image",
     "slashImageSubtext": "Upload a photo -- can flow beside text, or sit above/below it",
-    "slashImageGroup": "Media"
+    "slashImageGroup": "Media",
+    "open": "Open"
   },
   "tripChecklists": {
     "title": "Checklists",

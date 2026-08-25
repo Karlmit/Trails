@@ -62,7 +62,11 @@
     "createAccount": "Skapa konto",
     "creating": "Skapar…",
     "createAccountFailed": "Kunde inte skapa kontot.",
-    "networkError": "Kunde inte nå servern. Försök igen."
+    "networkError": "Kunde inte nå servern. Försök igen.",
+    "role": {
+      "ADMIN": "Admin",
+      "USER": "Användare"
+    }
   },
   "tripShell": {
     "travelMode": "Reseläge",
@@ -281,7 +285,41 @@
     "photoGalleryPrivate": "Privat",
     "photoGalleryWorking": "Arbetar…",
     "photoGalleryDelete": "Ta bort",
-    "photoGalleryDeleteConfirm": "Ta bort det här fotot?"
+    "photoGalleryDeleteConfirm": "Ta bort det här fotot?",
+    "entryType": {
+      "STAY": "Boende",
+      "TRANSPORT": "Transport",
+      "ACTIVITY": "Aktivitet",
+      "NOTE": "Anteckning",
+      "BLOG_POST": "Blogginlägg"
+    },
+    "entrySubtype": {
+      "HOTEL": "Hotell",
+      "HOSTEL": "Vandrarhem",
+      "RESORT": "Resort",
+      "APARTMENT": "Lägenhet",
+      "VILLA": "Villa",
+      "GUESTHOUSE": "Gästhus",
+      "STAY_OTHER": "Annat",
+      "FLIGHT": "Flyg",
+      "TRAIN": "Tåg",
+      "FERRY": "Färja",
+      "BUS": "Buss",
+      "CAR": "Bil",
+      "TAXI": "Taxi",
+      "TRANSFER": "Transfer",
+      "TRANSPORT_OTHER": "Annat",
+      "TOUR": "Rundtur",
+      "RESTAURANT": "Restaurang",
+      "ATTRACTION": "Sevärdhet",
+      "EVENT": "Evenemang",
+      "BEACH": "Strand",
+      "HIKE": "Vandring",
+      "MUSEUM": "Museum",
+      "SHOPPING": "Shopping",
+      "NIGHTLIFE": "Nöjesliv",
+      "ACTIVITY_OTHER": "Annat"
+    }
   },
   "tripBlog": {
     "heading": "Blogg",
@@ -326,7 +364,8 @@
     "insertImage": "Infoga bild",
     "slashImageTitle": "Bild",
     "slashImageSubtext": "Ladda upp ett foto -- kan flyta bredvid text, eller ligga ovanför/under den",
-    "slashImageGroup": "Media"
+    "slashImageGroup": "Media",
+    "open": "Öppna"
   },
   "tripChecklists": {
     "title": "Checklistor",

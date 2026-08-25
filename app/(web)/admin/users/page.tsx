@@ -53,7 +53,7 @@ export default async function AdminUsersPage() {
                     {t('created', { date: serialized.createdAt.slice(0, 10) })}
                   </p>
                 </div>
-                <span className="badge">{serialized.role}</span>
+                <span className="badge">{t(`role.${serialized.role}`)}</span>
               </div>
             );
           })}

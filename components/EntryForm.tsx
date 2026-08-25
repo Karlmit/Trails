@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
+import { SUBTYPES_BY_ENTRY_TYPE } from '@/lib/entry-types/labels';
 import { commitStagedLinks, LinkStagingList, type StagedLink } from '@/components/LinkStagingList';
 import { DateTimeInput, combineDateTime, splitDateTime } from '@/components/DateTimeInput';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
@@ -250,6 +250,7 @@ export function EntryForm({
 }: EntryFormProps) {
   const t = useTranslations('errors');
   const tEntries = useTranslations('tripEntries');
+  const tShared = useTranslations('shared');
   const router = useRouter();
   // `entry` (edit mode) always wins; `initialValues` only ever seeds a
   // create-mode form (spec-ideas' convert step).
@@ -562,7 +563,7 @@ export function EntryForm({
           >
             {ENTRY_TYPES.map((type) => (
               <option key={type} value={type}>
-                {ENTRY_TYPE_LABELS[type]}
+                {tShared(`entryType.${type}`)}
               </option>
             ))}
           </select>
@@ -585,7 +586,7 @@ export function EntryForm({
             <option value="">{tEntries('selectPlaceholder')}</option>
             {subtypeOptions.map((value) => (
               <option key={value} value={value}>
-                {subtypeLabel(value)}
+                {tShared(`entrySubtype.${value}`)}
               </option>
             ))}
           </select>

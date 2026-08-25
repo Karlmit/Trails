@@ -5,15 +5,14 @@
 // form), just factored into its own component per this spec's Code Map.
 
 import { getTranslations } from 'next-intl/server';
-import { ENTRY_TYPE_LABELS } from '@/lib/entry-types/labels';
 
 // Only these three Entry Types ever carry Expense fields at all --
 // Note (FR-14) and Blog Post (FR-18) schemas have no expenseAmount/
 // expenseCurrency field, so offering them here would be a filter option
 // that can never match anything. See lib/entry-types/note.schema.ts and
-// blog-post.schema.ts. Labels come from the canonical ENTRY_TYPE_LABELS
-// (lib/entry-types/labels.ts) rather than a second hardcoded map, so the
-// two can't drift.
+// blog-post.schema.ts. Labels come from the `shared.entryType.*` messages
+// (the same translations EntryForm/EntryDetailPanel use), not a second
+// hardcoded map, so the two can't drift.
 export const BUDGET_ENTRY_TYPES = ['STAY', 'TRANSPORT', 'ACTIVITY'] as const;
 
 export interface BudgetFiltersProps {
@@ -26,6 +25,7 @@ export interface BudgetFiltersProps {
 export async function BudgetFilters({ tripId, sections, entryType, sectionId }: BudgetFiltersProps) {
   const hasActiveFilter = Boolean(entryType || sectionId);
   const t = await getTranslations('tripBudget');
+  const tShared = await getTranslations('shared');
 
   return (
     <form method="get" className="row" style={{ marginBottom: 'var(--space-4)' }}>
@@ -35,7 +35,7 @@ export async function BudgetFilters({ tripId, sections, entryType, sectionId }: 
           <option value="">{t('all')}</option>
           {BUDGET_ENTRY_TYPES.map((type) => (
             <option key={type} value={type}>
-              {ENTRY_TYPE_LABELS[type]}
+              {tShared(`entryType.${type}`)}
             </option>
           ))}
         </select>

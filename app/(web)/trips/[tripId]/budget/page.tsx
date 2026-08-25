@@ -4,7 +4,6 @@ import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { aggregateBudget, type BudgetEntryInput } from '@/lib/budget';
 import { timelineVisibleEntryWhere, entryDetailHref } from '@/lib/entry-types';
-import { ENTRY_TYPE_LABELS } from '@/lib/entry-types/labels';
 import { isUuid } from '@/lib/uuid';
 import { BudgetFilters } from '@/components/BudgetFilters';
 
@@ -82,6 +81,13 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
   const lineItemCount = groups.reduce((sum, group) => sum + group.lineItems.length, 0);
 
   const t = await getTranslations('tripBudget');
+  const tShared = await getTranslations('shared');
+  const tEntries = await getTranslations('tripEntries');
+  // expensePaymentStatus stays a free-text column (see EntryForm.tsx's own
+  // comment) storing the literal English word "Paid"/"Unpaid" -- translate
+  // just those two known values, leave any other legacy free text as-is.
+  const paymentStatusLabel = (value: string) =>
+    value === 'Paid' ? tEntries('paymentStatusPaid') : value === 'Unpaid' ? tEntries('paymentStatusUnpaid') : value;
 
   return (
     <main className="page">
@@ -125,8 +131,8 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
                     <div className="stack" style={{ gap: 0 }}>
                       <Link href={entryDetailHref(tripId, item.entryType, item.id)}>{item.title}</Link>
                       <span className="text-soft">
-                        {ENTRY_TYPE_LABELS[item.entryType] ?? item.entryType}
-                        {item.expensePaymentStatus ? ` · ${item.expensePaymentStatus}` : ''}
+                        {tShared(`entryType.${item.entryType}`)}
+                        {item.expensePaymentStatus ? ` · ${paymentStatusLabel(item.expensePaymentStatus)}` : ''}
                         {item.expensePaymentNote ? ` · ${item.expensePaymentNote}` : ''}
                       </span>
                     </div>

@@ -64,9 +64,9 @@ export function entryClockTime(date: Date): { hour: number; minute: number } {
  * client hydration always agree byte-for-byte (no dependency on either
  * side's local clock), unlike `toLocaleString()`.
  */
-export function formatEntryDateTime(date: Date | string): string {
+export function formatEntryDateTime(date: Date | string, locale: string): string {
   const value = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: 'UTC',
     year: 'numeric',
     month: 'short',
@@ -154,9 +154,9 @@ export function entryEndpointDateKey(date: Date, zone: string | null): string {
 }
 
 /** Same `zone`-aware resolution as `entryEndpointClockTime`, for display formatting. */
-export function formatEntryEndpointDateTime(date: Date, zone: string | null): string {
-  if (!zone) return formatEntryDateTime(date);
-  return new Intl.DateTimeFormat('en-US', {
+export function formatEntryEndpointDateTime(date: Date, zone: string | null, locale: string): string {
+  if (!zone) return formatEntryDateTime(date, locale);
+  return new Intl.DateTimeFormat(locale, {
     timeZone: zone,
     year: 'numeric',
     month: 'short',
@@ -173,8 +173,8 @@ export function formatEntryEndpointDateTime(date: Date, zone: string | null): st
  * but we should not have to enter a specific time for it"). `zone` follows
  * the same resolution rule as every other Entry-endpoint display function.
  */
-export function formatEntryEndpointDateOnly(date: Date, zone: string | null): string {
-  return new Intl.DateTimeFormat('en-US', {
+export function formatEntryEndpointDateOnly(date: Date, zone: string | null, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     timeZone: zone ?? 'UTC',
     year: 'numeric',
     month: 'short',

@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
-import { ENTRY_TYPE_LABELS } from '@/lib/entry-types/labels';
 import { formatAttachmentSize } from '@/lib/attachments';
 import { isUuid } from '@/lib/uuid';
 
@@ -24,6 +23,7 @@ export default async function DocumentsPage({ params }: PageProps) {
   if (!trip) notFound();
 
   const t = await getTranslations('tripDocuments');
+  const tShared = await getTranslations('shared');
 
   const attachments = await prisma.attachment.findMany({
     where: { tripId },
@@ -74,7 +74,7 @@ export default async function DocumentsPage({ params }: PageProps) {
       const owner = entryById.get(attachment.ownerId);
       if (!owner) continue;
       const group = groups.get(owner.entryType) ?? {
-        label: ENTRY_TYPE_LABELS[owner.entryType] ?? owner.entryType,
+        label: tShared(`entryType.${owner.entryType}`),
         rows: [],
       };
       group.rows.push({ attachment, title: owner.title, href: entryDetailHref(tripId, owner.entryType, owner.id) });

@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { getLocale, getTranslations } from 'next-intl/server';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
 import { extractPlainText } from '@/lib/rich-text';
 
@@ -16,14 +17,16 @@ import { extractPlainText } from '@/lib/rich-text';
 // (view/edit/publish/delete all live on the detail page it links to); kept
 // so a future inline action added here can't accidentally ship without
 // also being Guest-gated.
-export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; readOnly?: boolean }) {
+export async function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; readOnly?: boolean }) {
   void readOnly;
+  const t = await getTranslations('tripBlog');
+  const locale = await getLocale();
   const isPublished = post.publishedAt !== null;
   // post.startAt is the Post's own recorded date -- its literal digits, per
   // the same never-timezone-converted contract as a TimelineEntry's own
   // startAt (dateTimeField's comment) -- pinned to UTC explicitly so it's
   // never shifted by the viewer's browser timezone.
-  const date = new Date(post.startAt).toLocaleDateString(undefined, {
+  const date = new Date(post.startAt).toLocaleDateString(locale, {
     timeZone: 'UTC',
     weekday: 'short',
     month: 'short',
@@ -37,7 +40,7 @@ export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; re
       <div className="row-between">
         <h3 style={{ margin: 0 }}>{post.title}</h3>
         <span className={`badge ${isPublished ? 'badge-published' : 'badge-draft'}`}>
-          {isPublished ? 'Published' : 'Draft'}
+          {isPublished ? t('published') : t('draft')}
         </span>
       </div>
       {post.primaryPhotoId && (
@@ -59,7 +62,7 @@ export function BlogPostCard({ post, readOnly = false }: { post: BlogPostDTO; re
       )}
       <div className="row">
         <Link href={`/trips/${post.tripId}/blog/${post.id}`} className="btn btn-outline">
-          Open
+          {t('open')}
         </Link>
       </div>
     </div>

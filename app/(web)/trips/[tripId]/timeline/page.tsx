@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import {
   computeTripStatus,
@@ -22,7 +22,6 @@ import {
   sectionCustomColorSolid,
 } from '@/lib/section-colors';
 import { entryTypeColor } from '@/lib/entry-types/colors';
-import { subtypeLabel } from '@/lib/entry-types/labels';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
@@ -52,10 +51,10 @@ const laneX = (laneIndex: number) => LANE_UNIT * (laneIndex + 1) + LANE_UNIT / 2
 // long that day. Always split into exactly two lines instead -- "Dec 1"
 // then "Tuesday" -- so every row's date cell is the same shape regardless
 // of which day it is.
-function formatDayLabel(dateKey: string): { monthDay: string; weekday: string } {
+function formatDayLabel(dateKey: string, locale: string): { monthDay: string; weekday: string } {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
-  const monthDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
-  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(date);
+  const monthDay = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(date);
   return { monthDay, weekday };
 }
 
@@ -266,6 +265,8 @@ export default async function TimelinePage({ params }: PageProps) {
   if (!isUuid(tripId)) notFound();
 
   const t = await getTranslations('tripTimeline');
+  const tShared = await getTranslations('shared');
+  const locale = await getLocale();
 
   // spec-guest-access: one of the five Guest-eligible page shapes -- repeats
   // the layout's own canViewTrip check (defense-in-depth).
@@ -349,7 +350,7 @@ export default async function TimelinePage({ params }: PageProps) {
             day.sectionIndex !== null && nextSectionIndex !== null && nextSectionIndex !== day.sectionIndex;
           const nextBandColor = isSectionTransition ? bandColorFor(nextSectionIndex) : undefined;
           const rowLine = index + 1;
-          const dayLabel = formatDayLabel(day.dateKey);
+          const dayLabel = formatDayLabel(day.dateKey, locale);
 
           return (
             <div key={day.dateKey} className="timeline-grid-row">
@@ -472,7 +473,7 @@ export default async function TimelinePage({ params }: PageProps) {
                             <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
                           )}
                           {label.showSubtype && line.subtype && (
-                            <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
+                            <span className="text-soft"> · {tShared(`entrySubtype.${line.subtype}`)}</span>
                           )}
                           {isBlogPost && <span className="entry-chip-blog-cta"> {t('readPost')}</span>}
                         </Link>

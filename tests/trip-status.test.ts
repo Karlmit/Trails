@@ -117,11 +117,11 @@ describe('entryClockTime', () => {
 
 describe('formatEntryDateTime', () => {
   it("formats an Entry's own timestamp pinned to UTC, immune to any timezone", () => {
-    expect(formatEntryDateTime('2026-08-05T15:00:00.000Z')).toBe('Aug 5, 2026, 15:00');
+    expect(formatEntryDateTime('2026-08-05T15:00:00.000Z', 'en')).toBe('Aug 5, 2026, 15:00');
   });
 
   it('accepts a Date object directly, same as a string', () => {
-    expect(formatEntryDateTime(new Date('2026-08-05T15:00:00.000Z'))).toBe('Aug 5, 2026, 15:00');
+    expect(formatEntryDateTime(new Date('2026-08-05T15:00:00.000Z'), 'en')).toBe('Aug 5, 2026, 15:00');
   });
 });
 
@@ -182,7 +182,7 @@ describe('entryEndpointClockTime / entryEndpointDateKey / formatEntryEndpointDat
     const date = new Date('2026-08-05T15:00:00.000Z');
     expect(entryEndpointClockTime(date, null)).toEqual({ hour: 15, minute: 0 });
     expect(entryEndpointDateKey(date, null)).toBe('2026-08-05');
-    expect(formatEntryEndpointDateTime(date, null)).toBe(formatEntryDateTime(date));
+    expect(formatEntryEndpointDateTime(date, null, 'en')).toBe(formatEntryDateTime(date, 'en'));
   });
 
   it('converts through the declared zone when non-null', () => {
@@ -190,7 +190,7 @@ describe('entryEndpointClockTime / entryEndpointDateKey / formatEntryEndpointDat
     const date = new Date('2026-08-05T09:00:00.000Z');
     expect(entryEndpointClockTime(date, 'Asia/Bangkok')).toEqual({ hour: 16, minute: 0 });
     expect(entryEndpointDateKey(date, 'Asia/Bangkok')).toBe('2026-08-05');
-    expect(formatEntryEndpointDateTime(date, 'Asia/Bangkok')).toContain('16:00');
+    expect(formatEntryEndpointDateTime(date, 'Asia/Bangkok', 'en')).toContain('16:00');
   });
 
   it('a zone conversion can roll the day-key forward relative to the literal UTC date', () => {
@@ -219,11 +219,11 @@ describe('timezoneDisclosure', () => {
 
 describe('formatEntryEndpointDateOnly', () => {
   it('formats just the date, no clock time, with zero conversion when zone is null', () => {
-    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T15:00:00.000Z'), null)).toBe('Aug 5, 2026');
+    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T15:00:00.000Z'), null, 'en')).toBe('Aug 5, 2026');
   });
 
   it('formats through the declared zone when non-null', () => {
     // 22:00 UTC is Aug 6 in Asia/Bangkok (+7).
-    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T22:00:00.000Z'), 'Asia/Bangkok')).toBe('Aug 6, 2026');
+    expect(formatEntryEndpointDateOnly(new Date('2026-08-05T22:00:00.000Z'), 'Asia/Bangkok', 'en')).toBe('Aug 6, 2026');
   });
 });
