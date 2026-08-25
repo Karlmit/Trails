@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeIdea } from '@/lib/serializers';
 import { distinctCategories, filterIdeas, PRIORITY_LABELS, WEATHER_SUITABILITY_LABELS } from '@/lib/ideas';
@@ -23,6 +24,8 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
   if (!isUuid(tripId)) notFound();
 
   const { priority, sectionId, category, weatherSuitability } = await searchParams;
+
+  const t = await getTranslations('tripIdeas');
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
@@ -61,28 +64,26 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
   return (
     <main className="page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Ideas</h2>
+        <h2 style={{ margin: 0 }}>{t('title')}</h2>
       </div>
-      <p className="text-soft">
-        Unconfirmed candidates for this Trip. Convert one once it&rsquo;s booked to add it to the Timeline.
-      </p>
+      <p className="text-soft">{t('subtitle')}</p>
 
       <form method="get" className="row" style={{ marginBottom: 'var(--space-4)' }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="idea-filter-priority">Priority</label>
+          <label htmlFor="idea-filter-priority">{t('priorityLabel')}</label>
           <select id="idea-filter-priority" name="priority" defaultValue={priority ?? ''}>
-            <option value="">All</option>
-            {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+            <option value="">{t('allOption')}</option>
+            {Object.keys(PRIORITY_LABELS).map((value) => (
               <option key={value} value={value}>
-                {label}
+                {t(`priority.${value}`)}
               </option>
             ))}
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="idea-filter-section">Section</label>
+          <label htmlFor="idea-filter-section">{t('sectionLabel')}</label>
           <select id="idea-filter-section" name="sectionId" defaultValue={sectionId ?? ''}>
-            <option value="">All</option>
+            <option value="">{t('allOption')}</option>
             {trip.sections.map((section) => (
               <option key={section.id} value={section.id}>
                 {section.name}
@@ -91,9 +92,9 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="idea-filter-category">Category</label>
+          <label htmlFor="idea-filter-category">{t('categoryLabel')}</label>
           <select id="idea-filter-category" name="category" defaultValue={category ?? ''}>
-            <option value="">All</option>
+            <option value="">{t('allOption')}</option>
             {categoryOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -102,22 +103,22 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
           </select>
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="idea-filter-weather">Weather suitability</label>
+          <label htmlFor="idea-filter-weather">{t('weatherSuitabilityLabel')}</label>
           <select id="idea-filter-weather" name="weatherSuitability" defaultValue={weatherSuitability ?? ''}>
-            <option value="">All</option>
-            {Object.entries(WEATHER_SUITABILITY_LABELS).map(([value, label]) => (
+            <option value="">{t('allOption')}</option>
+            {Object.keys(WEATHER_SUITABILITY_LABELS).map((value) => (
               <option key={value} value={value}>
-                {label}
+                {t(`weatherSuitability.${value}`)}
               </option>
             ))}
           </select>
         </div>
         <button type="submit" className="btn btn-outline">
-          Filter
+          {t('filterButton')}
         </button>
         {(priority || sectionId || category || weatherSuitability) && (
           <a href={`/trips/${tripId}/ideas`} className="text-soft">
-            Clear filters
+            {t('clearFilters')}
           </a>
         )}
       </form>
@@ -133,9 +134,7 @@ export default async function IdeasPage({ params, searchParams }: PageProps) {
 
       {ideas.length === 0 ? (
         <div className="empty-state">
-          {allIdeas.length === 0
-            ? 'No Ideas yet. Add one above.'
-            : 'No Ideas match this filter.'}
+          {allIdeas.length === 0 ? t('emptyStateNoIdeas') : t('emptyStateNoMatch')}
         </div>
       ) : (
         <div className="stack" style={{ gap: 'var(--space-2)' }}>

@@ -1,22 +1,16 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { IdeaDTO } from '@/components/IdeaCard';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
 
-const PRIORITIES = [
-  { value: 'MUST_DO', label: 'Must do' },
-  { value: 'WOULD_LIKE', label: 'Would like' },
-  { value: 'MAYBE', label: 'Maybe' },
-] as const;
+const PRIORITIES = ['MUST_DO', 'WOULD_LIKE', 'MAYBE'] as const;
 
-const WEATHER_SUITABILITIES = [
-  { value: 'INDOOR', label: 'Indoor' },
-  { value: 'OUTDOOR', label: 'Outdoor' },
-  { value: 'EITHER', label: 'Either' },
-] as const;
+const WEATHER_SUITABILITIES = ['INDOOR', 'OUTDOOR', 'EITHER'] as const;
 
 interface IdeaFormProps {
   tripId: string;
@@ -48,17 +42,19 @@ export function IdeaForm({
   onSaved,
   onCancel,
 }: IdeaFormProps) {
+  const t = useTranslations('errors');
+  const ti = useTranslations('tripIdeas');
   const router = useRouter();
   const [open, setOpen] = useState(mode === 'edit');
   const [title, setTitle] = useState(idea?.title ?? '');
   const [sectionId, setSectionId] = useState(idea?.sectionId ?? '');
   const [category, setCategory] = useState(idea?.category ?? '');
   const [description, setDescription] = useState(idea?.description ?? '');
-  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]['value']>(
-    (idea?.priority as (typeof PRIORITIES)[number]['value']) ?? 'WOULD_LIKE',
+  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>(
+    (idea?.priority as (typeof PRIORITIES)[number]) ?? 'WOULD_LIKE',
   );
-  const [weatherSuitability, setWeatherSuitability] = useState<(typeof WEATHER_SUITABILITIES)[number]['value']>(
-    (idea?.weatherSuitability as (typeof WEATHER_SUITABILITIES)[number]['value']) ?? 'EITHER',
+  const [weatherSuitability, setWeatherSuitability] = useState<(typeof WEATHER_SUITABILITIES)[number]>(
+    (idea?.weatherSuitability as (typeof WEATHER_SUITABILITIES)[number]) ?? 'EITHER',
   );
   const [locationName, setLocationName] = useState(idea?.locationName ?? '');
   const [locationAddress, setLocationAddress] = useState(idea?.locationAddress ?? '');
@@ -124,7 +120,7 @@ export function IdeaForm({
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(responseBody?.error?.message ?? 'Could not save this Idea.');
+        setError(translateApiError(t, responseBody?.error?.message) ?? ti('couldNotSaveIdea'));
         return;
       }
 
@@ -135,7 +131,7 @@ export function IdeaForm({
       onSaved?.(responseBody as IdeaDTO);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -144,7 +140,7 @@ export function IdeaForm({
   if (mode === 'create' && !open) {
     return (
       <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
-        + Add Idea
+        {ti('openButton')}
       </button>
     );
   }
@@ -161,7 +157,7 @@ export function IdeaForm({
       {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
-        <label htmlFor="idea-title">Title</label>
+        <label htmlFor="idea-title">{ti('titleLabel')}</label>
         <input
           id="idea-title"
           value={title}
@@ -172,9 +168,9 @@ export function IdeaForm({
       </div>
 
       <div className="field">
-        <label htmlFor="idea-section">Section</label>
+        <label htmlFor="idea-section">{ti('sectionLabel')}</label>
         <select id="idea-section" value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
-          <option value="">No Section</option>
+          <option value="">{ti('noSectionOption')}</option>
           {sections.map((section) => (
             <option key={section.id} value={section.id}>
               {section.name}
@@ -184,7 +180,7 @@ export function IdeaForm({
       </div>
 
       <div className="field">
-        <label htmlFor="idea-category">Category</label>
+        <label htmlFor="idea-category">{ti('categoryLabel')}</label>
         <input id="idea-category" value={category} onChange={(e) => setCategory(e.target.value)} />
         {/* User-reported: the native <datalist> dropdown this used to be
             wasn't recognizable as "pick from existing categories" -- easy
@@ -209,7 +205,7 @@ export function IdeaForm({
       </div>
 
       <div className="field">
-        <label htmlFor="idea-description">Description</label>
+        <label htmlFor="idea-description">{ti('descriptionLabel')}</label>
         <textarea
           id="idea-description"
           value={description}
@@ -221,29 +217,29 @@ export function IdeaForm({
 
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="idea-priority">Priority</label>
+          <label htmlFor="idea-priority">{ti('priorityLabel')}</label>
           <select
             id="idea-priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as typeof priority)}
           >
             {PRIORITIES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option key={option} value={option}>
+                {ti(`priority.${option}`)}
               </option>
             ))}
           </select>
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="idea-weather-suitability">Weather suitability</label>
+          <label htmlFor="idea-weather-suitability">{ti('weatherSuitabilityLabel')}</label>
           <select
             id="idea-weather-suitability"
             value={weatherSuitability}
             onChange={(e) => setWeatherSuitability(e.target.value as typeof weatherSuitability)}
           >
             {WEATHER_SUITABILITIES.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+              <option key={option} value={option}>
+                {ti(`weatherSuitability.${option}`)}
               </option>
             ))}
           </select>
@@ -251,12 +247,12 @@ export function IdeaForm({
       </div>
 
       <div className="field">
-        <label htmlFor="idea-location-name">Location name</label>
+        <label htmlFor="idea-location-name">{ti('locationNameLabel')}</label>
         <input id="idea-location-name" value={locationName} onChange={(e) => setLocationName(e.target.value)} />
       </div>
 
       <div className="field">
-        <label htmlFor="idea-location-address">Location address</label>
+        <label htmlFor="idea-location-address">{ti('locationAddressLabel')}</label>
         <input
           id="idea-location-address"
           value={locationAddress}
@@ -265,7 +261,7 @@ export function IdeaForm({
       </div>
 
       <div className="field">
-        <label htmlFor="idea-location-map-link">Map link</label>
+        <label htmlFor="idea-location-map-link">{ti('mapLinkLabel')}</label>
         <input
           id="idea-location-map-link"
           value={locationMapLink}
@@ -276,7 +272,7 @@ export function IdeaForm({
 
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="idea-expense-amount">Estimated expense</label>
+          <label htmlFor="idea-expense-amount">{ti('estimatedExpenseLabel')}</label>
           <input
             id="idea-expense-amount"
             type="number"
@@ -287,7 +283,7 @@ export function IdeaForm({
           />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="idea-expense-currency">Currency</label>
+          <label htmlFor="idea-expense-currency">{ti('currencyLabel')}</label>
           <input
             id="idea-expense-currency"
             value={estimatedExpenseCurrency}
@@ -300,7 +296,7 @@ export function IdeaForm({
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
-          {submitting ? 'Saving…' : mode === 'create' ? 'Add Idea' : 'Save'}
+          {submitting ? ti('saving') : mode === 'create' ? ti('addIdea') : ti('save')}
         </button>
         <button
           type="button"
@@ -314,7 +310,7 @@ export function IdeaForm({
             }
           }}
         >
-          Cancel
+          {ti('cancel')}
         </button>
       </div>
       </form>

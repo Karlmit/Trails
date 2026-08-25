@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -26,6 +27,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   const { tripId, entryId } = await params;
   if (!isUuid(tripId) || !isUuid(entryId)) notFound();
 
+  const t = await getTranslations('tripBlog');
   const viewer = await getViewer();
 
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
@@ -52,7 +54,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   return (
     <main className="page">
       <Link href={`/trips/${tripId}/blog`} className="text-soft">
-        Back to Blog
+        {t('backToBlog')}
       </Link>
       <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
     </main>

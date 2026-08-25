@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { isUuid } from '@/lib/uuid';
@@ -18,15 +19,17 @@ export default async function NewEntryPage({ params }: PageProps) {
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip) notFound();
 
+  const t = await getTranslations('tripEntries');
+
   return (
     <main className="page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Add Entry</h2>
+        <h2 style={{ margin: 0 }}>{t('addEntryHeading')}</h2>
         <Link href={`/trips/${tripId}/timeline`} className="text-soft">
-          Back to Timeline
+          {t('backToTimelineLink')}
         </Link>
       </div>
-      <p className="text-soft">Stay, Transport, Activity, or Note -- pick a type below.</p>
+      <p className="text-soft">{t('addEntryDescription')}</p>
       <EntryForm
         tripId={tripId}
         mode="create"

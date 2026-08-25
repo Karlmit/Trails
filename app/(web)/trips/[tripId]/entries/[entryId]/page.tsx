@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -20,6 +21,8 @@ interface PageProps {
 export default async function EntryDetailPage({ params }: PageProps) {
   const { tripId, entryId } = await params;
   if (!isUuid(tripId) || !isUuid(entryId)) notFound();
+
+  const t = await getTranslations('tripEntries');
 
   const viewer = await getViewer();
 
@@ -62,7 +65,7 @@ export default async function EntryDetailPage({ params }: PageProps) {
   return (
     <main className="page">
       <Link href={`/trips/${tripId}/timeline`} className="text-soft">
-        Back to Timeline
+        {t('backToTimelineLink')}
       </Link>
       <EntryDetailPanel
         tripId={tripId}

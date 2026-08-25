@@ -32,11 +32,23 @@ enum UserRole {
   @@map("user_role")
 }
 
+// Multi-language support: sv is the app-wide default (spec: "Default
+// language will now be Swedish"), en the only other supported locale for
+// now. Signed-in users switch it from Settings (app/api/v1/me); a Guest's
+// choice lives only in a cookie (lib/locale.ts's resolveLocale), never here.
+enum Locale {
+  sv
+  en
+
+  @@map("locale")
+}
+
 model User {
   id           String    @id @default(uuid()) @db.Uuid
   username     String    @unique
   passwordHash String    @map("password_hash")
   role         UserRole  @default(USER)
+  locale       Locale    @default(sv)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeSection } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -23,13 +24,12 @@ export default async function SectionsPage({ params }: PageProps) {
   if (!trip) notFound();
 
   const sections = trip.sections.map(serializeSection);
+  const t = await getTranslations('tripSections');
 
   return (
     <main className="page">
-      <h2>Sections</h2>
-      <p className="text-soft">
-        Group this Trip&rsquo;s days into named legs. Sections appear as color bands on the Timeline.
-      </p>
+      <h2>{t('pageTitle')}</h2>
+      <p className="text-soft">{t('pageDescription')}</p>
       <SectionManager tripId={tripId} sections={sections} />
     </main>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface TimezoneSelectProps {
   id: string;
@@ -50,6 +51,7 @@ export function filterTimezones(zones: readonly string[], query: string): string
 // "option") -- no dependency added. `Intl.supportedValuesOf('timeZone')` is
 // the full IANA zone list, so nobody has to look up a code by memory.
 export function TimezoneSelect({ id, initialValue = '', onChange, required }: TimezoneSelectProps) {
+  const t = useTranslations('shared');
   const zones = useMemo(() => {
     let list: string[];
     try {
@@ -146,7 +148,7 @@ export function TimezoneSelect({ id, initialValue = '', onChange, required }: Ti
         autoComplete="off"
         required={required}
         value={query}
-        placeholder="Search timezones…"
+        placeholder={t('timezoneSelectSearchPlaceholder')}
         onChange={(event) => handleInputChange(event.target.value)}
         onFocus={() => setOpen(true)}
         onBlur={() => {
@@ -160,7 +162,7 @@ export function TimezoneSelect({ id, initialValue = '', onChange, required }: Ti
         <ul role="listbox" id={listboxId} className="combobox-listbox">
           {filtered.length === 0 ? (
             <li className="combobox-empty" role="presentation">
-              No matching timezone
+              {t('timezoneSelectNoMatch')}
             </li>
           ) : (
             filtered.map((zone, index) => (

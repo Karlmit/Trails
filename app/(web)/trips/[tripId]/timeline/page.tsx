@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import {
   computeTripStatus,
@@ -90,22 +91,28 @@ interface DayLineLabel {
   showSubtype: boolean;
 }
 
+type Translator = (key: string, values?: Record<string, string | number>) => string;
+
 // User-requested: a multi-day Stay's name repeated on every day it spans
 // was noise -- the branch line itself already shows it's ongoing, so a
 // Stay is now only visible on its check-in/check-out days, each with its
 // own time as a subtitle below the name (rather than folded into one
 // inline string the way Transport's Departure/Arrival still is).
-function stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: string): string {
+function stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: string, t: Translator): string {
   const parts: string[] = [];
   if (line.isStart) {
     const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
     const hasTime = hour !== 0 || minute !== 0;
-    parts.push(hasTime ? `Check-in ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}` : 'Check-in');
+    parts.push(
+      hasTime ? `${t('checkIn')} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}` : t('checkIn'),
+    );
   }
   if (line.isEnd && line.endAt) {
     const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
     const hasTime = hour !== 0 || minute !== 0;
-    parts.push(hasTime ? `Check-out ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}` : 'Check-out');
+    parts.push(
+      hasTime ? `${t('checkOut')} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}` : t('checkOut'),
+    );
   }
   return parts.join(' · ');
 }
@@ -153,7 +160,7 @@ function formatLayoverDuration(arrivalAt: string, departureAt: string): string |
 // across the entire subtitle's width, tried first, put it right next to
 // the far-right Section badge column instead). Plain inline text, same
 // single-string-per-line shape every other subtitle already uses.
-function transportItinerarySubtitle(typeDetails: unknown): string | null {
+function transportItinerarySubtitle(typeDetails: unknown, t: Translator): string | null {
   const details = typeDetails as { flights?: unknown } | null | undefined;
   const flights = Array.isArray(details?.flights) ? (details.flights as FlightForTimeline[]) : [];
   // A single Flight is today's exact plain behavior -- no breakdown needed.
@@ -172,36 +179,43 @@ function transportItinerarySubtitle(typeDetails: unknown): string | null {
     // before it) clock time that layover needs -- both, for the rare
     // flight with a layover on each side.
     const times: string[] = [];
-    if (index > 0) times.push(`Departure: ${formatStopoverClock(flight.departureAt)}`);
-    if (index < flights.length - 1) times.push(`Arrival: ${formatStopoverClock(flight.arrivalAt)}`);
-    const flightLabel = flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`;
+    if (index > 0) times.push(`${t('departure')}: ${formatStopoverClock(flight.departureAt)}`);
+    if (index < flights.length - 1) times.push(`${t('arrival')}: ${formatStopoverClock(flight.arrivalAt)}`);
+    const flightLabel = flight.flightNumber
+      ? `✈ ${flight.flightNumber}`
+      : `✈ ${t('flightNumberFallback', { number: index + 1 })}`;
     lines.push(times.length > 0 ? `${flightLabel} (${times.join(' · ')})` : flightLabel);
   });
   return lines.join('\n');
 }
 
-function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel {
+function dayLineLabel(line: TimelineDayLine, tripTimezone: string, t: Translator): DayLineLabel {
   if (line.entryType === 'STAY') {
     if (!line.isStart && !line.isEnd) {
       return { hidden: true, title: '', subtitle: null, showSubtype: false };
     }
-    return { hidden: false, title: line.title, subtitle: stayEndpointSubtitle(line, tripTimezone), showSubtype: false };
+    return {
+      hidden: false,
+      title: line.title,
+      subtitle: stayEndpointSubtitle(line, tripTimezone, t),
+      showSubtype: false,
+    };
   }
   if (line.entryType === 'TRANSPORT') {
     if (line.isStart) {
       const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
       const hasTime = hour !== 0 || minute !== 0;
       const title = hasTime
-        ? `${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
-        : `${line.title} · Departure`;
-      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails), showSubtype: false };
+        ? `${line.title} · ${t('departure')} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
+        : `${line.title} · ${t('departure')}`;
+      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails, t), showSubtype: false };
     }
     if (line.isEnd && line.endAt) {
       const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
       const hasTime = hour !== 0 || minute !== 0;
       const title = hasTime
-        ? `${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
-        : `${line.title} · Arrival`;
+        ? `${line.title} · ${t('arrival')} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
+        : `${line.title} · ${t('arrival')}`;
       return { hidden: false, title, subtitle: null, showSubtype: false };
     }
     return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
@@ -250,6 +264,8 @@ function branchPath(branch: TimelineBranchSegment): string {
 export default async function TimelinePage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
+
+  const t = await getTranslations('tripTimeline');
 
   // spec-guest-access: one of the five Guest-eligible page shapes -- repeats
   // the layout's own canViewTrip check (defense-in-depth).
@@ -304,8 +320,9 @@ export default async function TimelinePage({ params }: PageProps) {
 
       {trip.sections.length === 0 && (
         <p className="text-soft" style={{ marginBottom: 'var(--space-3)' }}>
-          No Sections yet. <Link href={`/trips/${tripId}/sections`}>Add one</Link> to group this
-          Trip&rsquo;s days into named legs.
+          {t.rich('noSectionsYet', {
+            link: (chunks) => <Link href={`/trips/${tripId}/sections`}>{chunks}</Link>,
+          })}
         </p>
       )}
 
@@ -418,14 +435,16 @@ export default async function TimelinePage({ params }: PageProps) {
                 )}
                 {day.isToday && (
                   <div className="timeline-current-marker">
-                    Today · {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')} (
-                    {trip.timezone})
+                    {t('todayMarker', {
+                      time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+                      timezone: trip.timezone,
+                    })}
                   </div>
                 )}
                 {day.lines.length > 0 ? (
                   <div className="entry-dot-list">
                     {day.lines.map((line) => {
-                      const label = dayLineLabel(line, trip.timezone);
+                      const label = dayLineLabel(line, trip.timezone, t);
                       // A Stay's own through-day: the branch line already
                       // shows it's ongoing, so no text at all here.
                       if (label.hidden) return null;
@@ -455,13 +474,13 @@ export default async function TimelinePage({ params }: PageProps) {
                           {label.showSubtype && line.subtype && (
                             <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
                           )}
-                          {isBlogPost && <span className="entry-chip-blog-cta"> Read post →</span>}
+                          {isBlogPost && <span className="entry-chip-blog-cta"> {t('readPost')}</span>}
                         </Link>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="timeline-day-empty">No entries yet</div>
+                  <div className="timeline-day-empty">{t('noEntriesYet')}</div>
                 )}
               </div>
             </div>
@@ -470,7 +489,7 @@ export default async function TimelinePage({ params }: PageProps) {
       </div>
 
       {viewer.type === 'user' && (
-        <Link href={`/trips/${tripId}/entries/new`} className="fab" aria-label="Add Entry">
+        <Link href={`/trips/${tripId}/entries/new`} className="fab" aria-label={t('addEntry')}>
           +
         </Link>
       )}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Locale } from '@prisma/client';
 import { locationFields } from '@/lib/entry-types/shared-fields.schema';
 import { SECTION_COLOR_VALUES, SECTION_EMOJI_OPTIONS } from '@/lib/section-colors';
 
@@ -341,5 +342,14 @@ export const checklistItemUpdateSchema = z
     text: z.string().trim().min(1, 'Text is required').max(500).optional(),
     checked: z.boolean().optional(),
     note: z.string().trim().max(2000).optional().nullable(),
+  })
+  .strict();
+
+// Multi-language support: the only field PATCH /api/v1/me accepts -- a
+// signed-in User's own language preference (lib/locale.ts's resolveLocale
+// reads this back on every subsequent request).
+export const localeSchema = z
+  .object({
+    locale: z.nativeEnum(Locale),
   })
   .strict();

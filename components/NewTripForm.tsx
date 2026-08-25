@@ -1,11 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
 import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
 
 export function NewTripForm() {
+  const t = useTranslations('errors');
+  const tTrips = useTranslations('trips');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -31,7 +35,7 @@ export function NewTripForm() {
     // real, list-backed IANA string or '' -- '' means the user typed
     // something but never picked a zone, which must block submission.
     if (!timezone) {
-      setError('Please pick a timezone from the list.');
+      setError(tTrips('pickTimezone'));
       return;
     }
 
@@ -56,7 +60,7 @@ export function NewTripForm() {
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not create the Trip.');
+        setError(translateApiError(t, body?.error?.message) ?? tTrips('createFailed'));
         return;
       }
 
@@ -72,7 +76,7 @@ export function NewTripForm() {
       // form already does after both submit and Cancel.
       autoEndDate.reset(false);
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tTrips('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -81,7 +85,7 @@ export function NewTripForm() {
   if (!open) {
     return (
       <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
-        + New Trip
+        {tTrips('newTrip')}
       </button>
     );
   }
@@ -90,11 +94,11 @@ export function NewTripForm() {
     <form onSubmit={handleSubmit} className="card stack">
       {error && <div className="form-error-banner">{error}</div>}
       <div className="field">
-        <label htmlFor="trip-name">Name</label>
+        <label htmlFor="trip-name">{tTrips('nameLabel')}</label>
         <input id="trip-name" value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
       <div className="field">
-        <label htmlFor="trip-destination">Destination</label>
+        <label htmlFor="trip-destination">{tTrips('destinationLabel')}</label>
         <input
           id="trip-destination"
           value={destination}
@@ -103,7 +107,7 @@ export function NewTripForm() {
       </div>
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="trip-start">Start date</label>
+          <label htmlFor="trip-start">{tTrips('startDateLabel')}</label>
           <input
             id="trip-start"
             type="date"
@@ -119,7 +123,7 @@ export function NewTripForm() {
           />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="trip-end">End date</label>
+          <label htmlFor="trip-end">{tTrips('endDateLabel')}</label>
           <input
             id="trip-end"
             type="date"
@@ -137,11 +141,11 @@ export function NewTripForm() {
         </div>
       </div>
       <div className="field">
-        <label htmlFor="trip-timezone">Timezone</label>
+        <label htmlFor="trip-timezone">{tTrips('timezoneLabel')}</label>
         <TimezoneSelect id="trip-timezone" initialValue={timezone} onChange={setTimezone} required />
       </div>
       <div className="field">
-        <label htmlFor="trip-description">Description</label>
+        <label htmlFor="trip-description">{tTrips('descriptionLabel')}</label>
         <textarea
           id="trip-description"
           value={description}
@@ -150,7 +154,7 @@ export function NewTripForm() {
         />
       </div>
       <div className="field">
-        <label htmlFor="trip-cover-image">Cover image URL</label>
+        <label htmlFor="trip-cover-image">{tTrips('coverImageLabel')}</label>
         <input
           id="trip-cover-image"
           type="url"
@@ -160,19 +164,19 @@ export function NewTripForm() {
         />
       </div>
       <div className="field">
-        <label htmlFor="trip-visibility">Visibility</label>
+        <label htmlFor="trip-visibility">{tTrips('visibilityLabel')}</label>
         <select
           id="trip-visibility"
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
         >
-          <option value="PRIVATE">Private</option>
-          <option value="PUBLIC">Public</option>
+          <option value="PRIVATE">{tTrips('visibilityPrivate')}</option>
+          <option value="PUBLIC">{tTrips('visibilityPublic')}</option>
         </select>
       </div>
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Creating…' : 'Create Trip'}
+          {submitting ? tTrips('creating') : tTrips('createTrip')}
         </button>
         <button
           type="button"
@@ -182,7 +186,7 @@ export function NewTripForm() {
             autoEndDate.reset(false);
           }}
         >
-          Cancel
+          {tTrips('cancel')}
         </button>
       </div>
     </form>

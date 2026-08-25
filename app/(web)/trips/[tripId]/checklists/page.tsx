@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionUser } from '@/lib/auth';
 import { serializeChecklist, serializeChecklistItem } from '@/lib/serializers';
@@ -27,6 +28,8 @@ export default async function ChecklistsPage({ params }: PageProps) {
   const user = await getSessionUser();
   if (!user) notFound();
 
+  const t = await getTranslations('tripChecklists');
+
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
@@ -45,17 +48,15 @@ export default async function ChecklistsPage({ params }: PageProps) {
 
   return (
     <main className="page">
-      <h2>Checklists</h2>
-      <p className="text-soft">
-        Packing lists, pre-departure tasks, and anything else worth tracking for this Trip.
-      </p>
+      <h2>{t('title')}</h2>
+      <p className="text-soft">{t('subtitle')}</p>
 
       <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
         <ChecklistForm tripId={tripId} />
       </div>
 
       {checklists.length === 0 ? (
-        <div className="empty-state">No Checklists yet. Add one above.</div>
+        <div className="empty-state">{t('emptyState')}</div>
       ) : (
         <div className="stack">
           {checklists.map((checklist) => (

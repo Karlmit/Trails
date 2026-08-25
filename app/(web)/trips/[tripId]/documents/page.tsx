@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 import { ENTRY_TYPE_LABELS } from '@/lib/entry-types/labels';
@@ -21,6 +22,8 @@ export default async function DocumentsPage({ params }: PageProps) {
 
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip) notFound();
+
+  const t = await getTranslations('tripDocuments');
 
   const attachments = await prisma.attachment.findMany({
     where: { tripId },
@@ -81,7 +84,7 @@ export default async function DocumentsPage({ params }: PageProps) {
     if (attachment.ownerType === 'IMPORTANT_INFO') {
       const owner = importantInfoById.get(attachment.ownerId);
       if (!owner) continue;
-      const group = groups.get('IMPORTANT_INFO') ?? { label: 'Important Info', rows: [] };
+      const group = groups.get('IMPORTANT_INFO') ?? { label: t('importantInfoGroupLabel'), rows: [] };
       group.rows.push({ attachment, title: owner.title, href: `/trips/${tripId}/important-info` });
       groups.set('IMPORTANT_INFO', group);
     }
@@ -89,13 +92,11 @@ export default async function DocumentsPage({ params }: PageProps) {
 
   return (
     <main className="page">
-      <h2 style={{ margin: 0 }}>Documents</h2>
-      <p className="text-soft">
-        Every file uploaded anywhere on this Trip, grouped by the Entry it&rsquo;s attached to.
-      </p>
+      <h2 style={{ margin: 0 }}>{t('pageTitle')}</h2>
+      <p className="text-soft">{t('pageDescription')}</p>
 
       {groups.size === 0 ? (
-        <div className="empty-state">No documents uploaded on this Trip yet.</div>
+        <div className="empty-state">{t('emptyStatePage')}</div>
       ) : (
         <div className="stack">
           {[...groups.entries()].map(([groupKey, group]) => (

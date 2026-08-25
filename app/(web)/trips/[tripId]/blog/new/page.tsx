@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { dateKeyOfDateColumn } from '@/lib/trip-status';
 import { isUuid } from '@/lib/uuid';
@@ -18,6 +19,8 @@ export default async function NewBlogPostPage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
+  const t = await getTranslations('tripBlog');
+
   // spec-guest-access: creating a Blog Post is a User-only action -- the
   // Blog list page never renders a link to this route for a Guest, but
   // this repeats that check directly since it's a real, guessable URL.
@@ -30,9 +33,9 @@ export default async function NewBlogPostPage({ params }: PageProps) {
   return (
     <main className="page blog-editor-page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>New Blog Post</h2>
+        <h2 style={{ margin: 0 }}>{t('newHeading')}</h2>
         <Link href={`/trips/${tripId}/blog`} className="text-soft">
-          Back to Blog
+          {t('backToBlog')}
         </Link>
       </div>
       <BlogPostForm

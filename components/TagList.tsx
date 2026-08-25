@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -28,6 +30,8 @@ interface TagListProps {
 // (EntryDetailPanel, BlogPostDetailPanel, IdeaCard, ImportantInfoCard) --
 // same self-fetching shape as AttachmentList.tsx.
 export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) {
+  const t = useTranslations('errors');
+  const tShared = useTranslations('shared');
   const router = useRouter();
   const [tags, setTags] = useState<TagDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +79,7 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not add this Tag.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not add this Tag.');
         return;
       }
       setTags((current) => [...current, body as TagDTO]);
@@ -100,7 +104,7 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
       if (!response.ok) {
         setTags(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not remove this Tag.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not remove this Tag.');
         return;
       }
       router.refresh();
@@ -123,16 +127,16 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-        Tags
+        {tShared('tagListLabel')}
       </span>
 
       {error && <div className="form-error-banner">{error}</div>}
 
       {loading ? (
-        <p className="text-soft">Loading…</p>
+        <p className="text-soft">{tShared('tagListLoading')}</p>
       ) : (
         <div className="row" style={{ gap: 'var(--space-1)' }}>
-          {tags.length === 0 && <span className="text-soft">No tags yet.</span>}
+          {tags.length === 0 && <span className="text-soft">{tShared('tagListEmpty')}</span>}
           {tags.map((tag) => (
             <span key={tag.id} className="tag-chip">
               {tag.text}
@@ -141,7 +145,7 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
                   type="button"
                   onClick={() => handleDelete(tag)}
                   disabled={deletingIds.has(tag.id)}
-                  aria-label={`Remove tag ${tag.text}`}
+                  aria-label={tShared('tagListRemoveAriaLabel', { text: tag.text })}
                   style={{
                     border: 'none',
                     background: 'none',
@@ -165,9 +169,9 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Add a tag…"
+            placeholder={tShared('tagListAddPlaceholder')}
             maxLength={50}
-            aria-label="New tag text"
+            aria-label={tShared('tagListNewTagAriaLabel')}
             style={{
               border: '1px solid #d6dbde',
               borderRadius: 'var(--radius-input)',
@@ -176,7 +180,7 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
             }}
           />
           <button type="submit" className="btn btn-outline" disabled={submitting || !text.trim()}>
-            {submitting ? 'Adding…' : 'Add'}
+            {submitting ? tShared('tagListAdding') : tShared('tagListAddButton')}
           </button>
         </form>
       )}

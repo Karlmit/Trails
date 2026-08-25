@@ -14,13 +14,15 @@ import type {
 } from '@prisma/client';
 import { computeTripStatus, tripDurationDays } from '@/lib/trip-status';
 
-// FR-30, spec-admin-users: `role`/`createdAt` only, alongside `id`/`username`
-// -- `passwordHash` is deliberately never included (spec's "Never" boundary).
+// FR-30, spec-admin-users: `role`/`createdAt`/`locale` only, alongside
+// `id`/`username` -- `passwordHash` is deliberately never included (spec's
+// "Never" boundary).
 export function serializeUser(user: User) {
   return {
     id: user.id,
     username: user.username,
     role: user.role,
+    locale: user.locale,
     createdAt: user.createdAt.toISOString(),
   };
 }

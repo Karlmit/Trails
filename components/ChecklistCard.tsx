@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -28,6 +30,8 @@ export interface ChecklistDTO {
 // `router.refresh()` keeps the Server Component cache in sync per AD-12
 // without a full page reload.
 export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('tripChecklists');
   const router = useRouter();
   const [items, setItems] = useState(checklist.items);
   const [isPrivate, setIsPrivate] = useState(checklist.isPrivate);
@@ -74,14 +78,14 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
       if (!response.ok) {
         setIsPrivate(!nextPrivate);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not update this Checklist.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotUpdateChecklist'));
         return;
       }
 
       router.refresh();
     } catch {
       setIsPrivate(!nextPrivate);
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
     } finally {
       setTogglingPrivate(false);
     }
@@ -106,14 +110,14 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
         // Roll back on failure.
         setItems((current) => current.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)));
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not update this item.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotUpdateItem'));
         return;
       }
 
       router.refresh();
     } catch {
       setItems((current) => current.map((i) => (i.id === item.id ? { ...i, checked: item.checked } : i)));
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
     } finally {
       setTogglingIds((current) => {
         const next = new Set(current);
@@ -142,7 +146,7 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not add this item.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotAddItem'));
         return;
       }
 
@@ -151,14 +155,14 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
       setNewItemNote('');
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
     } finally {
       setAddingItem(false);
     }
   }
 
   async function handleDeleteItem(itemId: string, itemText: string) {
-    if (!confirm(`Remove "${itemText}" from this Checklist?`)) return;
+    if (!confirm(tc('confirmRemoveItem', { text: itemText }))) return;
     setError(null);
     const previous = items;
     setItems((current) => current.filter((i) => i.id !== itemId));
@@ -168,31 +172,31 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
       if (!response.ok) {
         setItems(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this item.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotDeleteItem'));
         return;
       }
       router.refresh();
     } catch {
       setItems(previous);
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
     }
   }
 
   async function handleDeleteChecklist() {
-    if (!confirm(`Delete "${checklist.title}"? Its items will be deleted too.`)) return;
+    if (!confirm(tc('confirmDeleteChecklist', { title: checklist.title }))) return;
     setError(null);
     setDeletingChecklist(true);
     try {
       const response = await fetch(`/api/v1/checklists/${checklist.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this Checklist.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotDeleteChecklist'));
         setDeletingChecklist(false);
         return;
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
       setDeletingChecklist(false);
     }
   }
@@ -219,9 +223,9 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
               checked={isPrivate}
               onChange={handleTogglePrivate}
               disabled={togglingPrivate}
-              aria-label="Private"
+              aria-label={tc('private')}
             />
-            <span className="text-soft">Private</span>
+            <span className="text-soft">{tc('private')}</span>
           </label>
           <button
             type="button"
@@ -230,13 +234,13 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
             onClick={handleDeleteChecklist}
             disabled={deletingChecklist}
           >
-            {deletingChecklist ? 'Deleting…' : 'Delete Checklist'}
+            {deletingChecklist ? tc('deleting') : tc('deleteChecklist')}
           </button>
         </div>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-soft">No items yet. Add one below.</p>
+        <p className="text-soft">{tc('noItemsYet')}</p>
       ) : (
         <div>
           {items.map((item) => (
@@ -257,9 +261,9 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
                 type="button"
                 className="checklist-item-remove"
                 onClick={() => handleDeleteItem(item.id, item.text)}
-                aria-label={`Remove ${item.text}`}
+                aria-label={tc('removeItemAriaLabel', { text: item.text })}
               >
-                remove
+                {tc('remove')}
               </button>
             </div>
           ))}
@@ -268,22 +272,22 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
 
       <form onSubmit={handleAddItem} className="row" style={{ marginTop: 'var(--space-2)', alignItems: 'flex-start' }}>
         <div className="field" style={{ flex: 1, minWidth: '160px', marginBottom: 0 }}>
-          <label htmlFor={`new-item-text-${checklist.id}`}>Item</label>
+          <label htmlFor={`new-item-text-${checklist.id}`}>{tc('itemLabel')}</label>
           <input
             id={`new-item-text-${checklist.id}`}
             value={newItemText}
             onChange={(e) => setNewItemText(e.target.value)}
-            placeholder="Add an item…"
+            placeholder={tc('addItemPlaceholder')}
             maxLength={500}
           />
         </div>
         <div className="field" style={{ flex: 1, minWidth: '160px', marginBottom: 0 }}>
-          <label htmlFor={`new-item-note-${checklist.id}`}>Note (optional)</label>
+          <label htmlFor={`new-item-note-${checklist.id}`}>{tc('noteLabel')}</label>
           <input
             id={`new-item-note-${checklist.id}`}
             value={newItemNote}
             onChange={(e) => setNewItemNote(e.target.value)}
-            placeholder="e.g. size, quantity…"
+            placeholder={tc('notePlaceholder')}
             maxLength={1000}
           />
         </div>
@@ -293,7 +297,7 @@ export function ChecklistCard({ checklist }: { checklist: ChecklistDTO }) {
           style={{ marginTop: 'var(--space-4)' }}
           disabled={addingItem || !newItemText.trim()}
         >
-          {addingItem ? 'Adding…' : 'Add item'}
+          {addingItem ? tc('adding') : tc('addItem')}
         </button>
       </form>
     </div>

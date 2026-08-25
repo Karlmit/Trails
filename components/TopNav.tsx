@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 // User-reported: "Some content are overlapping. Some menues scroll wierdly
 // to the sides... hamburger menus are prefered over side scrolling." The
@@ -31,6 +32,7 @@ import { useEffect, useState } from 'react';
 // "Admin" link only renders for `role === 'ADMIN'`, never for a `USER` or
 // logged-out visitor.
 export function TopNav({ username, role = null }: { username: string | null; role?: string | null }) {
+  const t = useTranslations('nav');
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,22 +77,25 @@ export function TopNav({ username, role = null }: { username: string | null; rol
           <>
             <div className="top-nav-actions top-nav-actions-desktop">
               <Link href="/trips" className="text-soft">
-                Trips
+                {t('trips')}
               </Link>
               {role === 'ADMIN' && (
                 <Link href="/admin/users" className="text-soft">
-                  Admin
+                  {t('admin')}
                 </Link>
               )}
+              <Link href="/settings" className="text-soft">
+                {t('settings')}
+              </Link>
               <span className="text-soft">{username}</span>
               <button type="button" className="btn btn-dark-outline" onClick={handleLogout} disabled={loggingOut}>
-                {loggingOut ? 'Logging out…' : 'Log out'}
+                {loggingOut ? t('loggingOut') : t('logOut')}
               </button>
             </div>
             <button
               type="button"
               className="top-nav-menu-btn"
-              aria-label="Menu"
+              aria-label={t('menu')}
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
             >
@@ -104,7 +109,7 @@ export function TopNav({ username, role = null }: { username: string | null; rol
           // action, so it never needed the hamburger treatment.
           <div className="top-nav-actions">
             <Link href="/login" className="btn btn-dark-outline">
-              Log in
+              {t('logIn')}
             </Link>
           </div>
         )}
@@ -112,14 +117,17 @@ export function TopNav({ username, role = null }: { username: string | null; rol
       {username && menuOpen && (
         <div className="top-nav-mobile-panel">
           <Link href="/trips" className="top-nav-mobile-link" onClick={() => setMenuOpen(false)}>
-            Trips
+            {t('trips')}
           </Link>
           {role === 'ADMIN' && (
             <Link href="/admin/users" className="top-nav-mobile-link" onClick={() => setMenuOpen(false)}>
-              Admin
+              {t('admin')}
             </Link>
           )}
-          <div className="top-nav-mobile-username text-soft">Signed in as {username}</div>
+          <Link href="/settings" className="top-nav-mobile-link" onClick={() => setMenuOpen(false)}>
+            {t('settings')}
+          </Link>
+          <div className="top-nav-mobile-username text-soft">{t('signedInAs', { username })}</div>
           <button
             type="button"
             className="btn btn-dark-outline"
@@ -127,7 +135,7 @@ export function TopNav({ username, role = null }: { username: string | null; rol
             disabled={loggingOut}
             style={{ width: '100%' }}
           >
-            {loggingOut ? 'Logging out…' : 'Log out'}
+            {loggingOut ? t('loggingOut') : t('logOut')}
           </button>
         </div>
       )}

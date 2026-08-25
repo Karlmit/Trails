@@ -1,10 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { PRIORITY_LABELS, WEATHER_SUITABILITY_LABELS } from '@/lib/ideas';
 import { IdeaForm } from '@/components/IdeaForm';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
@@ -52,25 +53,27 @@ export function IdeaCard({
   sections: { id: string; name: string }[];
   categoryOptions: string[];
 }) {
+  const t = useTranslations('errors');
+  const ti = useTranslations('tripIdeas');
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
-    if (!confirm(`Delete "${idea.title}"? This cannot be undone.`)) return;
+    if (!confirm(ti('confirmDelete', { title: idea.title }))) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch(`/api/v1/ideas/${idea.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this Idea.');
+        setError(translateApiError(t, body?.error?.message) ?? ti('couldNotDeleteIdea'));
         return;
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setBusy(false);
     }
@@ -89,7 +92,7 @@ export function IdeaCard({
         />
         {error && <div className="form-error-banner">{error}</div>}
         <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-          {busy ? 'Deleting…' : 'Delete Idea'}
+          {busy ? ti('deleting') : ti('deleteIdea')}
         </button>
       </div>
     );
@@ -104,10 +107,10 @@ export function IdeaCard({
         <h3 style={{ margin: 0 }}>{idea.title}</h3>
         <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
           <span className={`badge ${PRIORITY_BADGE_CLASS[idea.priority] ?? 'badge-priority-maybe'}`}>
-            {PRIORITY_LABELS[idea.priority] ?? idea.priority}
+            {ti(`priority.${idea.priority}`)}
           </span>
           <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-            Edit
+            {ti('edit')}
           </button>
         </div>
       </div>
@@ -131,9 +134,7 @@ export function IdeaCard({
           <span className="text-soft">{sections.find((s) => s.id === idea.sectionId)?.name}</span>
         )}
         {idea.category && <span className="text-soft">{idea.category}</span>}
-        <span className="text-soft">
-          {WEATHER_SUITABILITY_LABELS[idea.weatherSuitability] ?? idea.weatherSuitability}
-        </span>
+        <span className="text-soft">{ti(`weatherSuitability.${idea.weatherSuitability}`)}</span>
       </div>
 
       {idea.description && <p className="text-soft text-multiline" style={{ margin: 0 }}>{idea.description}</p>}
@@ -146,7 +147,7 @@ export function IdeaCard({
               {' '}
               ·{' '}
               <a href={idea.locationMapLink} target="_blank" rel="noreferrer">
-                Map
+                {ti('map')}
               </a>
             </>
           )}
@@ -155,12 +156,15 @@ export function IdeaCard({
 
       {idea.estimatedExpenseAmount != null && idea.estimatedExpenseCurrency && (
         <div className="text-soft">
-          Est. {idea.estimatedExpenseAmount} {idea.estimatedExpenseCurrency}
+          {ti('estimatedExpense', {
+            amount: idea.estimatedExpenseAmount,
+            currency: idea.estimatedExpenseCurrency,
+          })}
         </div>
       )}
 
       <Link href={`/trips/${idea.tripId}/ideas/${idea.id}/convert`} className="btn btn-primary">
-        Convert to Entry
+        {ti('convertToEntry')}
       </Link>
 
       <LinkList ownerType="IDEA" ownerId={idea.id} readOnly />

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeIdea } from '@/lib/serializers';
 import { dateKeyOfDateColumn } from '@/lib/trip-status';
@@ -27,19 +28,17 @@ export default async function ConvertIdeaPage({ params }: PageProps) {
 
   const dto = serializeIdea(idea);
 
+  const t = await getTranslations('tripIdeas');
+
   return (
     <main className="page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Convert &ldquo;{dto.title}&rdquo; to an Entry</h2>
+        <h2 style={{ margin: 0 }}>{t('convertTitle', { title: dto.title })}</h2>
         <Link href={`/trips/${tripId}/ideas`} className="text-soft">
-          Back to Ideas
+          {t('backToIdeas')}
         </Link>
       </div>
-      <p className="text-soft">
-        Title, Location, and estimated expense are carried over from the Idea -- everything is still editable.
-        Category, priority, and weather tags were just for weighing candidates and don&rsquo;t carry over. Add
-        the confirmed date/time and booking details, then save to create the Entry and remove this Idea.
-      </p>
+      <p className="text-soft">{t('convertDescription')}</p>
       <EntryForm
         tripId={tripId}
         mode="create"

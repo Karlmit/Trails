@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { AuthForm } from '@/components/AuthForm';
 import { getSessionUser, hasAnyUsers } from '@/lib/auth';
 
@@ -13,13 +14,13 @@ export default async function SignupPage() {
   const bootstrapped = await hasAnyUsers();
   if (bootstrapped) redirect('/login');
 
+  const t = await getTranslations('auth');
+
   return (
     <main className="page" style={{ display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
-        <h1>Set up Trails</h1>
-        <p className="text-soft">
-          Create the first account for this instance. It will be an Admin.
-        </p>
+        <h1>{t('signupTitle')}</h1>
+        <p className="text-soft">{t('signupSubtitle')}</p>
         <AuthForm mode="signup" />
       </div>
     </main>

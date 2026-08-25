@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { EditTripForm } from '@/components/EditTripForm';
 
 interface TripOverviewPanelProps {
@@ -24,6 +25,7 @@ interface TripOverviewPanelProps {
 }
 
 export function TripOverviewPanel({ trip, readOnly = false }: TripOverviewPanelProps) {
+  const t = useTranslations('tripOverview');
   const [editing, setEditing] = useState(false);
 
   if (editing && !readOnly) {
@@ -44,7 +46,7 @@ export function TripOverviewPanel({ trip, readOnly = false }: TripOverviewPanelP
         <h2 style={{ margin: 0 }}>{trip.name}</h2>
         {!readOnly && (
           <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-            Edit
+            {t('editButton')}
           </button>
         )}
       </div>
@@ -52,33 +54,33 @@ export function TripOverviewPanel({ trip, readOnly = false }: TripOverviewPanelP
       <dl className="row" style={{ gap: 'var(--space-6)' }}>
         <div>
           <dt className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Start date
+            {t('startDateLabel')}
           </dt>
           <dd style={{ margin: 0 }}>{trip.startDate}</dd>
         </div>
         <div>
           <dt className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            End date
+            {t('endDateLabel')}
           </dt>
           <dd style={{ margin: 0 }}>{trip.endDate}</dd>
         </div>
         <div>
           <dt className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Duration
+            {t('durationLabel')}
           </dt>
-          <dd style={{ margin: 0 }}>{trip.durationDays} days</dd>
+          <dd style={{ margin: 0 }}>{t('durationDays', { count: trip.durationDays })}</dd>
         </div>
         <div>
           <dt className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Timezone
+            {t('timezoneLabel')}
           </dt>
           <dd style={{ margin: 0 }}>{trip.timezone}</dd>
         </div>
         <div>
           <dt className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Visibility
+            {t('visibilityLabel')}
           </dt>
-          <dd style={{ margin: 0 }}>{trip.visibility === 'PUBLIC' ? 'Public' : 'Private'}</dd>
+          <dd style={{ margin: 0 }}>{trip.visibility === 'PUBLIC' ? t('visibilityPublic') : t('visibilityPrivate')}</dd>
         </div>
       </dl>
       {trip.description && <p style={{ margin: 0 }}>{trip.description}</p>}

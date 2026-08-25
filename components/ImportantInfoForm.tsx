@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { ImportantInfoDTO } from '@/components/ImportantInfoCard';
@@ -24,6 +26,9 @@ interface ImportantInfoFormProps {
 // its parent (ImportantInfoCard), same as EntryForm mounted from
 // EntryDetailPanel.
 export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: ImportantInfoFormProps) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('common');
+  const ti = useTranslations('tripImportantInfo');
   const router = useRouter();
   const [open, setOpen] = useState(mode === 'edit');
   const [title, setTitle] = useState(item?.title ?? '');
@@ -86,7 +91,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(responseBody?.error?.message ?? 'Could not save this item.');
+        setError(translateApiError(t, responseBody?.error?.message) ?? ti('saveError'));
         return;
       }
 
@@ -97,7 +102,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
       onSaved?.(responseBody as ImportantInfoDTO);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -106,7 +111,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   if (mode === 'create' && !open) {
     return (
       <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
-        + Add Important Info
+        {ti('addButtonCta')}
       </button>
     );
   }
@@ -124,7 +129,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
         {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
-        <label htmlFor="important-info-title">Title</label>
+        <label htmlFor="important-info-title">{ti('titleLabel')}</label>
         <input
           id="important-info-title"
           value={title}
@@ -135,7 +140,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
       </div>
 
       <div className="field">
-        <label htmlFor="important-info-content">Description</label>
+        <label htmlFor="important-info-content">{ti('descriptionLabel')}</label>
         <textarea
           id="important-info-content"
           value={content}
@@ -146,7 +151,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
       </div>
 
       <div className="field">
-        <label htmlFor="important-info-emoji">Emoji (optional)</label>
+        <label htmlFor="important-info-emoji">{ti('emojiOptionalLabel')}</label>
         <input
           id="important-info-emoji"
           value={emoji}
@@ -166,12 +171,12 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
 
       <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
         <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-        Private
+        {ti('private')}
       </label>
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
-          {submitting ? 'Saving…' : mode === 'create' ? 'Add Important Info' : 'Save'}
+          {submitting ? tc('saving') : mode === 'create' ? ti('addButton') : tc('save')}
         </button>
         <button
           type="button"
@@ -185,7 +190,7 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
             }
           }}
         >
-          Cancel
+          {tc('cancel')}
         </button>
       </div>
       </form>

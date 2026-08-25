@@ -1,11 +1,15 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
 // FR-21, spec-checklists: create a Checklist. Same toggle-open inline-form
 // pattern as IdeaForm/SectionManager -- no new UI pattern introduced.
 export function ChecklistForm({ tripId }: { tripId: string }) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('tripChecklists');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -28,7 +32,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not create this Checklist.');
+        setError(translateApiError(t, body?.error?.message) ?? tc('couldNotCreateChecklist'));
         return;
       }
 
@@ -38,7 +42,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       setOpen(false);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tc('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -47,7 +51,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
   if (!open) {
     return (
       <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
-        + Add Checklist
+        {tc('openButton')}
       </button>
     );
   }
@@ -57,7 +61,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       {error && <div className="form-error-banner">{error}</div>}
 
       <div className="field">
-        <label htmlFor="checklist-title">Title</label>
+        <label htmlFor="checklist-title">{tc('titleLabel')}</label>
         <input
           id="checklist-title"
           value={title}
@@ -68,7 +72,7 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
       </div>
 
       <div className="field">
-        <label htmlFor="checklist-emoji">Emoji (optional)</label>
+        <label htmlFor="checklist-emoji">{tc('emojiLabel')}</label>
         <input
           id="checklist-emoji"
           value={emoji}
@@ -81,15 +85,15 @@ export function ChecklistForm({ tripId }: { tripId: string }) {
 
       <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
         <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-        Private
+        {tc('private')}
       </label>
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Adding…' : 'Add Checklist'}
+          {submitting ? tc('adding') : tc('submit')}
         </button>
         <button type="button" className="btn btn-dark-outline" onClick={() => setOpen(false)}>
-          Cancel
+          {tc('cancel')}
         </button>
       </div>
     </form>

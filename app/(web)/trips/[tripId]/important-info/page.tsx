@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeImportantInfo } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -39,20 +40,19 @@ export default async function ImportantInfoPage({ params }: PageProps) {
     primaryPhotoId: primaryPhotoByItemId.get(item.id) ?? null,
   }));
 
+  const t = await getTranslations('tripImportantInfo');
+
   return (
     <main className="page">
-      <h2>Important Info</h2>
-      <p className="text-soft">
-        Insurance, passport copies, visa info, emergency contacts, embassy details, SIM/eSIM, addresses,
-        and anything else worth keeping on hand for this Trip.
-      </p>
+      <h2>{t('pageTitle')}</h2>
+      <p className="text-soft">{t('pageDescription')}</p>
 
       <div className="stack" style={{ marginBottom: 'var(--space-4)' }}>
         <ImportantInfoForm tripId={tripId} mode="create" />
       </div>
 
       {items.length === 0 ? (
-        <div className="empty-state">No Important Info yet. Add one above.</div>
+        <div className="empty-state">{t('emptyState')}</div>
       ) : (
         <div className="stack" style={{ gap: 'var(--space-2)' }}>
           {items.map((item, index) => (

@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
@@ -8,6 +10,8 @@ interface AuthFormProps {
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
+  const t = useTranslations('errors');
+  const tAuth = useTranslations('auth');
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -29,18 +33,18 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         if (response.status === 410) {
-          setError('Signup is closed. Redirecting to login…');
+          setError(tAuth('signupClosedRedirecting'));
           setTimeout(() => router.push('/login'), 1200);
           return;
         }
-        setError(body?.error?.message ?? 'Something went wrong. Please try again.');
+        setError(translateApiError(t, body?.error?.message) ?? tAuth('genericError'));
         return;
       }
 
       router.push('/');
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tAuth('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +54,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     <form onSubmit={handleSubmit} className="card" style={{ maxWidth: 380 }}>
       {error && <div className="form-error-banner">{error}</div>}
       <div className="field">
-        <label htmlFor="username">Username</label>
+        <label htmlFor="username">{tAuth('usernameLabel')}</label>
         <input
           id="username"
           name="username"
@@ -62,7 +66,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         />
       </div>
       <div className="field">
-        <label htmlFor="password">Password</label>
+        <label htmlFor="password">{tAuth('passwordLabel')}</label>
         <input
           id="password"
           name="password"
@@ -75,7 +79,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         />
       </div>
       <button type="submit" className="btn btn-primary" disabled={submitting} style={{ width: '100%' }}>
-        {submitting ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+        {submitting ? tAuth('pleaseWait') : mode === 'login' ? tAuth('logIn') : tAuth('createAccount')}
       </button>
     </form>
   );

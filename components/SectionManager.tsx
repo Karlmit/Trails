@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import {
@@ -43,19 +45,21 @@ const EMPTY_FORM: SectionFormValues = {
 function ColorSwatchPicker({
   value,
   onChange,
+  t,
 }: {
   value: string | null;
   onChange: (color: string | null) => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
-    <div className="color-swatch-picker" role="group" aria-label="Section color">
+    <div className="color-swatch-picker" role="group" aria-label={t('colorGroupAriaLabel')}>
       <button
         type="button"
         className={`color-swatch-btn color-swatch-btn-none${value === null ? ' is-selected' : ''}`}
         onClick={() => onChange(null)}
         aria-pressed={value === null}
-        aria-label="No color (auto)"
-        title="No color (auto)"
+        aria-label={t('noColorLabel')}
+        title={t('noColorLabel')}
       >
         ×
       </button>
@@ -67,7 +71,7 @@ function ColorSwatchPicker({
           style={{ ['--swatch-color' as string]: swatch.solid }}
           onClick={() => onChange(swatch.value)}
           aria-pressed={value === swatch.value}
-          aria-label={`Color ${swatch.value}`}
+          aria-label={t('colorSwatchAriaLabel', { value: swatch.value })}
           title={swatch.value}
         />
       ))}
@@ -80,19 +84,21 @@ function ColorSwatchPicker({
 function EmojiPicker({
   value,
   onChange,
+  t,
 }: {
   value: string | null;
   onChange: (emoji: string | null) => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
-    <div className="emoji-picker" role="group" aria-label="Section emoji">
+    <div className="emoji-picker" role="group" aria-label={t('emojiGroupAriaLabel')}>
       <button
         type="button"
         className={`emoji-picker-btn emoji-picker-btn-none${value === null ? ' is-selected' : ''}`}
         onClick={() => onChange(null)}
         aria-pressed={value === null}
-        aria-label="No emoji"
-        title="No emoji"
+        aria-label={t('noEmojiLabel')}
+        title={t('noEmojiLabel')}
       >
         ×
       </button>
@@ -103,7 +109,7 @@ function EmojiPicker({
           className={`emoji-picker-btn${value === emoji ? ' is-selected' : ''}`}
           onClick={() => onChange(emoji)}
           aria-pressed={value === emoji}
-          aria-label={`Emoji ${emoji}`}
+          aria-label={t('emojiOptionAriaLabel', { emoji })}
           title={emoji}
         >
           {emoji}
@@ -122,6 +128,7 @@ function SectionFieldset({
   values,
   onChange,
   autoEndDate,
+  t,
 }: {
   idPrefix: string;
   values: SectionFormValues;
@@ -130,12 +137,13 @@ function SectionFieldset({
   // owns a separate instance per form (create vs. each Section's own edit
   // form) so touched-tracking never bleeds between them.
   autoEndDate: AutoEndDate;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <>
       <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor={`${idPrefix}-name`}>Section name</label>
+          <label htmlFor={`${idPrefix}-name`}>{t('sectionNameLabel')}</label>
           <input
             id={`${idPrefix}-name`}
             value={values.name}
@@ -144,7 +152,7 @@ function SectionFieldset({
           />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor={`${idPrefix}-start`}>Start</label>
+          <label htmlFor={`${idPrefix}-start`}>{t('startLabel')}</label>
           <input
             id={`${idPrefix}-start`}
             type="date"
@@ -163,7 +171,7 @@ function SectionFieldset({
           />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor={`${idPrefix}-end`}>End</label>
+          <label htmlFor={`${idPrefix}-end`}>{t('endLabel')}</label>
           <input
             id={`${idPrefix}-end`}
             type="date"
@@ -181,18 +189,21 @@ function SectionFieldset({
         </div>
       </div>
       <div className="field" style={{ marginBottom: 0 }}>
-        <label>Color</label>
-        <ColorSwatchPicker value={values.color} onChange={(color) => onChange({ ...values, color })} />
+        <label>{t('colorLabel')}</label>
+        <ColorSwatchPicker value={values.color} onChange={(color) => onChange({ ...values, color })} t={t} />
       </div>
       <div className="field" style={{ marginBottom: 0 }}>
-        <label>Emoji</label>
-        <EmojiPicker value={values.emoji} onChange={(emoji) => onChange({ ...values, emoji })} />
+        <label>{t('emojiLabel')}</label>
+        <EmojiPicker value={values.emoji} onChange={(emoji) => onChange({ ...values, emoji })} t={t} />
       </div>
     </>
   );
 }
 
 export function SectionManager({ tripId, sections }: { tripId: string; sections: SectionDTO[] }) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('common');
+  const ts = useTranslations('tripSections');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [createValues, setCreateValues] = useState<SectionFormValues>(EMPTY_FORM);
@@ -228,7 +239,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not create the Section.');
+        setError(translateApiError(t, body?.error?.message) ?? ts('createError'));
         return;
       }
 
@@ -237,7 +248,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
       setOpen(false);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ts('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -261,7 +272,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
           editValues.endDate !== beingEdited.endDate ||
           editValues.color !== beingEdited.color ||
           editValues.emoji !== beingEdited.emoji);
-      if (hasUnsavedChanges && !confirm('Discard unsaved changes to this Section?')) {
+      if (hasUnsavedChanges && !confirm(ts('discardUnsavedConfirm'))) {
         return;
       }
     }
@@ -302,32 +313,32 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setEditError(body?.error?.message ?? 'Could not update the Section.');
+        setEditError(translateApiError(t, body?.error?.message) ?? ts('updateError'));
         return;
       }
 
       setEditingId(null);
       router.refresh();
     } catch {
-      setEditError('Could not reach the server. Please try again.');
+      setEditError(ts('networkError'));
     } finally {
       setEditSubmitting(false);
     }
   }
 
   async function handleDelete(sectionId: string) {
-    if (!confirm('Delete this Section? Its color band will be removed.')) return;
+    if (!confirm(ts('deleteConfirm'))) return;
     setError(null);
     try {
       const response = await fetch(`/api/v1/sections/${sectionId}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete the Section.');
+        setError(translateApiError(t, body?.error?.message) ?? ts('deleteError'));
         return;
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ts('networkError'));
     }
   }
 
@@ -354,13 +365,14 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
                   values={editValues}
                   onChange={setEditValues}
                   autoEndDate={editAutoEndDate}
+                  t={ts}
                 />
                 <div className="row">
                   <button type="submit" className="btn btn-primary" disabled={editSubmitting}>
-                    {editSubmitting ? 'Saving…' : 'Save changes'}
+                    {editSubmitting ? tc('saving') : ts('saveChanges')}
                   </button>
                   <button type="button" className="btn btn-dark-outline" onClick={cancelEdit}>
-                    Cancel
+                    {tc('cancel')}
                   </button>
                 </div>
               </form>
@@ -389,7 +401,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
                     color: 'var(--color-brand-accent)',
                   }}
                 >
-                  edit
+                  {ts('editLink')}
                 </button>
                 <button
                   type="button"
@@ -403,7 +415,7 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
                     cursor: 'pointer',
                   }}
                 >
-                  remove
+                  {ts('removeLink')}
                 </button>
               </div>
             ),
@@ -423,10 +435,11 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
             values={createValues}
             onChange={setCreateValues}
             autoEndDate={createAutoEndDate}
+            t={ts}
           />
           <div className="row">
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Adding…' : 'Add Section'}
+              {submitting ? ts('adding') : ts('addSection')}
             </button>
             <button
               type="button"
@@ -438,13 +451,13 @@ export function SectionManager({ tripId, sections }: { tripId: string; sections:
                 setError(null);
               }}
             >
-              Cancel
+              {tc('cancel')}
             </button>
           </div>
         </form>
       ) : (
         <button type="button" className="btn btn-outline" onClick={() => setOpen(true)}>
-          + Add Section
+          {ts('addSectionCta')}
         </button>
       )}
     </div>

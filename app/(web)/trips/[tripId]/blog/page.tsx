@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -29,6 +30,7 @@ export default async function BlogPage({ params }: PageProps) {
   const { tripId } = await params;
   if (!isUuid(tripId)) notFound();
 
+  const t = await getTranslations('tripBlog');
   const viewer = await getViewer();
 
   const trip = await prisma.trip.findUnique({
@@ -79,7 +81,7 @@ export default async function BlogPage({ params }: PageProps) {
   return (
     <main className="page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Blog</h2>
+        <h2 style={{ margin: 0 }}>{t('heading')}</h2>
         {/* User-reported: "I would like the blog content editor to be a
             full page experience" -- create now launches its own dedicated
             page (blog/new/page.tsx), same FAB-launched-create-page pattern
@@ -87,17 +89,14 @@ export default async function BlogPage({ params }: PageProps) {
             cramped above this list. */}
         {viewer.type === 'user' && (
           <Link href={`/trips/${tripId}/blog/new`} className="btn btn-primary">
-            + New Post
+            {t('newPost')}
           </Link>
         )}
       </div>
-      <p className="text-soft">
-        This Trip&rsquo;s journal. A new post starts as a Draft and is never shown on the Timeline until you
-        Publish it. Any User with access to this Trip can see Drafts here, same as everything else on it.
-      </p>
+      <p className="text-soft">{t('description')}</p>
 
       {posts.length === 0 ? (
-        <div className="empty-state">No Blog Posts yet. Add one to get started.</div>
+        <div className="empty-state">{t('emptyState')}</div>
       ) : (
         <div className="stack">
           {posts.map((post) => (

@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ENTRY_TYPE_LABELS, SUBTYPES_BY_ENTRY_TYPE, subtypeLabel } from '@/lib/entry-types/labels';
@@ -15,11 +17,18 @@ export type CreatableEntryType = 'STAY' | 'TRANSPORT' | 'ACTIVITY' | 'NOTE';
 // shared-fields.schema.ts) so no pre-existing value is ever rejected, but
 // the UI narrows it to a closed Paid/Unpaid choice per user request --
 // they'd been typing exactly "Paid" or "Unpaid" into the old free-text
-// field already, so those are the two canonical values here.
+// field already, so those are the two canonical values here. The stored
+// value stays the literal English word (matching pre-existing data); only
+// the displayed label is translated (see PAYMENT_STATUS_LABEL_KEYS below).
 const PAYMENT_STATUSES = [
   { value: 'Paid', label: 'Paid' },
   { value: 'Unpaid', label: 'Unpaid' },
 ] as const;
+
+const PAYMENT_STATUS_LABEL_KEYS: Record<(typeof PAYMENT_STATUSES)[number]['value'], string> = {
+  Paid: 'paymentStatusPaid',
+  Unpaid: 'paymentStatusUnpaid',
+};
 
 export interface EntryDTO {
   id: string;
@@ -211,13 +220,21 @@ function flightsFromSeed(
 // literal-clock-time comparison (no timezone math): a layover's own
 // arrival and the next leg's departure happen at the same real airport in
 // the overwhelming common case.
-function stopoverGapLabel(prev: FlightDraft, next: FlightDraft): string {
+function stopoverGapLabel(
+  prev: FlightDraft,
+  next: FlightDraft,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string {
   const location = prev.arrivalLocation.trim() || next.departureLocation.trim();
   const fmt = (value: string) => {
     const { hour, minute } = splitDateTime(value);
     return hour && minute ? `${hour}:${minute}` : '?';
   };
-  return `⏱ Stopover${location ? ` at ${location}` : ''}: ${fmt(prev.arrivalAt)}–${fmt(next.departureAt)}`;
+  const from = fmt(prev.arrivalAt);
+  const to = fmt(next.departureAt);
+  return location
+    ? t('stopoverWithLocation', { location, from, to })
+    : t('stopoverNoLocation', { from, to });
 }
 
 export function EntryForm({
@@ -231,6 +248,8 @@ export function EntryForm({
   onSaved,
   onCancel,
 }: EntryFormProps) {
+  const t = useTranslations('errors');
+  const tEntries = useTranslations('tripEntries');
   const router = useRouter();
   // `entry` (edit mode) always wins; `initialValues` only ever seeds a
   // create-mode form (spec-ideas' convert step).
@@ -359,26 +378,26 @@ export function EntryForm({
     // of its own times set, matching what the User can see on-screen.
     const validFlights = entryType === 'TRANSPORT' ? flights.filter((f) => f.departureAt && f.arrivalAt) : [];
     if (entryType === 'TRANSPORT' && validFlights.length === 0) {
-      setError('At least one Flight needs both a departure and arrival date/time.');
+      setError(tEntries('errorFlightRequired'));
       return;
     }
     const effectiveStartAt = entryType === 'TRANSPORT' ? validFlights[0].departureAt : startAt;
     const effectiveEndAt = entryType === 'TRANSPORT' ? validFlights[validFlights.length - 1].arrivalAt : endAt;
 
     if (!effectiveStartAt) {
-      setError('A start date/time is required.');
+      setError(tEntries('errorStartRequired'));
       return;
     }
     if (entryType !== 'NOTE' && !subtype) {
-      setError('Please choose an Entry Subtype.');
+      setError(tEntries('errorSubtypeRequired'));
       return;
     }
     if (endRequired && !effectiveEndAt) {
-      setError('Check-out is required.');
+      setError(tEntries('errorCheckOutRequired'));
       return;
     }
     if (titleFromLocation && !locationName.trim()) {
-      setError('Location name is required.');
+      setError(tEntries('errorLocationNameRequired'));
       return;
     }
 
@@ -506,7 +525,7 @@ export function EntryForm({
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(responseBody?.error?.message ?? 'Could not save this Entry.');
+        setError(translateApiError(t, responseBody?.error?.message) ?? tEntries('errorCouldNotSave'));
         return;
       }
 
@@ -520,7 +539,7 @@ export function EntryForm({
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tEntries('errorNetworkError'));
     } finally {
       setSubmitting(false);
     }
@@ -532,7 +551,7 @@ export function EntryForm({
 
       {mode === 'create' && (
         <div className="field">
-          <label htmlFor="entry-type">Entry Type</label>
+          <label htmlFor="entry-type">{tEntries('entryTypeLabel')}</label>
           <select
             id="entry-type"
             value={entryType}
@@ -552,16 +571,18 @@ export function EntryForm({
 
       {!titleFromLocation && (
         <div className="field">
-          <label htmlFor="entry-title">Title</label>
+          <label htmlFor="entry-title">{tEntries('titleLabel')}</label>
           <input id="entry-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
         </div>
       )}
 
       {entryType !== 'NOTE' && (
         <div className="field">
-          <label htmlFor="entry-subtype">{entryType === 'TRANSPORT' ? 'Mode' : 'Subtype'}</label>
+          <label htmlFor="entry-subtype">
+            {entryType === 'TRANSPORT' ? tEntries('modeLabel') : tEntries('subtypeFieldLabel')}
+          </label>
           <select id="entry-subtype" value={subtype} onChange={(e) => setSubtype(e.target.value)} required>
-            <option value="">Select…</option>
+            <option value="">{tEntries('selectPlaceholder')}</option>
             {subtypeOptions.map((value) => (
               <option key={value} value={value}>
                 {subtypeLabel(value)}
@@ -572,7 +593,7 @@ export function EntryForm({
       )}
 
       <div className="field">
-        <label htmlFor="entry-description">Description</label>
+        <label htmlFor="entry-description">{tEntries('descriptionLabel')}</label>
         <textarea
           id="entry-description"
           value={description}
@@ -584,7 +605,9 @@ export function EntryForm({
       {entryType !== 'TRANSPORT' && (
         <div className="row">
           <div className="field" style={{ flex: 1 }}>
-            <label htmlFor="entry-start">{entryType === 'STAY' ? 'Check-in' : 'Start'}</label>
+            <label htmlFor="entry-start">
+              {entryType === 'STAY' ? tEntries('checkInLabel') : tEntries('startLabel')}
+            </label>
             <DateTimeInput
               id="entry-start"
               value={startAt}
@@ -603,7 +626,9 @@ export function EntryForm({
           </div>
           {showEnd && (
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-end">{entryType === 'STAY' ? 'Check-out' : 'End (optional)'}</label>
+              <label htmlFor="entry-end">
+                {entryType === 'STAY' ? tEntries('checkOutLabel') : tEntries('endOptionalLabel')}
+              </label>
               <DateTimeInput
                 id="entry-end"
                 value={endAt}
@@ -663,7 +688,7 @@ export function EntryForm({
       {showLocation && (
         <>
           <div className="field">
-            <label htmlFor="entry-location-name">Location name</label>
+            <label htmlFor="entry-location-name">{tEntries('locationNameLabel')}</label>
             <input
               id="entry-location-name"
               value={locationName}
@@ -672,7 +697,7 @@ export function EntryForm({
             />
           </div>
           <div className="field">
-            <label htmlFor="entry-location-address">Location address</label>
+            <label htmlFor="entry-location-address">{tEntries('locationAddressLabel')}</label>
             <input
               id="entry-location-address"
               value={locationAddress}
@@ -680,7 +705,7 @@ export function EntryForm({
             />
           </div>
           <div className="field">
-            <label htmlFor="entry-location-map">Map link</label>
+            <label htmlFor="entry-location-map">{tEntries('mapLinkLabel')}</label>
             <input
               id="entry-location-map"
               value={locationMapLink}
@@ -693,7 +718,7 @@ export function EntryForm({
 
       {entryType === 'STAY' && (
         <div className="field">
-          <label htmlFor="entry-room-info">Room info</label>
+          <label htmlFor="entry-room-info">{tEntries('roomInfoLabel')}</label>
           <input id="entry-room-info" value={roomInfo} onChange={(e) => setRoomInfo(e.target.value)} />
         </div>
       )}
@@ -707,14 +732,14 @@ export function EntryForm({
               than separately entered data. */}
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-              Flights
+              {tEntries('flightsSectionLabel')}
             </span>
             {flights.map((flight, index) => (
               <div key={index} className="stack" style={{ gap: 'var(--space-2)' }}>
                 <div className="card stack" style={{ padding: 'var(--space-2)', gap: 'var(--space-2)' }}>
                   <div className="row-between">
                     <span className="text-soft" style={{ fontSize: '0.85rem' }}>
-                      Flight {index + 1}
+                      {tEntries('flightNumberFallback', { number: index + 1 })}
                     </span>
                     {index > 0 && (
                       <button
@@ -723,33 +748,37 @@ export function EntryForm({
                         style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
                         onClick={() => removeFlight(index)}
                       >
-                        Remove
+                        {tEntries('removeFlightButton')}
                       </button>
                     )}
                   </div>
                   <div className="row">
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-dep-location`}>Departure location</label>
+                      <label htmlFor={`entry-flight-${index}-dep-location`}>
+                        {tEntries('departureLocationLabel')}
+                      </label>
                       <input
                         id={`entry-flight-${index}-dep-location`}
                         value={flight.departureLocation}
                         onChange={(e) => updateFlight(index, { departureLocation: e.target.value })}
-                        placeholder="e.g. Stockholm (ARN)"
+                        placeholder={tEntries('departureLocationPlaceholder')}
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-arr-location`}>Arrival location</label>
+                      <label htmlFor={`entry-flight-${index}-arr-location`}>
+                        {tEntries('arrivalLocationLabel')}
+                      </label>
                       <input
                         id={`entry-flight-${index}-arr-location`}
                         value={flight.arrivalLocation}
                         onChange={(e) => updateFlight(index, { arrivalLocation: e.target.value })}
-                        placeholder="e.g. Phuket (HKT)"
+                        placeholder={tEntries('arrivalLocationPlaceholder')}
                       />
                     </div>
                   </div>
                   <div className="row">
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-departure`}>Departure</label>
+                      <label htmlFor={`entry-flight-${index}-departure`}>{tEntries('departureLabel')}</label>
                       <DateTimeInput
                         id={`entry-flight-${index}-departure`}
                         value={flight.departureAt}
@@ -759,7 +788,7 @@ export function EntryForm({
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-arrival`}>Arrival</label>
+                      <label htmlFor={`entry-flight-${index}-arrival`}>{tEntries('arrivalLabel')}</label>
                       <DateTimeInput
                         id={`entry-flight-${index}-arrival`}
                         value={flight.arrivalAt}
@@ -771,7 +800,7 @@ export function EntryForm({
                   </div>
                   <div className="row">
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-dep-tz`}>Departure timezone</label>
+                      <label htmlFor={`entry-flight-${index}-dep-tz`}>{tEntries('departureTimezoneLabel')}</label>
                       <TimezoneSelect
                         id={`entry-flight-${index}-dep-tz`}
                         initialValue={flight.departureTimezone}
@@ -780,7 +809,7 @@ export function EntryForm({
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-arr-tz`}>Arrival timezone</label>
+                      <label htmlFor={`entry-flight-${index}-arr-tz`}>{tEntries('arrivalTimezoneLabel')}</label>
                       <TimezoneSelect
                         id={`entry-flight-${index}-arr-tz`}
                         initialValue={flight.arrivalTimezone}
@@ -791,7 +820,7 @@ export function EntryForm({
                   </div>
                   <div className="row">
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-number`}>Flight number</label>
+                      <label htmlFor={`entry-flight-${index}-number`}>{tEntries('flightNumberLabel')}</label>
                       <input
                         id={`entry-flight-${index}-number`}
                         value={flight.flightNumber}
@@ -799,7 +828,7 @@ export function EntryForm({
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-terminal`}>Terminal</label>
+                      <label htmlFor={`entry-flight-${index}-terminal`}>{tEntries('terminalLabel')}</label>
                       <input
                         id={`entry-flight-${index}-terminal`}
                         value={flight.terminal}
@@ -807,7 +836,7 @@ export function EntryForm({
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-gate`}>Gate</label>
+                      <label htmlFor={`entry-flight-${index}-gate`}>{tEntries('gateLabel')}</label>
                       <input
                         id={`entry-flight-${index}-gate`}
                         value={flight.gate}
@@ -817,7 +846,7 @@ export function EntryForm({
                   </div>
                   <div className="row">
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-platform`}>Platform</label>
+                      <label htmlFor={`entry-flight-${index}-platform`}>{tEntries('platformLabel')}</label>
                       <input
                         id={`entry-flight-${index}-platform`}
                         value={flight.platform}
@@ -825,7 +854,7 @@ export function EntryForm({
                       />
                     </div>
                     <div className="field" style={{ flex: 1 }}>
-                      <label htmlFor={`entry-flight-${index}-seat`}>Seat</label>
+                      <label htmlFor={`entry-flight-${index}-seat`}>{tEntries('seatLabel')}</label>
                       <input
                         id={`entry-flight-${index}-seat`}
                         value={flight.seat}
@@ -836,18 +865,18 @@ export function EntryForm({
                 </div>
                 {index < flights.length - 1 && (
                   <div className="text-soft" style={{ fontSize: '0.85rem' }}>
-                    {stopoverGapLabel(flight, flights[index + 1])}
+                    {stopoverGapLabel(flight, flights[index + 1], tEntries)}
                   </div>
                 )}
               </div>
             ))}
             <button type="button" className="btn btn-outline" onClick={addFlight}>
-              + Add flight
+              {tEntries('addFlightButton')}
             </button>
           </div>
 
           <div className="field">
-            <label htmlFor="entry-baggage">Baggage info</label>
+            <label htmlFor="entry-baggage">{tEntries('baggageInfoLabel')}</label>
             <input id="entry-baggage" value={baggageInfo} onChange={(e) => setBaggageInfo(e.target.value)} />
           </div>
         </>
@@ -856,7 +885,7 @@ export function EntryForm({
       {showBookingExpense && (
         <>
           <div className="field">
-            <label htmlFor="entry-booking-ref">Booking reference</label>
+            <label htmlFor="entry-booking-ref">{tEntries('bookingReferenceLabel')}</label>
             <input
               id="entry-booking-ref"
               value={bookingReference}
@@ -865,7 +894,7 @@ export function EntryForm({
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-website">Website</label>
+              <label htmlFor="entry-website">{tEntries('websiteLabel')}</label>
               <input
                 id="entry-website"
                 value={website}
@@ -874,7 +903,7 @@ export function EntryForm({
               />
             </div>
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-booked-via">Booked via</label>
+              <label htmlFor="entry-booked-via">{tEntries('bookedViaLabel')}</label>
               <input
                 id="entry-booked-via"
                 value={bookedVia}
@@ -885,7 +914,7 @@ export function EntryForm({
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-expense-amount">Expense amount</label>
+              <label htmlFor="entry-expense-amount">{tEntries('expenseAmountLabel')}</label>
               <input
                 id="entry-expense-amount"
                 type="number"
@@ -896,7 +925,7 @@ export function EntryForm({
               />
             </div>
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-expense-currency">Currency</label>
+              <label htmlFor="entry-expense-currency">{tEntries('currencyLabel')}</label>
               <input
                 id="entry-expense-currency"
                 value={expenseCurrency}
@@ -921,16 +950,16 @@ export function EntryForm({
           </div>
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-expense-status">Payment status</label>
+              <label htmlFor="entry-expense-status">{tEntries('paymentStatusLabel')}</label>
               <select
                 id="entry-expense-status"
                 value={expensePaymentStatus}
                 onChange={(e) => setExpensePaymentStatus(e.target.value)}
               >
-                <option value="">Not set</option>
+                <option value="">{tEntries('notSetOption')}</option>
                 {PAYMENT_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
-                    {status.label}
+                    {tEntries(PAYMENT_STATUS_LABEL_KEYS[status.value])}
                   </option>
                 ))}
                 {/* Preserve any pre-existing value outside the closed set above
@@ -942,7 +971,7 @@ export function EntryForm({
               </select>
             </div>
             <div className="field" style={{ flex: 1 }}>
-              <label htmlFor="entry-expense-note">Payment note</label>
+              <label htmlFor="entry-expense-note">{tEntries('paymentNoteLabel')}</label>
               <input
                 id="entry-expense-note"
                 value={expensePaymentNote}
@@ -955,27 +984,27 @@ export function EntryForm({
 
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="entry-contact-name">Contact name</label>
+          <label htmlFor="entry-contact-name">{tEntries('contactNameLabel')}</label>
           <input id="entry-contact-name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="entry-contact-phone">Contact phone</label>
+          <label htmlFor="entry-contact-phone">{tEntries('contactPhoneLabel')}</label>
           <input id="entry-contact-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="entry-contact-email">Contact email</label>
+          <label htmlFor="entry-contact-email">{tEntries('contactEmailLabel')}</label>
           <input id="entry-contact-email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
         </div>
       </div>
 
       <div className="field">
-        <label htmlFor="entry-notes">Notes</label>
+        <label htmlFor="entry-notes">{tEntries('notesLabel')}</label>
         <textarea id="entry-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
       </div>
 
       {mode === 'edit' && (
         <div className="field">
-          <label htmlFor="entry-post-trip-notes">Post-Trip Notes</label>
+          <label htmlFor="entry-post-trip-notes">{tEntries('postTripNotesLabel')}</label>
           <textarea
             id="entry-post-trip-notes"
             value={postTripNotes}
@@ -994,7 +1023,7 @@ export function EntryForm({
             onChange={(e) => setIsPrivate(e.target.checked)}
             style={{ width: 'auto' }}
           />
-          Private (hidden from Guests)
+          {tEntries('privateCheckboxLabel')}
         </label>
       </div>
 
@@ -1002,11 +1031,15 @@ export function EntryForm({
 
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Saving…' : mode === 'create' ? 'Create Entry' : 'Save changes'}
+          {submitting
+            ? tEntries('savingButton')
+            : mode === 'create'
+              ? tEntries('createEntryButton')
+              : tEntries('saveChangesButton')}
         </button>
         {onCancel && (
           <button type="button" className="btn btn-dark-outline" onClick={onCancel}>
-            Cancel
+            {tEntries('cancelButton')}
           </button>
         )}
       </div>

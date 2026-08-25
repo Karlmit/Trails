@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { appFont } from '@/app/fonts';
 import { getSessionUser } from '@/lib/auth';
 import { TopNav } from '@/components/TopNav';
@@ -14,12 +16,16 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  const locale = await getLocale();
+  const messages = await getMessages();
 
   return (
-    <html lang="en" className={appFont.variable}>
+    <html lang={locale} className={appFont.variable}>
       <body>
-        <TopNav username={user?.username ?? null} role={user?.role ?? null} />
-        {children}
+        <NextIntlClientProvider messages={messages}>
+          <TopNav username={user?.username ?? null} role={user?.role ?? null} />
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

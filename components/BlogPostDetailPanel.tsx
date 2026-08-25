@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -15,7 +17,10 @@ import { formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-sta
 // this Client Component's own server-render pass.
 const RichTextView = dynamic(() => import('@/components/RichTextEditor').then((m) => m.RichTextView), {
   ssr: false,
-  loading: () => <div className="text-soft">Loading…</div>,
+  loading: () => {
+    const t = useTranslations('tripBlog');
+    return <div className="text-soft">{t('loading')}</div>;
+  },
 });
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
@@ -46,6 +51,8 @@ export function BlogPostDetailPanel({
   // Guest.
   photos?: PhotoDTO[];
 }) {
+  const t = useTranslations('errors');
+  const tBlog = useTranslations('tripBlog');
   const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [busy, setBusy] = useState(false);
@@ -62,7 +69,7 @@ export function BlogPostDetailPanel({
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? `Could not ${isPublished ? 'unpublish' : 'publish'} this Blog Post.`);
+        setError(translateApiError(t, body?.error?.message) ?? `Could not ${isPublished ? 'unpublish' : 'publish'} this Blog Post.`);
         return;
       }
       setPost(body);
@@ -75,14 +82,14 @@ export function BlogPostDetailPanel({
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+    if (!confirm(tBlog('confirmDelete', { title: post.title }))) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch(`/api/v1/timeline-entries/${post.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this Blog Post.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not delete this Blog Post.');
         return;
       }
       router.push(`/trips/${tripId}/blog`);
@@ -100,18 +107,18 @@ export function BlogPostDetailPanel({
       <div className="card stack">
         <div className="row-between">
           <span className={`badge ${isPublished ? 'badge-published' : 'badge-draft'}`}>
-            {isPublished ? 'Published' : 'Draft'}
+            {isPublished ? tBlog('published') : tBlog('draft')}
           </span>
           {!readOnly && (
             <div className="row" style={{ gap: 'var(--space-2)' }}>
               <button type="button" className="btn btn-primary" onClick={handlePublishToggle} disabled={busy}>
-                {busy ? 'Working…' : isPublished ? 'Unpublish' : 'Publish'}
+                {busy ? tBlog('working') : isPublished ? tBlog('unpublish') : tBlog('publish')}
               </button>
               <Link href={`/trips/${tripId}/blog/${post.id}/edit`} className="btn btn-outline">
-                Edit
+                {tBlog('edit')}
               </Link>
               <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-                {busy ? 'Deleting…' : 'Delete'}
+                {busy ? tBlog('deleting') : tBlog('delete')}
               </button>
             </div>
           )}
@@ -121,7 +128,7 @@ export function BlogPostDetailPanel({
 
         <dl style={{ margin: 0 }}>
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-            Date
+            {tBlog('dateLabel')}
           </dt>
           {/* User-reported: "we do not need a time for blog posts, only
               date" -- always date-only now, regardless of what's actually
@@ -140,7 +147,7 @@ export function BlogPostDetailPanel({
                 hydration, could disagree with the server's own locale/
                 timezone entirely). formatEntryDateTime is hydration-safe and
                 always 24-hour, same as every other timestamp in the app. */}
-            Published {formatEntryDateTime(post.publishedAt as string)} · visible on the Timeline
+            {tBlog('publishedAt', { time: formatEntryDateTime(post.publishedAt as string) })}
           </p>
         )}
 

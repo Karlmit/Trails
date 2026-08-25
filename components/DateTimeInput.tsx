@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 interface DateTimeInputProps {
   id?: string;
@@ -68,6 +69,7 @@ export function splitDateTime(value: string): { date: string; hour: string; minu
 // following a Start change (EntryForm's useAutoEndDate wiring) -- actually
 // show up here.
 export function DateTimeInput({ id, value, onChange, required, timeRequired = true }: DateTimeInputProps) {
+  const t = useTranslations('shared');
   const autoId = useId();
   const baseId = id ?? autoId;
 
@@ -108,7 +110,7 @@ export function DateTimeInput({ id, value, onChange, required, timeRequired = tr
       />
       <select
         id={`${baseId}-hour`}
-        aria-label="Hour"
+        aria-label={t('dateTimeInputHourLabel')}
         value={hour}
         onChange={(e) => {
           const nextHour = e.target.value;
@@ -124,7 +126,7 @@ export function DateTimeInput({ id, value, onChange, required, timeRequired = tr
         }}
         required={required && timeRequired}
       >
-        <option value="">HH</option>
+        <option value="">{t('dateTimeInputHourPlaceholder')}</option>
         {HOURS.map((h) => (
           <option key={h} value={h}>
             {h}
@@ -134,12 +136,12 @@ export function DateTimeInput({ id, value, onChange, required, timeRequired = tr
       <span aria-hidden="true">:</span>
       <select
         id={`${baseId}-minute`}
-        aria-label="Minute"
+        aria-label={t('dateTimeInputMinuteLabel')}
         value={minute}
         onChange={(e) => update(date, hour, e.target.value)}
         required={required && timeRequired}
       >
-        <option value="">MM</option>
+        <option value="">{t('dateTimeInputMinutePlaceholder')}</option>
         {MINUTES.map((m) => (
           <option key={m} value={m}>
             {m}

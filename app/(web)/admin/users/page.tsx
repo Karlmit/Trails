@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { getSessionUser, isAdmin } from '@/lib/auth';
 import { serializeUser } from '@/lib/serializers';
@@ -15,13 +16,14 @@ import { CreateUserForm } from '@/components/CreateUserForm';
 // existence).
 export default async function AdminUsersPage() {
   const user = await getSessionUser();
+  const t = await getTranslations('admin');
 
   if (!isAdmin(user)) {
     return (
       <main className="page-wide">
-        <h1>Admin</h1>
+        <h1>{t('noAccessTitle')}</h1>
         <div className="empty-state">
-          <p>You don&apos;t have access to this page.</p>
+          <p>{t('noAccess')}</p>
         </div>
       </main>
     );
@@ -31,13 +33,13 @@ export default async function AdminUsersPage() {
 
   return (
     <main className="page-wide">
-      <h1>Users</h1>
+      <h1>{t('title')}</h1>
 
       <CreateUserForm />
 
       {users.length === 0 ? (
         <div className="empty-state">
-          <p>No accounts yet.</p>
+          <p>{t('emptyState')}</p>
         </div>
       ) : (
         <div className="stack" style={{ marginTop: 'var(--space-4)' }}>
@@ -48,7 +50,7 @@ export default async function AdminUsersPage() {
                 <div>
                   <strong>{serialized.username}</strong>
                   <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>
-                    Created {serialized.createdAt.slice(0, 10)}
+                    {t('created', { date: serialized.createdAt.slice(0, 10) })}
                   </p>
                 </div>
                 <span className="badge">{serialized.role}</span>

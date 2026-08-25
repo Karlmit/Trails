@@ -4,6 +4,7 @@
 // (app/(web)/trips/[tripId]/ideas/page.tsx's `?priority=&weatherTag=`
 // form), just factored into its own component per this spec's Code Map.
 
+import { getTranslations } from 'next-intl/server';
 import { ENTRY_TYPE_LABELS } from '@/lib/entry-types/labels';
 
 // Only these three Entry Types ever carry Expense fields at all --
@@ -22,15 +23,16 @@ export interface BudgetFiltersProps {
   sectionId?: string;
 }
 
-export function BudgetFilters({ tripId, sections, entryType, sectionId }: BudgetFiltersProps) {
+export async function BudgetFilters({ tripId, sections, entryType, sectionId }: BudgetFiltersProps) {
   const hasActiveFilter = Boolean(entryType || sectionId);
+  const t = await getTranslations('tripBudget');
 
   return (
     <form method="get" className="row" style={{ marginBottom: 'var(--space-4)' }}>
       <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor="budget-filter-entry-type">Entry Type</label>
+        <label htmlFor="budget-filter-entry-type">{t('entryTypeLabel')}</label>
         <select id="budget-filter-entry-type" name="entryType" defaultValue={entryType ?? ''}>
-          <option value="">All</option>
+          <option value="">{t('all')}</option>
           {BUDGET_ENTRY_TYPES.map((type) => (
             <option key={type} value={type}>
               {ENTRY_TYPE_LABELS[type]}
@@ -39,9 +41,9 @@ export function BudgetFilters({ tripId, sections, entryType, sectionId }: Budget
         </select>
       </div>
       <div className="field" style={{ marginBottom: 0 }}>
-        <label htmlFor="budget-filter-section">Section</label>
+        <label htmlFor="budget-filter-section">{t('sectionLabel')}</label>
         <select id="budget-filter-section" name="sectionId" defaultValue={sectionId ?? ''}>
-          <option value="">All</option>
+          <option value="">{t('all')}</option>
           {sections.map((section) => (
             <option key={section.id} value={section.id}>
               {section.name}
@@ -50,11 +52,11 @@ export function BudgetFilters({ tripId, sections, entryType, sectionId }: Budget
         </select>
       </div>
       <button type="submit" className="btn btn-outline">
-        Filter
+        {t('filterButton')}
       </button>
       {hasActiveFilter && (
         <a href={`/trips/${tripId}/budget`} className="text-soft">
-          Clear filters
+          {t('clearFilters')}
         </a>
       )}
     </form>

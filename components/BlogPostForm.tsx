@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -11,7 +13,10 @@ import { useRef, useState, type FormEvent } from 'react';
 // other browser-only editor library (Monaco, etc.) needs in the App Router.
 const RichTextEditor = dynamic(() => import('@/components/RichTextEditor').then((m) => m.RichTextEditor), {
   ssr: false,
-  loading: () => <div className="rich-text-editor-loading text-soft">Loading editor…</div>,
+  loading: () => {
+    const t = useTranslations('tripBlog');
+    return <div className="rich-text-editor-loading text-soft">{t('loadingEditor')}</div>;
+  },
 });
 
 export interface BlogPostDTO {
@@ -69,6 +74,8 @@ function toDateOnly(iso: string | null): string {
 }
 
 export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: BlogPostFormProps) {
+  const t = useTranslations('errors');
+  const tBlog = useTranslations('tripBlog');
   const router = useRouter();
   const [title, setTitle] = useState(post?.title ?? '');
   // A ref, not state -- see RichTextEditor's `contentRef` prop comment for
@@ -120,7 +127,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       });
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(responseBody?.error?.message ?? 'Could not create this Blog Post.');
+        throw new Error(translateApiError(t, responseBody?.error?.message) ?? 'Could not create this Blog Post.');
       }
       existingIdRef.current = responseBody.id;
       return responseBody.id as string;
@@ -175,7 +182,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(responseBody?.error?.message ?? 'Could not save this Blog Post.');
+        setError(translateApiError(t, responseBody?.error?.message) ?? 'Could not save this Blog Post.');
         return;
       }
 
@@ -196,8 +203,8 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         className="blog-editor-title-input"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title"
-        aria-label="Title"
+        placeholder={tBlog('titlePlaceholder')}
+        aria-label={tBlog('titlePlaceholder')}
         required
       />
 
@@ -206,7 +213,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         type="date"
         value={startAt}
         onChange={(e) => setStartAt(e.target.value)}
-        aria-label="Date"
+        aria-label={tBlog('dateLabel')}
         required
       />
 
@@ -220,15 +227,15 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
             onChange={(e) => setIsPrivate(e.target.checked)}
             style={{ width: 'auto' }}
           />
-          Private (hidden from Guests)
+          {tBlog('privateLabel')}
         </label>
 
         <div className="row">
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Saving…' : mode === 'create' ? 'Save Draft' : 'Save changes'}
+            {submitting ? tBlog('saving') : mode === 'create' ? tBlog('saveDraft') : tBlog('saveChanges')}
           </button>
           <Link href={cancelHref} className="btn btn-dark-outline">
-            Cancel
+            {tBlog('cancel')}
           </Link>
         </div>
       </div>

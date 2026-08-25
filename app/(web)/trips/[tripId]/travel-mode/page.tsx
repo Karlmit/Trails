@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { computeTripStatus, dateKeyInTimezone, entryEndpointDateKey, timezoneDisclosure } from '@/lib/trip-status';
 import { sectionIndexForDateKey } from '@/lib/timeline';
@@ -59,18 +60,18 @@ export default async function TravelModePage({ params }: PageProps) {
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
   if (!trip) notFound();
 
+  const t = await getTranslations('tripTravelMode');
+
   const now = new Date();
   const status = computeTripStatus(trip, now);
 
   if (status !== 'ACTIVE') {
     return (
       <main className="page">
-        <h2 style={{ margin: 0 }}>Travel Mode</h2>
-        <p className="text-soft">
-          {status === 'UPCOMING' ? "This Trip hasn't started yet." : 'This Trip has ended.'}
-        </p>
+        <h2 style={{ margin: 0 }}>{t('title')}</h2>
+        <p className="text-soft">{status === 'UPCOMING' ? t('notStartedYet') : t('hasEnded')}</p>
         <Link href={`/trips/${tripId}/timeline`} className="btn btn-outline">
-          Back to Timeline
+          {t('backToTimeline')}
         </Link>
       </main>
     );
@@ -138,7 +139,7 @@ export default async function TravelModePage({ params }: PageProps) {
         </div>
         {mapsUrl && (
           <a href={mapsUrl} target="_blank" rel="noreferrer" className="btn btn-outline">
-            Map
+            {t('map')}
           </a>
         )}
       </div>
@@ -147,86 +148,86 @@ export default async function TravelModePage({ params }: PageProps) {
 
   return (
     <main className="page">
-      <h2 style={{ margin: 0 }}>Travel Mode</h2>
-      <p className="text-soft">What&rsquo;s happening now, and what&rsquo;s next.</p>
+      <h2 style={{ margin: 0 }}>{t('title')}</h2>
+      <p className="text-soft">{t('subtitle')}</p>
 
       <div className="card stack">
-        <h3 style={{ margin: 0 }}>Current</h3>
+        <h3 style={{ margin: 0 }}>{t('current')}</h3>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Section
+            {t('section')}
           </div>
-          <div>{currentSection ? currentSection.name : 'No Section covers today'}</div>
+          <div>{currentSection ? currentSection.name : t('noSectionToday')}</div>
         </div>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Stay
+            {t('stay')}
           </div>
-          {currentStay ? <EntryRow entry={currentStay} /> : <div className="text-soft">Nothing right now</div>}
+          {currentStay ? <EntryRow entry={currentStay} /> : <div className="text-soft">{t('nothingRightNow')}</div>}
         </div>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Activity
+            {t('activity')}
           </div>
           {currentActivity ? (
             <EntryRow entry={currentActivity} />
           ) : (
-            <div className="text-soft">Nothing right now</div>
+            <div className="text-soft">{t('nothingRightNow')}</div>
           )}
         </div>
       </div>
 
       <div className="card stack">
-        <h3 style={{ margin: 0 }}>Next</h3>
+        <h3 style={{ margin: 0 }}>{t('next')}</h3>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Next up
+            {t('nextUp')}
           </div>
-          {nextOverall ? <EntryRow entry={nextOverall} /> : <div className="text-soft">Nothing left on this Trip</div>}
+          {nextOverall ? <EntryRow entry={nextOverall} /> : <div className="text-soft">{t('nothingLeftOnTrip')}</div>}
         </div>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Next Transport
+            {t('nextTransport')}
           </div>
-          {nextTransport ? <EntryRow entry={nextTransport} /> : <div className="text-soft">None scheduled</div>}
+          {nextTransport ? <EntryRow entry={nextTransport} /> : <div className="text-soft">{t('noneScheduled')}</div>}
         </div>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Next Activity
+            {t('nextActivity')}
           </div>
-          {nextActivity ? <EntryRow entry={nextActivity} /> : <div className="text-soft">None scheduled</div>}
+          {nextActivity ? <EntryRow entry={nextActivity} /> : <div className="text-soft">{t('noneScheduled')}</div>}
         </div>
 
         <div>
           <div className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-            Next Stay
+            {t('nextStay')}
           </div>
-          {nextStay ? <EntryRow entry={nextStay} /> : <div className="text-soft">None scheduled</div>}
+          {nextStay ? <EntryRow entry={nextStay} /> : <div className="text-soft">{t('noneScheduled')}</div>}
         </div>
       </div>
 
       <div className="card stack">
-        <h3 style={{ margin: 0 }}>Quick access</h3>
+        <h3 style={{ margin: 0 }}>{t('quickAccess')}</h3>
         <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           <Link href={`/trips/${tripId}/documents`} className="btn btn-outline">
-            Documents
+            {t('documents')}
           </Link>
           <Link href={`/trips/${tripId}/important-info`} className="btn btn-outline">
-            Important Info
+            {t('importantInfo')}
           </Link>
         </div>
       </div>
 
       <div className="card stack">
-        <h3 style={{ margin: 0 }}>Today&rsquo;s full itinerary</h3>
+        <h3 style={{ margin: 0 }}>{t('todaysFullItinerary')}</h3>
         {todaysEntries.length === 0 ? (
-          <div className="empty-state">Nothing on the Timeline for today.</div>
+          <div className="empty-state">{t('nothingToday')}</div>
         ) : (
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             {todaysEntries.map((entry) => (

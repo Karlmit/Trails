@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -24,6 +26,8 @@ interface LinkListProps {
 // TagList.tsx -- mounted on every owning entity's detail/edit view, never
 // for a Guest.
 export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps) {
+  const t = useTranslations('errors');
+  const tShared = useTranslations('shared');
   const router = useRouter();
   const [links, setLinks] = useState<LinkDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +76,7 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not add this Link.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not add this Link.');
         return;
       }
       setLinks((current) => [...current, body as LinkDTO]);
@@ -98,7 +102,7 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
       if (!response.ok) {
         setLinks(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not remove this Link.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not remove this Link.');
         return;
       }
       router.refresh();
@@ -121,15 +125,15 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-        Links
+        {tShared('linkListLabel')}
       </span>
 
       {error && <div className="form-error-banner">{error}</div>}
 
       {loading ? (
-        <p className="text-soft">Loading…</p>
+        <p className="text-soft">{tShared('linkListLoading')}</p>
       ) : links.length === 0 ? (
-        <p className="text-soft">No links yet.</p>
+        <p className="text-soft">{tShared('linkListEmpty')}</p>
       ) : (
         <div className="stack" style={{ gap: 'var(--space-2)' }}>
           {links.map((link) => (
@@ -145,7 +149,7 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
                   onClick={() => handleDelete(link)}
                   disabled={deletingIds.has(link.id)}
                 >
-                  {deletingIds.has(link.id) ? 'Removing…' : 'Remove'}
+                  {deletingIds.has(link.id) ? tShared('linkListRemoving') : tShared('linkListRemove')}
                 </button>
               )}
             </div>
@@ -158,9 +162,9 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
+            placeholder={tShared('linkListUrlPlaceholder')}
             maxLength={2048}
-            aria-label="New link URL"
+            aria-label={tShared('linkListUrlLabel')}
             style={{
               border: '1px solid #d6dbde',
               borderRadius: 'var(--radius-input)',
@@ -172,9 +176,9 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
           <input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Label (optional)"
+            placeholder={tShared('linkListLabelPlaceholder')}
             maxLength={200}
-            aria-label="New link label"
+            aria-label={tShared('linkListLabelAriaLabel')}
             style={{
               border: '1px solid #d6dbde',
               borderRadius: 'var(--radius-input)',
@@ -183,7 +187,7 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
             }}
           />
           <button type="submit" className="btn btn-outline" disabled={submitting || !url.trim()}>
-            {submitting ? 'Adding…' : 'Add'}
+            {submitting ? tShared('linkListAdding') : tShared('linkListAddButton')}
           </button>
         </form>
       )}

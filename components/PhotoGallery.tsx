@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -49,6 +51,8 @@ function fileUrl(photoId: string): string {
 }
 
 export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, initialPhotos }: PhotoGalleryProps) {
+  const t = useTranslations('errors');
+  const tShared = useTranslations('shared');
   const router = useRouter();
   const [photos, setPhotos] = useState<PhotoDTO[]>(initialPhotos ?? []);
   const [loading, setLoading] = useState(initialPhotos === undefined);
@@ -108,7 +112,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not upload this photo.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not upload this photo.');
         return;
       }
       setPhotos((current) => [...current, body as PhotoDTO]);
@@ -122,7 +126,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
   }
 
   async function handleDelete(photo: PhotoDTO) {
-    if (!confirm('Delete this photo?')) return;
+    if (!confirm(tShared('photoGalleryDeleteConfirm'))) return;
     setError(null);
     withBusy(photo.id, true);
     const previous = photos;
@@ -133,7 +137,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       if (!response.ok) {
         setPhotos(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this photo.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not delete this photo.');
         return;
       }
       router.refresh();
@@ -159,7 +163,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       if (!response.ok) {
         setPhotos(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not mark this photo primary.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not mark this photo primary.');
         return;
       }
       router.refresh();
@@ -187,7 +191,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       if (!response.ok) {
         setPhotos(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not update this photo.');
+        setError(translateApiError(t, body?.error?.message) ?? 'Could not update this photo.');
         return;
       }
       router.refresh();
@@ -209,11 +213,11 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <div className="row-between">
         <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-          Photos
+          {tShared('photoGalleryLabel')}
         </span>
         {!readOnly && (
           <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
-            {uploading ? 'Uploading…' : 'Upload'}
+            {uploading ? tShared('photoGalleryUploading') : tShared('photoGalleryUploadButton')}
             <input
               type="file"
               accept="image/jpeg,image/png"
@@ -228,9 +232,9 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       {error && <div className="form-error-banner">{error}</div>}
 
       {loading ? (
-        <p className="text-soft">Loading…</p>
+        <p className="text-soft">{tShared('photoGalleryLoading')}</p>
       ) : photos.length === 0 ? (
-        <p className="text-soft">No photos yet. JPEG or PNG.</p>
+        <p className="text-soft">{tShared('photoGalleryEmpty')}</p>
       ) : (
         <div className="photo-gallery">
           {photos.map((photo) => (
@@ -260,7 +264,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
                 // resize on top of the stored original.
                 unoptimized
               />
-              {photo.isPrimary && <span className="badge photo-thumb-primary-badge">Cover</span>}
+              {photo.isPrimary && <span className="badge photo-thumb-primary-badge">{tShared('photoGalleryCoverBadge')}</span>}
               {!readOnly && (
                 <div className="photo-thumb-controls">
                   <button
@@ -269,7 +273,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
                     onClick={() => handleMarkPrimary(photo)}
                     disabled={photo.isPrimary || busyIds.has(photo.id)}
                   >
-                    {photo.isPrimary ? 'Cover photo' : 'Set as cover'}
+                    {photo.isPrimary ? tShared('photoGalleryCoverPhoto') : tShared('photoGallerySetAsCover')}
                   </button>
                   <label className="row" style={{ gap: 'var(--space-1)', alignItems: 'center', margin: 0 }}>
                     <input
@@ -277,9 +281,9 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
                       checked={photo.isPrivate}
                       onChange={() => handleTogglePrivate(photo)}
                       disabled={busyIds.has(photo.id)}
-                      aria-label="Private"
+                      aria-label={tShared('photoGalleryPrivateAriaLabel')}
                     />
-                    <span className="text-soft">Private</span>
+                    <span className="text-soft">{tShared('photoGalleryPrivate')}</span>
                   </label>
                   <button
                     type="button"
@@ -288,7 +292,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
                     onClick={() => handleDelete(photo)}
                     disabled={busyIds.has(photo.id)}
                   >
-                    {busyIds.has(photo.id) ? 'Working…' : 'Delete'}
+                    {busyIds.has(photo.id) ? tShared('photoGalleryWorking') : tShared('photoGalleryDelete')}
                   </button>
                 </div>
               )}

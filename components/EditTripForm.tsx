@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
@@ -22,6 +24,8 @@ interface EditTripFormProps {
 }
 
 export function EditTripForm({ trip, onDone }: EditTripFormProps) {
+  const t = useTranslations('errors');
+  const tOverview = useTranslations('tripOverview');
   const router = useRouter();
   const [name, setName] = useState(trip.name);
   const [destination, setDestination] = useState(trip.destination ?? '');
@@ -46,7 +50,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
     // but never picked a zone from the list -- block submission rather
     // than saving an unvalidated string.
     if (!timezone) {
-      setError('Please pick a timezone from the list.');
+      setError(tOverview('pickTimezone'));
       return;
     }
 
@@ -72,14 +76,14 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not save changes.');
+        setError(translateApiError(t, body?.error?.message) ?? tOverview('saveFailed'));
         return;
       }
 
       router.refresh();
       onDone();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tOverview('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -89,11 +93,11 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
     <form onSubmit={handleSubmit} className="card stack">
       {error && <div className="form-error-banner">{error}</div>}
       <div className="field">
-        <label htmlFor="edit-name">Name</label>
+        <label htmlFor="edit-name">{tOverview('nameLabel')}</label>
         <input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
       <div className="field">
-        <label htmlFor="edit-destination">Destination</label>
+        <label htmlFor="edit-destination">{tOverview('destinationLabel')}</label>
         <input
           id="edit-destination"
           value={destination}
@@ -102,7 +106,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
       </div>
       <div className="row">
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="edit-start">Start date</label>
+          <label htmlFor="edit-start">{tOverview('startDateLabel')}</label>
           <input
             id="edit-start"
             type="date"
@@ -121,7 +125,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
           />
         </div>
         <div className="field" style={{ flex: 1 }}>
-          <label htmlFor="edit-end">End date</label>
+          <label htmlFor="edit-end">{tOverview('endDateLabel')}</label>
           <input
             id="edit-end"
             type="date"
@@ -139,11 +143,11 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
         </div>
       </div>
       <div className="field">
-        <label htmlFor="edit-timezone">Timezone</label>
+        <label htmlFor="edit-timezone">{tOverview('timezoneLabel')}</label>
         <TimezoneSelect id="edit-timezone" initialValue={timezone} onChange={setTimezone} required />
       </div>
       <div className="field">
-        <label htmlFor="edit-description">Description</label>
+        <label htmlFor="edit-description">{tOverview('descriptionLabel')}</label>
         <textarea
           id="edit-description"
           value={description}
@@ -152,7 +156,7 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
         />
       </div>
       <div className="field">
-        <label htmlFor="edit-cover-image">Cover image URL</label>
+        <label htmlFor="edit-cover-image">{tOverview('coverImageLabel')}</label>
         <input
           id="edit-cover-image"
           type="url"
@@ -162,32 +166,31 @@ export function EditTripForm({ trip, onDone }: EditTripFormProps) {
         />
       </div>
       <div className="field">
-        <label htmlFor="edit-visibility">Visibility</label>
+        <label htmlFor="edit-visibility">{tOverview('visibilityLabel')}</label>
         <select
           id="edit-visibility"
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'PRIVATE')}
         >
-          <option value="PRIVATE">Private</option>
-          <option value="PUBLIC">Public</option>
+          <option value="PRIVATE">{tOverview('visibilityPrivate')}</option>
+          <option value="PUBLIC">{tOverview('visibilityPublic')}</option>
         </select>
       </div>
       <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
         <input type="checkbox" checked={pinnedActive} onChange={(e) => setPinnedActive(e.target.checked)} />
-        Mark this Trip as Active
+        {tOverview('markActive')}
       </label>
       {pinnedActive && (
         <p className="text-soft">
-          Overrides the normal date-based Status -- this Trip will always show as Active while
-          this is checked, and the Android app opens straight to its Timeline on launch.
+          {tOverview('markActiveDescription')}
         </p>
       )}
       <div className="row">
         <button type="submit" className="btn btn-primary" disabled={submitting}>
-          {submitting ? 'Saving…' : 'Save changes'}
+          {submitting ? tOverview('saving') : tOverview('saveChanges')}
         </button>
         <button type="button" className="btn btn-dark-outline" onClick={onDone}>
-          Cancel
+          {tOverview('cancel')}
         </button>
       </div>
     </form>

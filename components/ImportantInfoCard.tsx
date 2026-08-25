@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -46,6 +48,9 @@ export function ImportantInfoCard({
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('common');
+  const ti = useTranslations('tripImportantInfo');
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
   const [editing, setEditing] = useState(false);
@@ -72,33 +77,33 @@ export function ImportantInfoCard({
       if (!response.ok) {
         setItem((current) => ({ ...current, isPrivate: !nextPrivate }));
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not update this item.');
+        setError(translateApiError(t, body?.error?.message) ?? ti('updateError'));
         return;
       }
 
       router.refresh();
     } catch {
       setItem((current) => ({ ...current, isPrivate: !nextPrivate }));
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setTogglingPrivate(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+    if (!confirm(ti('deleteConfirm', { title: item.title }))) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch(`/api/v1/important-info/${item.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this item.');
+        setError(translateApiError(t, body?.error?.message) ?? ti('deleteError'));
         return;
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setBusy(false);
     }
@@ -118,12 +123,12 @@ export function ImportantInfoCard({
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not reorder this item.');
+        setError(translateApiError(t, body?.error?.message) ?? ti('reorderError'));
         return;
       }
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(ti('networkError'));
     } finally {
       setMoving(false);
     }
@@ -162,8 +167,8 @@ export function ImportantInfoCard({
               className="btn btn-outline"
               onClick={() => handleMove('up')}
               disabled={moving || isFirst}
-              aria-label="Move up"
-              title="Move up"
+              aria-label={ti('moveUp')}
+              title={ti('moveUp')}
             >
               ↑
             </button>
@@ -172,8 +177,8 @@ export function ImportantInfoCard({
               className="btn btn-outline"
               onClick={() => handleMove('down')}
               disabled={moving || isLast}
-              aria-label="Move down"
-              title="Move down"
+              aria-label={ti('moveDown')}
+              title={ti('moveDown')}
             >
               ↓
             </button>
@@ -184,15 +189,15 @@ export function ImportantInfoCard({
               checked={item.isPrivate}
               onChange={handleTogglePrivate}
               disabled={togglingPrivate}
-              aria-label="Private"
+              aria-label={ti('private')}
             />
-            <span className="text-soft">Private</span>
+            <span className="text-soft">{ti('private')}</span>
           </label>
           <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-            Edit
+            {tc('edit')}
           </button>
           <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-            {busy ? 'Deleting…' : 'Delete'}
+            {busy ? ti('deleting') : tc('delete')}
           </button>
         </div>
       </div>
@@ -214,7 +219,7 @@ export function ImportantInfoCard({
       {(item.locationName || item.locationAddress) && (
         <div>
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-            Location
+            {ti('locationLabel')}
           </dt>
           <dd style={{ margin: 0 }}>
             {[item.locationName, item.locationAddress].filter(Boolean).join(' — ')}
@@ -222,7 +227,7 @@ export function ImportantInfoCard({
               <>
                 {' '}
                 <a href={item.locationMapLink} target="_blank" rel="noreferrer">
-                  Open map
+                  {ti('openMap')}
                 </a>
               </>
             )}
@@ -233,7 +238,7 @@ export function ImportantInfoCard({
       {(item.contactName || item.contactPhone || item.contactEmail) && (
         <div>
           <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-            Contact
+            {ti('contactLabel')}
           </dt>
           <dd style={{ margin: 0 }}>
             {[item.contactName, item.contactPhone, item.contactEmail].filter(Boolean).join(' · ')}

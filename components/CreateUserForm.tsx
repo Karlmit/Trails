@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
@@ -11,6 +13,8 @@ import { useState, type FormEvent } from 'react';
 // up in the list below is itself the success confirmation, same as
 // ChecklistCard's add-item form.
 export function CreateUserForm() {
+  const t = useTranslations('errors');
+  const tAdmin = useTranslations('admin');
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +35,7 @@ export function CreateUserForm() {
 
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not create this account.');
+        setError(translateApiError(t, body?.error?.message) ?? tAdmin('createAccountFailed'));
         return;
       }
 
@@ -39,7 +43,7 @@ export function CreateUserForm() {
       setPassword('');
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tAdmin('networkError'));
     } finally {
       setSubmitting(false);
     }
@@ -49,7 +53,7 @@ export function CreateUserForm() {
     <form onSubmit={handleSubmit} className="card stack" style={{ maxWidth: 380 }}>
       {error && <div className="form-error-banner">{error}</div>}
       <div className="field">
-        <label htmlFor="new-user-username">Username</label>
+        <label htmlFor="new-user-username">{tAdmin('usernameLabel')}</label>
         <input
           id="new-user-username"
           name="username"
@@ -62,7 +66,7 @@ export function CreateUserForm() {
         />
       </div>
       <div className="field">
-        <label htmlFor="new-user-password">Password</label>
+        <label htmlFor="new-user-password">{tAdmin('passwordLabel')}</label>
         <input
           id="new-user-password"
           name="password"
@@ -76,7 +80,7 @@ export function CreateUserForm() {
         />
       </div>
       <button type="submit" className="btn btn-primary" disabled={submitting}>
-        {submitting ? 'Creating…' : 'Create account'}
+        {submitting ? tAdmin('creating') : tAdmin('createAccount')}
       </button>
     </form>
   );

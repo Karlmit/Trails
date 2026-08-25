@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { EntryForm, type EntryDTO } from '@/components/EntryForm';
@@ -72,12 +74,15 @@ function formatFlightTime(value: string): string {
   }).format(date);
 }
 
-function flightDetailsLine(flight: FlightDTO): string | null {
+function flightDetailsLine(
+  flight: FlightDTO,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string | null {
   const parts = [
-    flight.terminal && `Terminal ${flight.terminal}`,
-    flight.gate && `Gate ${flight.gate}`,
-    flight.platform && `Platform ${flight.platform}`,
-    flight.seat && `Seat ${flight.seat}`,
+    flight.terminal && t('terminalValue', { terminal: flight.terminal }),
+    flight.gate && t('gateValue', { gate: flight.gate }),
+    flight.platform && t('platformValue', { platform: flight.platform }),
+    flight.seat && t('seatValue', { seat: flight.seat }),
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
@@ -110,6 +115,8 @@ export function EntryDetailPanel({
   // only ever shown in parens when it differs from this).
   tripTimezone: string;
 }) {
+  const t = useTranslations('errors');
+  const tEntries = useTranslations('tripEntries');
   const router = useRouter();
   const [entry, setEntry] = useState(initialEntry);
   const [editing, setEditing] = useState(false);
@@ -117,20 +124,20 @@ export function EntryDetailPanel({
   const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
-    if (!confirm(`Delete "${entry.title}"? This cannot be undone.`)) return;
+    if (!confirm(tEntries('confirmDeleteEntry', { title: entry.title }))) return;
     setBusy(true);
     setError(null);
     try {
       const response = await fetch(`/api/v1/timeline-entries/${entry.id}`, { method: 'DELETE' });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this Entry.');
+        setError(translateApiError(t, body?.error?.message) ?? tEntries('errorCouldNotDelete'));
         return;
       }
       router.push(`/trips/${tripId}/timeline`);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tEntries('errorNetworkError'));
     } finally {
       setBusy(false);
     }
@@ -173,10 +180,10 @@ export function EntryDetailPanel({
           {!readOnly && (
             <div className="row" style={{ gap: 'var(--space-2)' }}>
               <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
-                Edit
+                {tEntries('editButton')}
               </button>
               <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={busy}>
-                {busy ? 'Deleting…' : 'Delete'}
+                {busy ? tEntries('deletingButton') : tEntries('deleteButton')}
               </button>
             </div>
           )}
@@ -192,7 +199,11 @@ export function EntryDetailPanel({
         <dl className="row" style={{ gap: 'var(--space-6)' }}>
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              {entry.entryType === 'TRANSPORT' ? 'Departure' : entry.entryType === 'STAY' ? 'Check-in' : 'Start'}
+              {entry.entryType === 'TRANSPORT'
+                ? tEntries('departureLabel')
+                : entry.entryType === 'STAY'
+                  ? tEntries('checkInLabel')
+                  : tEntries('startLabel')}
             </dt>
             <dd style={{ margin: 0 }}>
               {hasNoSpecificTime(entry.startAt, entry.startTimezone) ? (
@@ -208,7 +219,11 @@ export function EntryDetailPanel({
           {entry.endAt && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-                {entry.entryType === 'TRANSPORT' ? 'Arrival' : entry.entryType === 'STAY' ? 'Check-out' : 'End'}
+                {entry.entryType === 'TRANSPORT'
+                  ? tEntries('arrivalLabel')
+                  : entry.entryType === 'STAY'
+                    ? tEntries('checkOutLabel')
+                    : tEntries('endLabel')}
               </dt>
               <dd style={{ margin: 0 }}>
                 {hasNoSpecificTime(entry.endAt, entry.endTimezone) ? (
@@ -229,7 +244,7 @@ export function EntryDetailPanel({
           (entry.typeDetails.flights as FlightDTO[]).length > 1 && (
             <div>
               <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-                Itinerary
+                {tEntries('itineraryLabel')}
               </dt>
               <dd className="stack" style={{ margin: 0, gap: 'var(--space-2)' }}>
                 {(() => {
@@ -237,8 +252,10 @@ export function EntryDetailPanel({
                   return flights.map((flight, index) => (
                     <div key={index} className="stack" style={{ gap: 'var(--space-1)' }}>
                       <div>
-                        ✈ {flight.flightNumber || `Flight ${index + 1}`}
-                        {flightDetailsLine(flight) && <span className="text-soft"> · {flightDetailsLine(flight)}</span>}
+                        ✈ {flight.flightNumber || tEntries('flightNumberFallback', { number: index + 1 })}
+                        {flightDetailsLine(flight, tEntries) && (
+                          <span className="text-soft"> · {flightDetailsLine(flight, tEntries)}</span>
+                        )}
                       </div>
                       <div className="text-soft">
                         {[flight.departureLocation, formatFlightTime(flight.departureAt)].filter(Boolean).join(' ')}
@@ -249,10 +266,13 @@ export function EntryDetailPanel({
                         (() => {
                           const next = flights[index + 1];
                           const location = flight.arrivalLocation || next.departureLocation;
+                          const from = formatFlightTime(flight.arrivalAt);
+                          const to = formatFlightTime(next.departureAt);
                           return (
                             <div className="text-soft">
-                              ⏱ Stopover{location ? ` at ${location}` : ''}: {formatFlightTime(flight.arrivalAt)} –{' '}
-                              {formatFlightTime(next.departureAt)}
+                              {location
+                                ? tEntries('stopoverWithLocation', { location, from, to })
+                                : tEntries('stopoverNoLocation', { from, to })}
                             </div>
                           );
                         })()}
@@ -266,7 +286,7 @@ export function EntryDetailPanel({
         {(entry.locationName || entry.locationAddress) && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Location
+              {tEntries('locationLabel')}
             </dt>
             <dd style={{ margin: 0 }}>
               {[entry.locationName, entry.locationAddress].filter(Boolean).join(' — ')}
@@ -274,7 +294,7 @@ export function EntryDetailPanel({
                 <>
                   {' '}
                   <a href={entry.locationMapLink} target="_blank" rel="noreferrer">
-                    Open map
+                    {tEntries('openMapLink')}
                   </a>
                 </>
               )}
@@ -285,7 +305,7 @@ export function EntryDetailPanel({
         {entry.bookingReference && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Booking reference
+              {tEntries('bookingReferenceLabel')}
             </dt>
             <dd style={{ margin: 0 }}>{entry.bookingReference}</dd>
           </div>
@@ -294,7 +314,7 @@ export function EntryDetailPanel({
         {entry.website && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Website
+              {tEntries('websiteLabel')}
             </dt>
             <dd style={{ margin: 0 }}>
               <a href={entry.website} target="_blank" rel="noreferrer">
@@ -307,7 +327,7 @@ export function EntryDetailPanel({
         {entry.bookedVia && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Booked via
+              {tEntries('bookedViaLabel')}
             </dt>
             <dd style={{ margin: 0 }}>{entry.bookedVia}</dd>
           </div>
@@ -316,7 +336,7 @@ export function EntryDetailPanel({
         {entry.expenseAmount != null && entry.expenseCurrency && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Expense
+              {tEntries('expenseLabel')}
             </dt>
             <dd style={{ margin: 0 }}>
               {entry.expenseAmount} {entry.expenseCurrency}
@@ -328,7 +348,7 @@ export function EntryDetailPanel({
         {(entry.contactName || entry.contactPhone || entry.contactEmail) && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Contact
+              {tEntries('contactLabel')}
             </dt>
             <dd style={{ margin: 0 }}>
               {[entry.contactName, entry.contactPhone, entry.contactEmail].filter(Boolean).join(' · ')}
@@ -339,7 +359,7 @@ export function EntryDetailPanel({
         {entry.notes && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Notes
+              {tEntries('notesLabel')}
             </dt>
             <dd className="text-multiline" style={{ margin: 0 }}>{entry.notes}</dd>
           </div>
@@ -348,7 +368,7 @@ export function EntryDetailPanel({
         {entry.postTripNotes && (
           <div>
             <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-              Post-Trip Notes
+              {tEntries('postTripNotesLabel')}
             </dt>
             <dd className="text-multiline" style={{ margin: 0 }}>{entry.postTripNotes}</dd>
           </div>

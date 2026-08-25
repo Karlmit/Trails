@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { aggregateBudget, type BudgetEntryInput } from '@/lib/budget';
 import { timelineVisibleEntryWhere, entryDetailHref } from '@/lib/entry-types';
@@ -80,15 +81,14 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
   });
   const lineItemCount = groups.reduce((sum, group) => sum + group.lineItems.length, 0);
 
+  const t = await getTranslations('tripBudget');
+
   return (
     <main className="page">
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Budget</h2>
+        <h2 style={{ margin: 0 }}>{t('pageTitle')}</h2>
       </div>
-      <p className="text-soft">
-        Every Entry on this Trip with a recorded Expense, totaled per currency. No cross-currency
-        conversion -- each currency&rsquo;s subtotal stands on its own.
-      </p>
+      <p className="text-soft">{t('pageDescription')}</p>
 
       <BudgetFilters
         tripId={tripId}
@@ -98,9 +98,9 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
       />
 
       {budgetEntries.length === 0 ? (
-        <div className="empty-state">No expenses recorded on this Trip yet.</div>
+        <div className="empty-state">{t('emptyState')}</div>
       ) : lineItemCount === 0 ? (
-        <div className="empty-state">No expenses match this filter.</div>
+        <div className="empty-state">{t('emptyStateFiltered')}</div>
       ) : (
         <div className="stack">
           {groups.map((group) => (
@@ -108,11 +108,13 @@ export default async function BudgetPage({ params, searchParams }: PageProps) {
               <div className="row-between">
                 <h3 style={{ margin: 0 }}>{group.currency}</h3>
                 <span className="text-soft">
-                  Total: {group.total.toFixed(2)} {group.currency}
+                  {t('total', { amount: group.total.toFixed(2), currency: group.currency })}
                   {group.unpaidTotal > 0 && (
                     <>
                       {' · '}
-                      <strong>Unpaid: {group.unpaidTotal.toFixed(2)} {group.currency}</strong>
+                      <strong>
+                        {t('unpaid', { amount: group.unpaidTotal.toFixed(2), currency: group.currency })}
+                      </strong>
                     </>
                   )}
                 </span>

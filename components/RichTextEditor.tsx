@@ -13,6 +13,8 @@ import {
   useEditorState,
 } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 
 // User-reported: "look online for an easy way to integrate a ready made
 // WYSIWYG editor for blog posts ... a way to even choose if text is next to
@@ -43,6 +45,7 @@ const layoutImageBlock = createReactBlockSpec(
   },
   {
     render: ({ block, editor }) => {
+      const t = useTranslations('tripBlog');
       const [uploading, setUploading] = useState(false);
       const [uploadError, setUploadError] = useState<string | null>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +93,7 @@ const layoutImageBlock = createReactBlockSpec(
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
             >
-              {uploading ? 'Uploading…' : '🖼️ Add image'}
+              {uploading ? t('uploading') : t('addImage')}
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
             {uploadError && <div className="field-error">{uploadError}</div>}
@@ -107,17 +110,17 @@ const layoutImageBlock = createReactBlockSpec(
                 aria-pressed={block.props.layout === 'float-left'}
                 onClick={() => setLayout('float-left')}
               >
-                ⬅ Left
+                {t('layoutLeft')}
               </button>
               <button type="button" aria-pressed={block.props.layout === 'block'} onClick={() => setLayout('block')}>
-                ⬛ Center
+                {t('layoutCenter')}
               </button>
               <button
                 type="button"
                 aria-pressed={block.props.layout === 'float-right'}
                 onClick={() => setLayout('float-right')}
               >
-                ➡ Right
+                {t('layoutRight')}
               </button>
             </div>
           )}
@@ -177,7 +180,11 @@ export function parseBlogContent(raw: string | null | undefined): PartialBlock[]
 // its id; every later call (from the same or a different image) just
 // returns the id it already created. This function no longer needs to
 // know or care whether that create-on-demand happened.
-async function uploadBlogImage(file: File, ensurePostId: () => Promise<string>): Promise<string> {
+async function uploadBlogImage(
+  file: File,
+  ensurePostId: () => Promise<string>,
+  t: ReturnType<typeof useTranslations>,
+): Promise<string> {
   const postId = await ensurePostId();
   const formData = new FormData();
   formData.append('ownerType', 'TIMELINE_ENTRY');
@@ -186,12 +193,13 @@ async function uploadBlogImage(file: File, ensurePostId: () => Promise<string>):
   const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
   const photo = await response.json().catch(() => null);
   if (!response.ok || !photo?.id) {
-    throw new Error(photo?.error?.message ?? 'Could not upload this image.');
+    throw new Error(translateApiError(t, photo?.error?.message) ?? 'Could not upload this image.');
   }
   return `/api/v1/photos/${photo.id}/file`;
 }
 
 function useBlogEditor(initialContent: string | null | undefined, ensurePostId: () => Promise<string>) {
+  const t = useTranslations('errors');
   // A ref, not a value closed over directly by `uploadFile` below --
   // `useCreateBlockNote`'s own options (including `uploadFile`) are only
   // ever read once, at creation time (see its own comment), but
@@ -208,7 +216,7 @@ function useBlogEditor(initialContent: string | null | undefined, ensurePostId: 
   const editor = useCreateBlockNote({
     schema: blogPostSchema,
     initialContent: useMemo(() => parseBlogContent(initialContent), [initialContent]),
-    uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current()),
+    uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current(), t),
   });
   return editor;
 }
@@ -234,6 +242,7 @@ type BlogEditor = ReturnType<typeof useBlogEditor>;
 // lost by hiding the broken side menu there (see `.bn-side-menu`'s own
 // mobile media query in globals.css).
 function BlogToolbar({ editor }: { editor: BlogEditor }) {
+  const t = useTranslations('tripBlog');
   const activeStyles = useActiveStyles(editor);
   const currentBlock = useEditorState({
     editor,
@@ -262,10 +271,10 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
   const isHeading = (level: number) => currentBlock.type === 'heading' && blockProps.level === level;
 
   return (
-    <div className="blog-toolbar" role="toolbar" aria-label="Formatting">
+    <div className="blog-toolbar" role="toolbar" aria-label={t('toolbarLabel')}>
       <button
         type="button"
-        aria-label="Bold"
+        aria-label={t('bold')}
         aria-pressed={!!activeStyles.bold}
         onClick={() => toggleStyle('bold')}
       >
@@ -273,7 +282,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       </button>
       <button
         type="button"
-        aria-label="Italic"
+        aria-label={t('italic')}
         aria-pressed={!!activeStyles.italic}
         onClick={() => toggleStyle('italic')}
       >
@@ -282,7 +291,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <span className="blog-toolbar-divider" aria-hidden="true" />
       <button
         type="button"
-        aria-label="Heading"
+        aria-label={t('headingButton')}
         aria-pressed={isHeading(2)}
         onClick={() => toggleBlockType('heading', { level: 2 })}
       >
@@ -290,7 +299,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       </button>
       <button
         type="button"
-        aria-label="Subheading"
+        aria-label={t('subheadingButton')}
         aria-pressed={isHeading(3)}
         onClick={() => toggleBlockType('heading', { level: 3 })}
       >
@@ -299,7 +308,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <span className="blog-toolbar-divider" aria-hidden="true" />
       <button
         type="button"
-        aria-label="Bullet list"
+        aria-label={t('bulletList')}
         aria-pressed={currentBlock.type === 'bulletListItem'}
         onClick={() => toggleBlockType('bulletListItem')}
       >
@@ -307,14 +316,14 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       </button>
       <button
         type="button"
-        aria-label="Numbered list"
+        aria-label={t('numberedList')}
         aria-pressed={currentBlock.type === 'numberedListItem'}
         onClick={() => toggleBlockType('numberedListItem')}
       >
         1.
       </button>
       <span className="blog-toolbar-divider" aria-hidden="true" />
-      <button type="button" aria-label="Insert image" onClick={insertImage}>
+      <button type="button" aria-label={t('insertImage')} onClick={insertImage}>
         🖼️
       </button>
     </div>
@@ -344,6 +353,7 @@ export function RichTextEditor({
   ensurePostId: () => Promise<string>;
 }) {
   const editor = useBlogEditor(initialContent, ensurePostId);
+  const t = useTranslations('tripBlog');
 
   return (
     <div className="rich-text-editor">
@@ -363,10 +373,10 @@ export function RichTextEditor({
               [
                 ...getDefaultReactSlashMenuItems(editor),
                 {
-                  title: 'Image',
-                  subtext: 'Upload a photo -- can flow beside text, or sit above/below it',
+                  title: t('slashImageTitle'),
+                  subtext: t('slashImageSubtext'),
                   aliases: ['image', 'photo', 'picture', 'upload', 'float'],
-                  group: 'Media',
+                  group: t('slashImageGroup'),
                   icon: <span aria-hidden="true">🖼️</span>,
                   onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' }),
                 },

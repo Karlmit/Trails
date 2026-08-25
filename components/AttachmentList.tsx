@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
+import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatAttachmentSize } from '@/lib/attachments';
@@ -42,6 +44,9 @@ interface AttachmentListProps {
 // ownerType/ownerId/tripId, no initial list. Same error-banner + in-flight-
 // request-guarding conventions as ChecklistCard.tsx.
 export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }: AttachmentListProps) {
+  const t = useTranslations('errors');
+  const tc = useTranslations('common');
+  const td = useTranslations('tripDocuments');
   const router = useRouter();
   const [attachments, setAttachments] = useState<AttachmentDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,13 +96,13 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
       const response = await fetch('/api/v1/attachments', { method: 'POST', body: formData });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(body?.error?.message ?? 'Could not upload this file.');
+        setError(translateApiError(t, body?.error?.message) ?? td('uploadError'));
         return;
       }
       setAttachments((current) => [body as AttachmentDTO, ...current]);
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(td('networkError'));
     } finally {
       setUploading(false);
       uploadInFlight.current = false;
@@ -105,7 +110,7 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
   }
 
   async function handleDelete(attachment: AttachmentDTO) {
-    if (!confirm(`Delete "${attachment.originalFilename}"?`)) return;
+    if (!confirm(td('deleteConfirm', { filename: attachment.originalFilename }))) return;
     setError(null);
     setDeletingIds((current) => new Set(current).add(attachment.id));
     const previous = attachments;
@@ -116,13 +121,13 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
       if (!response.ok) {
         setAttachments(previous);
         const body = await response.json().catch(() => null);
-        setError(body?.error?.message ?? 'Could not delete this file.');
+        setError(translateApiError(t, body?.error?.message) ?? td('deleteError'));
         return;
       }
       router.refresh();
     } catch {
       setAttachments(previous);
-      setError('Could not reach the server. Please try again.');
+      setError(td('networkError'));
     } finally {
       setDeletingIds((current) => {
         const next = new Set(current);
@@ -140,11 +145,11 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <div className="row-between">
         <span className="text-soft" style={FIELD_LABEL_STYLE}>
-          Documents
+          {td('label')}
         </span>
         {!readOnly && (
           <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
-            {uploading ? 'Uploading…' : 'Upload'}
+            {uploading ? td('uploading') : td('upload')}
             <input
               type="file"
               accept="application/pdf,image/jpeg,image/png"
@@ -159,9 +164,9 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
       {error && <div className="form-error-banner">{error}</div>}
 
       {loading ? (
-        <p className="text-soft">Loading…</p>
+        <p className="text-soft">{tc('loading')}</p>
       ) : attachments.length === 0 ? (
-        <p className="text-soft">No files uploaded yet. PDF, JPEG, or PNG.</p>
+        <p className="text-soft">{td('emptyState')}</p>
       ) : (
         <div className="stack" style={{ gap: 'var(--space-2)' }}>
           {attachments.map((attachment) => (
@@ -179,7 +184,7 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
                     onClick={() => handleDelete(attachment)}
                     disabled={deletingIds.has(attachment.id)}
                   >
-                    {deletingIds.has(attachment.id) ? 'Deleting…' : 'Delete'}
+                    {deletingIds.has(attachment.id) ? td('deleting') : tc('delete')}
                   </button>
                 )}
               </span>

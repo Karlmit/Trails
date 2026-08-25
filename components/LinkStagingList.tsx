@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 export interface StagedLink {
   url: string;
@@ -22,6 +23,7 @@ interface LinkStagingListProps {
 // commits every staged Link via commitStagedLinks below, once its own
 // create call returns the real id.
 export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
+  const tShared = useTranslations('shared');
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
 
@@ -39,7 +41,7 @@ export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <span className="text-soft" style={{ fontSize: '0.8rem', textTransform: 'uppercase' }}>
-        Links
+        {tShared('linkStagingListLabel')}
       </span>
 
       {links.length > 0 && (
@@ -53,7 +55,7 @@ export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
                 style={{ border: 'none', background: 'none', padding: 0, fontSize: '0.8rem', cursor: 'pointer' }}
                 onClick={() => handleRemove(index)}
               >
-                Remove
+                {tShared('linkStagingListRemove')}
               </button>
             </div>
           ))}
@@ -64,9 +66,9 @@ export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…"
+          placeholder={tShared('linkStagingListUrlPlaceholder')}
           maxLength={2048}
-          aria-label="New link URL"
+          aria-label={tShared('linkStagingListUrlLabel')}
           style={{
             border: '1px solid #d6dbde',
             borderRadius: 'var(--radius-input)',
@@ -78,9 +80,9 @@ export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="Label (optional)"
+          placeholder={tShared('linkStagingListLabelPlaceholder')}
           maxLength={200}
-          aria-label="New link label"
+          aria-label={tShared('linkStagingListLabelAriaLabel')}
           style={{
             border: '1px solid #d6dbde',
             borderRadius: 'var(--radius-input)',
@@ -89,7 +91,7 @@ export function LinkStagingList({ links, onChange }: LinkStagingListProps) {
           }}
         />
         <button type="button" className="btn btn-outline" onClick={handleAdd} disabled={!url.trim()}>
-          Add
+          {tShared('linkStagingListAddButton')}
         </button>
       </div>
     </div>
