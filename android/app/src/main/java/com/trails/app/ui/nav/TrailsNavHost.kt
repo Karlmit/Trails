@@ -45,6 +45,8 @@ import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.documents.DocumentsScreen
 import com.trails.app.ui.entrydetail.EntryDetailScreen
 import com.trails.app.ui.entrydetail.EntryEditScreen
+import com.trails.app.ui.ideas.IdeaDetailScreen
+import com.trails.app.ui.ideas.IdeaDetailViewModel
 import com.trails.app.ui.ideas.IdeaEditScreen
 import com.trails.app.ui.ideas.IdeasScreen
 import com.trails.app.ui.importantinfo.ImportantInfoEditScreen
@@ -78,8 +80,10 @@ private fun sectionEditRoute(tripId: String, sectionId: String?) = "trip/$tripId
 private fun checklistDetailRoute(tripId: String, checklistId: String) = "trip/$tripId/checklists/$checklistId"
 private fun checklistEditRoute(tripId: String, checklistId: String?) = "trip/$tripId/checklists/${checklistId ?: NEW_ID}/edit"
 private val CHECKLISTS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.CHECKLISTS.route}"
+private val IDEAS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.IDEAS.route}"
 private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/important-info/${infoId ?: NEW_ID}/edit"
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
+private fun ideaDetailRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId"
 
 /**
  * Settings isn't Trip-scoped, so it can't use TripDrawerScaffold (which
@@ -246,7 +250,44 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
                 tripId, TripTab.IDEAS, stringResource(R.string.shell_title_ideas), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(ideaEditRoute(tripId, null)) }) },
             ) { padding ->
-                IdeasScreen(padding, onOpenIdea = { id -> navController.navigate(ideaEditRoute(tripId, id)) })
+                // User-requested: tapping an Idea opens a read-only view
+                // first -- editing is reached from there via its own Edit
+                // action, same split ChecklistsScreen already uses.
+                IdeasScreen(padding, onOpenIdea = { id -> navController.navigate(ideaDetailRoute(tripId, id)) })
+            }
+        }
+
+        // User-requested: "When I click on an idea, it should open in view
+        // mode, from there the user can enter edit mode" -- mirrors the
+        // Checklist detail/edit split above. Convert-to-Entry lives here
+        // (view mode), matching components/IdeaCard.tsx exactly; Delete
+        // stays on IdeaEditScreen, reached via this screen's own Edit action.
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/ideas/{$ARG_IDEA_ID}",
+            arguments = listOf(
+                navArgument(ARG_TRIP_ID) { type = NavType.StringType },
+                navArgument(ARG_IDEA_ID) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            val ideaId = backStackEntry.arguments?.getString(ARG_IDEA_ID).orEmpty()
+            val detailViewModel: IdeaDetailViewModel = hiltViewModel()
+            val ideaEntity by detailViewModel.idea.collectAsState()
+            TripDrawerScaffold(
+                tripId, TripTab.IDEAS,
+                ideaEntity?.title ?: stringResource(R.string.shell_idea),
+                navController, showBackButton = true,
+                actions = {
+                    IconButton(onClick = { navController.navigate(ideaEditRoute(tripId, ideaId)) }) {
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shell_cd_edit), tint = TrailsColors.Brand)
+                    }
+                },
+            ) { padding ->
+                IdeaDetailScreen(
+                    padding,
+                    onConverted = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
+                    viewModel = detailViewModel,
+                )
             }
         }
 
@@ -259,7 +300,12 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(tripId, TripTab.IDEAS, stringResource(R.string.shell_title_edit_idea), navController, showBackButton = true) { padding ->
-                IdeaEditScreen(padding, onDone = { navController.popBackStack() })
+                // onDone only ever fires for an existing Idea's delete/convert
+                // (a fresh create deliberately stays on this screen, see
+                // IdeaEditScreen's own comment) -- reached via the Detail
+                // screen's Edit action, so popping just one entry would land
+                // back on that now-stale Detail screen instead of the list.
+                IdeaEditScreen(padding, onDone = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) })
             }
         }
 

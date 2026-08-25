@@ -32,10 +32,13 @@
 
     <!-- Ideas list -->
     <string name="idea_empty_message">No ideas yet.\nSomething worth doing on this trip? Pin it here.</string>
+    <string name="idea_empty_state_no_match">No ideas match this filter.</string>
     <string name="idea_no_section_label">No Section</string>
-    <string name="idea_show_less">Show less</string>
-    <string name="idea_read_more">Read more</string>
     <string name="idea_open_in_maps">Open in Google Maps</string>
+    <string name="idea_filter_all_option">All</string>
+    <string name="idea_filter_clear">Clear filters</string>
+    <string name="idea_detail_edit_button">Edit</string>
+    <string name="idea_detail_photos_heading">Photos</string>
     <string name="idea_priority_must_do">Must do</string>
     <string name="idea_priority_would_like">Would like</string>
     <string name="idea_priority_maybe">Maybe</string>

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -23,9 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,39 +31,66 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
+import com.trails.app.data.entity.SectionEntity
+import com.trails.app.ui.components.DropdownField
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.io.File
 
-/** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx's default Section grouping, plus create/edit via [onOpenIdea]. */
+/** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx's default Section grouping + Priority/Section/Category/Weather filters, plus create/edit via [onOpenIdea]. */
 @Composable
-fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, viewModel: IdeasViewModel = hiltViewModel()) {
+fun IdeasScreen(
+    padding: PaddingValues,
+    onOpenIdea: (String) -> Unit = {},
+    viewModel: IdeasViewModel = hiltViewModel(),
+    sectionsViewModel: SectionsViewModel = hiltViewModel(),
+) {
     val groups by viewModel.groups.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val filters by viewModel.filters.collectAsState()
+    val categoryOptions by viewModel.categoryOptions.collectAsState()
+    val hasAnyIdeas by viewModel.hasAnyIdeas.collectAsState()
+    val sections by sectionsViewModel.sections.collectAsState(initial = emptyList())
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
-        if (groups.isEmpty()) {
-            EmptyState(
-                emoji = "💡",
-                message = stringResource(R.string.idea_empty_message),
-                modifier = Modifier.align(Alignment.Center),
+        Column(modifier = Modifier.fillMaxSize()) {
+            IdeaFilterBar(
+                filters = filters,
+                sections = sections,
+                categoryOptions = categoryOptions,
+                onPriorityChange = viewModel::onPriorityFilterChange,
+                onSectionChange = viewModel::onSectionFilterChange,
+                onCategoryChange = viewModel::onCategoryFilterChange,
+                onWeatherChange = viewModel::onWeatherFilterChange,
+                onClear = viewModel::clearFilters,
             )
-        } else {
-            val noSectionLabel = stringResource(R.string.idea_no_section_label)
-            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                groups.forEach { group ->
-                    item {
-                        Text(
-                            group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: noSectionLabel,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = TrailsColors.TextSoft,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                        )
-                    }
-                    items(group.ideas, key = { it.idea.id }) { item ->
-                        IdeaCompactCard(item, onClick = { onOpenIdea(item.idea.id) })
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (groups.isEmpty()) {
+                    EmptyState(
+                        emoji = "💡",
+                        message = if (hasAnyIdeas) stringResource(R.string.idea_empty_state_no_match) else stringResource(R.string.idea_empty_message),
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                } else {
+                    val noSectionLabel = stringResource(R.string.idea_no_section_label)
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+                        groups.forEach { group ->
+                            item {
+                                Text(
+                                    group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: noSectionLabel,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = TrailsColors.TextSoft,
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                                )
+                            }
+                            items(group.ideas, key = { it.idea.id }) { item ->
+                                IdeaCompactCard(item, onClick = { onOpenIdea(item.idea.id) })
+                            }
+                        }
                     }
                 }
             }
@@ -76,18 +99,80 @@ fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, view
 }
 
 @Composable
+private fun IdeaFilterBar(
+    filters: IdeaFilters,
+    sections: List<SectionEntity>,
+    categoryOptions: List<String>,
+    onPriorityChange: (String?) -> Unit,
+    onSectionChange: (String?) -> Unit,
+    onCategoryChange: (String?) -> Unit,
+    onWeatherChange: (String?) -> Unit,
+    onClear: () -> Unit,
+) {
+    val allLabel = stringResource(R.string.idea_filter_all_option)
+    val priorityLabels = IDEA_PRIORITY_LABEL_RES.mapValues { (_, resId) -> stringResource(resId) }
+    val weatherLabels = IDEA_WEATHER_LABEL_RES.mapValues { (_, resId) -> stringResource(resId) }
+
+    TrailsCard(modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DropdownField(
+                label = stringResource(R.string.idea_edit_label_priority),
+                options = listOf(null) + IDEA_PRIORITIES,
+                selected = filters.priority,
+                onSelected = onPriorityChange,
+                optionLabel = { value -> value?.let { priorityLabels[it] } ?: allLabel },
+                modifier = Modifier.weight(1f),
+            )
+            DropdownField(
+                label = stringResource(R.string.idea_edit_label_section),
+                options = listOf(null) + sections.map { it.id },
+                selected = filters.sectionId,
+                onSelected = onSectionChange,
+                optionLabel = { id -> id?.let { sid -> sections.find { it.id == sid }?.let { "${it.emoji.orEmpty()} ${it.name}".trim() } ?: sid } ?: allLabel },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DropdownField(
+                label = stringResource(R.string.idea_edit_label_category),
+                options = listOf(null) + categoryOptions,
+                selected = filters.category,
+                onSelected = onCategoryChange,
+                optionLabel = { it ?: allLabel },
+                modifier = Modifier.weight(1f),
+            )
+            DropdownField(
+                label = stringResource(R.string.idea_edit_label_weather),
+                options = listOf(null) + IDEA_WEATHER_SUITABILITY,
+                selected = filters.weatherSuitability,
+                onSelected = onWeatherChange,
+                optionLabel = { value -> value?.let { weatherLabels[it] } ?: allLabel },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (filters != IdeaFilters()) {
+            Text(
+                stringResource(R.string.idea_filter_clear),
+                style = MaterialTheme.typography.bodySmall,
+                color = TrailsColors.BrandAccent,
+                modifier = Modifier.clickable(onClick = onClear),
+            )
+        }
+    }
+}
+
+@Composable
 private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
     val idea = item.idea
-    var expanded by remember { mutableStateOf(false) }
 
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick),
         shape = TrailsShapes.Card,
         colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onClick)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (item.coverPhoto?.localPath != null) {
                     AsyncImage(
                         model = File(item.coverPhoto.localPath),
@@ -107,6 +192,13 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.TextSoft,
                         )
+                    }
+                    // User-requested: Category shown directly in the list,
+                    // no longer tucked behind a "Read more" toggle.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
+                        idea.category?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
+                        }
                         if (idea.estimatedExpenseAmount != null && idea.estimatedExpenseCurrency != null) {
                             Text(
                                 "${idea.estimatedExpenseAmount} ${idea.estimatedExpenseCurrency}",
@@ -119,46 +211,19 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
             }
 
             // User-requested: Description shows always, not tucked behind
-            // "Read more" -- same "shown unconditionally in view mode" choice
-            // web's IdeaCard makes for this field.
+            // "Read more" -- same "shown unconditionally in view mode"
+            // choice web's IdeaCard makes for this field. Everything else
+            // that used to hide behind "Read more" (Location/Map link,
+            // Links, Photos) now lives on the tap destination, IdeaDetailScreen.
             idea.description?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
-            }
-
-            val hasMore = idea.category != null || idea.locationAddress != null || idea.locationMapLink != null
-            if (hasMore) {
-                Text(
-                    if (expanded) stringResource(R.string.idea_show_less) else stringResource(R.string.idea_read_more),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TrailsColors.BrandAccent,
-                    modifier = Modifier.padding(top = 8.dp).clickable { expanded = !expanded },
-                )
-            }
-            if (expanded) {
-                Column(modifier = Modifier.padding(top = 6.dp)) {
-                    idea.category?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
-                    }
-                    idea.locationAddress?.let {
-                        Text("📍 $it", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
-                    }
-                    idea.locationMapLink?.let { link ->
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        Text(
-                            stringResource(R.string.idea_open_in_maps),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TrailsColors.BrandAccent,
-                            modifier = Modifier.padding(top = 4.dp).clickable { com.trails.app.util.openExternalUrl(context, link) },
-                        )
-                    }
-                }
             }
         }
     }
 }
 
 @Composable
-private fun PriorityBadge(priority: String) {
+internal fun PriorityBadge(priority: String) {
     val (bg, fg) = when (priority) {
         "MUST_DO" -> TrailsColors.BrandAccent to TrailsColors.TextOnDark
         "WOULD_LIKE" -> TrailsColors.BrandMint to TrailsColors.BrandDeep

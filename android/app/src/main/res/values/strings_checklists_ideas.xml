@@ -32,10 +32,13 @@
 
     <!-- Ideas list -->
     <string name="idea_empty_message">Inga idéer än.\nNågot värt att göra på resan? Spara det här.</string>
+    <string name="idea_empty_state_no_match">Inga idéer matchar det här filtret.</string>
     <string name="idea_no_section_label">Ingen sektion</string>
-    <string name="idea_show_less">Visa mindre</string>
-    <string name="idea_read_more">Läs mer</string>
     <string name="idea_open_in_maps">Öppna i Google Maps</string>
+    <string name="idea_filter_all_option">Alla</string>
+    <string name="idea_filter_clear">Rensa filter</string>
+    <string name="idea_detail_edit_button">Redigera</string>
+    <string name="idea_detail_photos_heading">Foton</string>
     <string name="idea_priority_must_do">Måste göras</string>
     <string name="idea_priority_would_like">Skulle vilja</string>
     <string name="idea_priority_maybe">Kanske</string>
