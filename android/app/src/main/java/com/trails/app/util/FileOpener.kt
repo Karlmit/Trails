@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.trails.app.R
 import java.io.File
 
 /** Opens a cached file (Attachment/Photo bytes already downloaded by FileCacheManager) via the system viewer. */
@@ -18,6 +19,6 @@ fun openCachedFile(context: Context, localPath: String, mimeType: String) {
     try {
         context.startActivity(intent)
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No app installed that can open this file", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.shell_no_app_for_file), Toast.LENGTH_SHORT).show()
     }
 }

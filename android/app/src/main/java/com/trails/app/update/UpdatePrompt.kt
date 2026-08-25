@@ -7,7 +7,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 
 /**
  * Mounted once at the app root (MainActivity), alongside the nav host, not
@@ -22,22 +24,24 @@ fun UpdatePrompt(viewModel: UpdateViewModel = hiltViewModel()) {
 
     AlertDialog(
         onDismissRequest = { if (!state.downloading) viewModel.dismiss() },
-        title = { Text("Update available: ${info.versionName}") },
+        title = { Text(stringResource(R.string.shell_update_title, info.versionName)) },
         text = {
             if (state.downloading) {
                 CircularProgressIndicator()
+            } else if (state.error) {
+                Text(stringResource(R.string.shell_update_error))
             } else {
-                Text(state.error ?: info.releaseNotes.ifBlank { "A new version of Trails is available." })
+                Text(info.releaseNotes.ifBlank { stringResource(R.string.shell_update_body_generic) })
             }
         },
         confirmButton = {
             TextButton(onClick = viewModel::startUpdate, enabled = !state.downloading) {
-                Text(if (state.downloading) "Downloading…" else "Update now")
+                Text(stringResource(if (state.downloading) R.string.shell_update_downloading else R.string.shell_update_now))
             }
         },
         dismissButton = {
             TextButton(onClick = viewModel::dismiss, enabled = !state.downloading) {
-                Text("Later")
+                Text(stringResource(R.string.shell_update_later))
             }
         },
     )

@@ -52,4 +52,16 @@
     <string name="shell_save_offline">Spara offline</string>
     <string name="shell_trip_sync_error">Det gick inte att uppdatera resorna</string>
     <string name="shell_trip_date_range">%1$s → %2$s · %3$d dagar</string>
+
+    <!-- App update prompt -->
+    <string name="shell_update_title">Uppdatering tillgänglig: %1$s</string>
+    <string name="shell_update_body_generic">En ny version av Trails är tillgänglig.</string>
+    <string name="shell_update_downloading">Laddar ner…</string>
+    <string name="shell_update_now">Uppdatera nu</string>
+    <string name="shell_update_later">Senare</string>
+    <string name="shell_update_error">Uppdateringen misslyckades</string>
+
+    <!-- External-app handoff fallbacks -->
+    <string name="shell_no_app_for_file">Ingen app installerad som kan öppna den här filen</string>
+    <string name="shell_no_app_for_link">Ingen app hittades som kan öppna länken</string>
 </resources>

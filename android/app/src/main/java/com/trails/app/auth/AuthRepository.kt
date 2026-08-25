@@ -20,15 +20,16 @@ class AuthRepository @Inject constructor(
         val response = api.login(LoginRequest(username, password))
         tokenStore.save(response.token, response.user.username)
         Result.success(Unit)
-    } catch (e: HttpException) {
+    } catch (_: HttpException) {
         // POST /api/v1/auth deliberately returns a generic 401 for every
         // failure case (unknown username, wrong password, malformed body) --
         // no field-level detail to surface (see the Phase 0/1 plan's API
-        // contract notes).
-        val message = if (e.code() == 401) "Invalid username or password" else "Login failed (HTTP ${e.code()})"
-        Result.failure(Exception(message))
-    } catch (e: IOException) {
-        Result.failure(Exception("Could not reach the server: ${e.message}"))
+        // contract notes). No message here (rather than an English one) --
+        // LoginViewModel falls back to its own translated errorRes when
+        // the throwable carries none.
+        Result.failure(Exception())
+    } catch (_: IOException) {
+        Result.failure(Exception())
     }
 
     /** Best-effort server-side revoke; the local token is always discarded regardless. */

@@ -11,7 +11,7 @@ import javax.inject.Inject
 data class UpdateUiState(
     val available: UpdateInfo? = null,
     val downloading: Boolean = false,
-    val error: String? = null,
+    val error: Boolean = false,
 )
 
 @HiltViewModel
@@ -39,12 +39,12 @@ class UpdateViewModel @Inject constructor(
         val info = _uiState.value.available ?: return
         if (!updateChecker.ensureCanInstall()) return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(downloading = true, error = null)
+            _uiState.value = _uiState.value.copy(downloading = true, error = false)
             try {
                 updateChecker.downloadAndInstall(info)
                 _uiState.value = _uiState.value.copy(downloading = false)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(downloading = false, error = e.message ?: "Update failed")
+                _uiState.value = _uiState.value.copy(downloading = false, error = true)
             }
         }
     }

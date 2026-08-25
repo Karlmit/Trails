@@ -7,7 +7,6 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.sync.SyncScheduler
 import com.trails.app.sync.TripRefresher
-import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
-data class BudgetLineItem(val entry: TimelineEntryEntity, val label: String)
+data class BudgetLineItem(val entry: TimelineEntryEntity, val paymentStatus: String?, val paymentNote: String?)
 data class BudgetGroup(
     val currency: String,
     val total: Double,
@@ -63,14 +62,7 @@ class BudgetViewModel @Inject constructor(
                             .filter { it.expensePaymentStatus?.trim()?.equals("unpaid", ignoreCase = true) == true }
                             .sumOf { it.expenseAmount ?: 0.0 },
                         lineItems = group.map { entry ->
-                            BudgetLineItem(
-                                entry,
-                                buildString {
-                                    append(ENTRY_TYPE_LABELS[entry.entryType] ?: entry.entryType)
-                                    entry.expensePaymentStatus?.let { append(" · $it") }
-                                    entry.expensePaymentNote?.let { append(" · $it") }
-                                },
-                            )
+                            BudgetLineItem(entry, entry.expensePaymentStatus, entry.expensePaymentNote)
                         },
                     )
                 }

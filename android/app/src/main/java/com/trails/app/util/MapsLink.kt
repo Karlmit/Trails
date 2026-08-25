@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.trails.app.R
 
 /** lib/travel-mode.ts::mapsSearchUrl / entryMapsUrl -- a Maps *search* URL, not the entry's own stored locationMapLink, so it always works given just an address/name. */
 fun mapsSearchUrl(address: String): String =
@@ -20,6 +21,6 @@ fun openExternalUrl(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(context, "No app found to open this link", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.shell_no_app_for_link), Toast.LENGTH_SHORT).show()
     }
 }

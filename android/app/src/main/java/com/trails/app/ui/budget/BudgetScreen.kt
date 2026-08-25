@@ -28,6 +28,7 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
 
 /** Mirrors app/(web)/trips/[tripId]/budget/page.tsx (filters not built -- full list only). */
 @Composable
@@ -84,7 +85,12 @@ fun BudgetScreen(
                                 ) {
                                     Column {
                                         Text(item.entry.title, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent)
-                                        Text(item.label, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
+                                        val label = buildString {
+                                            append(entryTypeLabelResolved(item.entry.entryType))
+                                            item.paymentStatus?.let { append(" · $it") }
+                                            item.paymentNote?.let { append(" · $it") }
+                                        }
+                                        Text(label, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
                                     }
                                     Text(
                                         "%.2f %s".format(item.entry.expenseAmount, item.entry.expenseCurrency),

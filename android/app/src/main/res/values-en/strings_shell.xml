@@ -52,4 +52,16 @@
     <string name="shell_save_offline">Save offline</string>
     <string name="shell_trip_sync_error">Could not refresh trips</string>
     <string name="shell_trip_date_range">%1$s → %2$s · %3$d days</string>
+
+    <!-- App update prompt -->
+    <string name="shell_update_title">Update available: %1$s</string>
+    <string name="shell_update_body_generic">A new version of Trails is available.</string>
+    <string name="shell_update_downloading">Downloading…</string>
+    <string name="shell_update_now">Update now</string>
+    <string name="shell_update_later">Later</string>
+    <string name="shell_update_error">Update failed</string>
+
+    <!-- External-app handoff fallbacks -->
+    <string name="shell_no_app_for_file">No app installed that can open this file</string>
+    <string name="shell_no_app_for_link">No app found to open this link</string>
 </resources>

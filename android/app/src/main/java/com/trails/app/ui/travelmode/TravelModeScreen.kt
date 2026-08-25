@@ -28,8 +28,8 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
-import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
-import com.trails.app.ui.timeline.graph.subtypeLabel
+import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
+import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 
 /** Mirrors app/(web)/trips/[tripId]/travel-mode/page.tsx. */
 @Composable
@@ -135,8 +135,8 @@ private fun EntryRow(entry: TimelineEntryEntity, onOpenEntry: (String, String) -
             Text(entry.title, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent)
             Text(
                 buildString {
-                    append(ENTRY_TYPE_LABELS[entry.entryType] ?: entry.entryType)
-                    entry.subtype?.let { append(" · ${subtypeLabel(it)}") }
+                    append(entryTypeLabelResolved(entry.entryType))
+                    entry.subtype?.let { append(" · ${subtypeLabelResolved(it)}") }
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = TrailsColors.TextSoft,

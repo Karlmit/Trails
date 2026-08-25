@@ -121,7 +121,7 @@ fun TripDrawerScaffold(
                 HorizontalDivider()
                 TripTab.entries.forEach { tab ->
                     NavigationDrawerItem(
-                        label = { Text(tab.label) },
+                        label = { Text(stringResource(tab.labelRes)) },
                         selected = tab == currentTab,
                         onClick = { navigateTo(tab.route) },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),

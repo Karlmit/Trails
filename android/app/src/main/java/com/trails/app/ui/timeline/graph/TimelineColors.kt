@@ -67,30 +67,10 @@ fun entryTypeColor(entryType: String): Color = when (entryType) {
     else -> TrailsColors.TextSoft // NOTE
 }
 
-// lib/entry-types/labels.ts
-private val SUBTYPE_LABELS = mapOf(
-    "HOTEL" to "Hotel", "HOSTEL" to "Hostel", "RESORT" to "Resort", "APARTMENT" to "Apartment",
-    "VILLA" to "Villa", "GUESTHOUSE" to "Guesthouse", "STAY_OTHER" to "Other",
-    "FLIGHT" to "Flight", "TRAIN" to "Train", "FERRY" to "Ferry", "BUS" to "Bus", "CAR" to "Car",
-    "TAXI" to "Taxi", "TRANSFER" to "Transfer", "TRANSPORT_OTHER" to "Other",
-    "TOUR" to "Tour", "RESTAURANT" to "Restaurant", "ATTRACTION" to "Attraction", "EVENT" to "Event",
-    "BEACH" to "Beach", "HIKE" to "Hike", "MUSEUM" to "Museum", "SHOPPING" to "Shopping",
-    "NIGHTLIFE" to "Nightlife", "ACTIVITY_OTHER" to "Other",
-)
-
-fun subtypeLabel(value: String): String = SUBTYPE_LABELS[value] ?: value
-
-val ENTRY_TYPE_LABELS = mapOf(
-    "STAY" to "Stay", "TRANSPORT" to "Transport", "ACTIVITY" to "Activity",
-    "NOTE" to "Note", "BLOG_POST" to "Blog Post",
-)
-
-// Localized counterparts of SUBTYPE_LABELS/ENTRY_TYPE_LABELS above -- kept as
-// separate additive maps (rather than replacing the plain-String ones) since
-// those are also consumed from a couple of ViewModels and other screens
-// outside this batch that can't call stringResource(); this batch's own
-// Composables (TimelineScreen/EntryDetailScreen/EntryEditScreen) resolve
-// through [subtypeLabelResolved]/[entryTypeLabelResolved] instead.
+// lib/entry-types/labels.ts, resolved through string resources so every
+// screen shows the current app language (see subtypeLabelResolved/
+// entryTypeLabelResolved below -- both are @Composable since resolving a
+// string resource requires one).
 private val SUBTYPE_LABEL_RES: Map<String, Int> = mapOf(
     "HOTEL" to R.string.timeline_subtype_hotel,
     "HOSTEL" to R.string.timeline_subtype_hostel,
