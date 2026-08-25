@@ -215,6 +215,20 @@ private fun DayRow(
                                     color = TrailsColors.TextSoft,
                                 )
                             }
+                            // User-requested: Transport's connecting-itinerary
+                            // breakdown -- one row per flight/layover, each with
+                            // its own right-aligned clock time or duration.
+                            label.itinerary?.forEach { row ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(row.left, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
+                                    if (row.right != null) {
+                                        Text(row.right, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
+                                    }
+                                }
+                            }
                         }
                     }
                 }

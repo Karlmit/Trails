@@ -37,7 +37,22 @@ fun formatDayLabel(dateKey: String): DayLabel = runCatching {
     DayLabel("$month ${date.dayOfMonth}", date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()))
 }.getOrDefault(DayLabel(dateKey, ""))
 
-data class DayLineLabel(val hidden: Boolean, val title: String, val subtitle: String?, val showSubtype: Boolean)
+data class DayLineLabel(
+    val hidden: Boolean,
+    val title: String,
+    val subtitle: String?,
+    val showSubtype: Boolean,
+    // User-requested: Transport's connecting-itinerary breakdown -- each
+    // row is a flight (left: its number, right: whichever of its own
+    // Arrival/Departure clock time borders an adjacent layover) or a
+    // layover (left: the airport, right: the computed layover duration).
+    // Kept separate from `subtitle` (a single plain string, Stay's own
+    // check-in/check-out line) since each row here needs its own
+    // left/right split, not just a line break.
+    val itinerary: List<ItineraryRow>? = null,
+)
+
+data class ItineraryRow(val left: String, val right: String?)
 
 // User-requested: a multi-day Stay's name repeated on every day it spans was
 // noise -- the branch line itself already shows it's ongoing, so a Stay is
@@ -65,26 +80,58 @@ private fun stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: String): S
     return parts.joinToString(" · ")
 }
 
+// User-requested: the layover's own row shows only the airport and the
+// computed duration now (the two clock times it used to show move onto
+// the bordering flights' own rows instead -- see transportItineraryRows).
+// Same naive literal-digit diff already used elsewhere for this pair (a
+// layover's arrival and the next departure happen at the same real
+// airport in the overwhelming common case, so no real timezone
+// conversion is needed to get a correct duration).
+private fun formatLayoverDuration(arrivalAt: String, departureAt: String): String? {
+    val arrival = runCatching { java.time.LocalDateTime.parse(arrivalAt.removeSuffix("Z").take(16)) }.getOrNull()
+    val departure = runCatching { java.time.LocalDateTime.parse(departureAt.removeSuffix("Z").take(16)) }.getOrNull()
+    if (arrival == null || departure == null) return null
+    val totalMinutes = java.time.Duration.between(arrival, departure).toMinutes()
+    if (totalMinutes < 0) return null
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours == 0L -> "${minutes}m"
+        minutes == 0L -> "${hours}h"
+        else -> "${hours}h ${minutes}m"
+    }
+}
+
 // User-requested redesign: every leg -- including the first -- is one
-// uniform Flight, shown as a multi-line subtitle on the departure day only
+// uniform Flight, shown as a breakdown of rows on the departure day only
 // (the arrival day keeps its own plain "Title · Arrival HH:MM" line,
 // unchanged). Mirrors
-// app/(web)/trips/[tripId]/timeline/page.tsx::transportItinerarySubtitle.
-private fun transportItinerarySubtitle(typeDetailsJson: String?): String? {
+// app/(web)/trips/[tripId]/timeline/page.tsx::transportItineraryRows.
+private fun transportItineraryRows(typeDetailsJson: String?): List<ItineraryRow>? {
     val flights = parseFlights(typeDetailsJson)
     // A single Flight is today's exact plain behavior -- no breakdown needed.
     if (flights.size <= 1) return null
 
-    val lines = mutableListOf<String>()
+    val rows = mutableListOf<ItineraryRow>()
     flights.forEachIndexed { index, flight ->
         if (index > 0) {
             val prev = flights[index - 1]
             val location = prev.arrivalLocation.ifBlank { flight.departureLocation }
-            lines += "⏱ ${if (location.isNotBlank()) "$location · " else ""}${formatStopoverClock(prev.arrivalAt)}–${formatStopoverClock(flight.departureAt)}"
+            rows += ItineraryRow(left = "⏱ $location", right = formatLayoverDuration(prev.arrivalAt, flight.departureAt))
         }
-        lines += if (flight.flightNumber.isNotBlank()) "✈ ${flight.flightNumber}" else "✈ Flight ${index + 1}"
+        // A flight bordering a layover shows whichever of its own Arrival
+        // (the layover right after it) or Departure (the layover right
+        // before it) clock time that layover needs -- both, for the rare
+        // flight with a layover on each side.
+        val times = mutableListOf<String>()
+        if (index > 0) times += "Departure: ${formatStopoverClock(flight.departureAt)}"
+        if (index < flights.size - 1) times += "Arrival: ${formatStopoverClock(flight.arrivalAt)}"
+        rows += ItineraryRow(
+            left = if (flight.flightNumber.isNotBlank()) "✈ ${flight.flightNumber}" else "✈ Flight ${index + 1}",
+            right = times.takeIf { it.isNotEmpty() }?.joinToString(" · ")?.let { "($it)" },
+        )
     }
-    return lines.joinToString("\n")
+    return rows
 }
 
 /** lib/(web)/trips/[tripId]/timeline/page.tsx::dayLineLabel */
@@ -108,7 +155,7 @@ fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
             } else {
                 "${line.title} · Departure"
             }
-            return DayLineLabel(hidden = false, title = title, subtitle = transportItinerarySubtitle(line.typeDetailsJson), showSubtype = false)
+            return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false, itinerary = transportItineraryRows(line.typeDetailsJson))
         }
         if (line.isEnd && line.endAt != null) {
             val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)

@@ -88,6 +88,19 @@ interface DayLineLabel {
   title: string;
   subtitle: string | null;
   showSubtype: boolean;
+  // User-requested: Transport's connecting-itinerary breakdown -- each row
+  // is a flight (left: its number, right: whichever of its own Arrival/
+  // Departure clock time borders an adjacent layover) or a layover (left:
+  // the airport, right: the computed layover duration). Kept separate
+  // from `subtitle` (a single plain string, Stay's own check-in/check-out
+  // line) since each row here needs its own left/right split, not just a
+  // line break.
+  itinerary: ItineraryRow[] | null;
+}
+
+interface ItineraryRow {
+  left: string;
+  right: string | null;
 }
 
 // User-requested: a multi-day Stay's name repeated on every day it spans
@@ -129,30 +142,67 @@ interface FlightForTimeline {
   flightNumber: string | null;
 }
 
-function transportItinerarySubtitle(typeDetails: unknown): string | null {
+// User-requested: the layover's own line shows only the airport and the
+// computed duration now (the two clock times it used to show move onto
+// the bordering flights' own lines instead -- see transportItineraryRows).
+// Same naive literal-digit diff already used elsewhere for this pair (a
+// layover's arrival and the next departure happen at the same real
+// airport in the overwhelming common case, so no real timezone
+// conversion is needed to get a correct duration).
+function formatLayoverDuration(arrivalAt: string, departureAt: string): string | null {
+  const diffMs = new Date(departureAt).getTime() - new Date(arrivalAt).getTime();
+  if (!Number.isFinite(diffMs) || diffMs < 0) return null;
+  const totalMinutes = Math.round(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function transportItineraryRows(typeDetails: unknown): ItineraryRow[] | null {
   const details = typeDetails as { flights?: unknown } | null | undefined;
   const flights = Array.isArray(details?.flights) ? (details.flights as FlightForTimeline[]) : [];
   // A single Flight is today's exact plain behavior -- no breakdown needed.
   if (flights.length <= 1) return null;
 
-  const lines: string[] = [];
+  const rows: ItineraryRow[] = [];
   flights.forEach((flight, index) => {
     if (index > 0) {
       const prev = flights[index - 1];
-      const location = prev.arrivalLocation || flight.departureLocation;
-      lines.push(`⏱ ${location ? `${location} · ` : ''}${formatStopoverClock(prev.arrivalAt)}–${formatStopoverClock(flight.departureAt)}`);
+      const location = prev.arrivalLocation || flight.departureLocation || '';
+      rows.push({
+        left: `⏱ ${location}`,
+        right: formatLayoverDuration(prev.arrivalAt, flight.departureAt),
+      });
     }
-    lines.push(flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`);
+    // A flight bordering a layover shows whichever of its own Arrival
+    // (the layover right after it) or Departure (the layover right
+    // before it) clock time that layover needs -- both, for the rare
+    // flight with a layover on each side.
+    const times: string[] = [];
+    if (index > 0) times.push(`Departure: ${formatStopoverClock(flight.departureAt)}`);
+    if (index < flights.length - 1) times.push(`Arrival: ${formatStopoverClock(flight.arrivalAt)}`);
+    rows.push({
+      left: flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`,
+      right: times.length > 0 ? `(${times.join(' · ')})` : null,
+    });
   });
-  return lines.join('\n');
+  return rows;
 }
 
 function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel {
   if (line.entryType === 'STAY') {
     if (!line.isStart && !line.isEnd) {
-      return { hidden: true, title: '', subtitle: null, showSubtype: false };
+      return { hidden: true, title: '', subtitle: null, showSubtype: false, itinerary: null };
     }
-    return { hidden: false, title: line.title, subtitle: stayEndpointSubtitle(line, tripTimezone), showSubtype: false };
+    return {
+      hidden: false,
+      title: line.title,
+      subtitle: stayEndpointSubtitle(line, tripTimezone),
+      showSubtype: false,
+      itinerary: null,
+    };
   }
   if (line.entryType === 'TRANSPORT') {
     if (line.isStart) {
@@ -161,7 +211,7 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel
       const title = hasTime
         ? `${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
         : `${line.title} · Departure`;
-      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails), showSubtype: false };
+      return { hidden: false, title, subtitle: null, showSubtype: false, itinerary: transportItineraryRows(line.typeDetails) };
     }
     if (line.isEnd && line.endAt) {
       const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
@@ -169,11 +219,11 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel
       const title = hasTime
         ? `${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
         : `${line.title} · Arrival`;
-      return { hidden: false, title, subtitle: null, showSubtype: false };
+      return { hidden: false, title, subtitle: null, showSubtype: false, itinerary: null };
     }
-    return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
+    return { hidden: false, title: line.title, subtitle: null, showSubtype: false, itinerary: null };
   }
-  return { hidden: false, title: line.title, subtitle: null, showSubtype: true };
+  return { hidden: false, title: line.title, subtitle: null, showSubtype: true, itinerary: null };
 }
 
 // spec-timeline-git-graph: the path data for one branch segment, in
@@ -418,6 +468,16 @@ export default async function TimelinePage({ params }: PageProps) {
                           <span>{label.title}</span>
                           {label.subtitle && (
                             <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
+                          )}
+                          {label.itinerary && (
+                            <span className="entry-chip-itinerary text-soft">
+                              {label.itinerary.map((row, index) => (
+                                <span key={index} className="entry-chip-itinerary-row">
+                                  <span>{row.left}</span>
+                                  {row.right && <span className="entry-chip-itinerary-right">{row.right}</span>}
+                                </span>
+                              ))}
+                            </span>
                           )}
                           {label.showSubtype && line.subtype && (
                             <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
