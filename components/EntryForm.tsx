@@ -132,13 +132,20 @@ interface FlightDraft {
   seat: string;
 }
 
-function blankFlight(tripTimezone: string): FlightDraft {
+// User-reported: Start/End already default a brand-new Entry's *date* to
+// the Trip's own first day so their native date-pickers open on the right
+// month (tripStartDate below) -- a new Flight's own Departure/Arrival
+// pickers didn't get the same treatment and always opened on today's
+// month instead. `dateOnly` carries that same default in here; still just
+// `''` for an existing entry being edited (its Flights already have real
+// dates) or when no Trip start date is known.
+function blankFlight(tripTimezone: string, dateOnly = ''): FlightDraft {
   return {
     departureLocation: '',
-    departureAt: '',
+    departureAt: dateOnly,
     departureTimezone: tripTimezone,
     arrivalLocation: '',
-    arrivalAt: '',
+    arrivalAt: dateOnly,
     arrivalTimezone: tripTimezone,
     flightNumber: '',
     terminal: '',
@@ -148,7 +155,12 @@ function blankFlight(tripTimezone: string): FlightDraft {
   };
 }
 
-function flightsFromSeed(seed: Partial<EntryDTO> | undefined, tripTimezone: string): FlightDraft[] {
+function flightsFromSeed(
+  seed: Partial<EntryDTO> | undefined,
+  tripTimezone: string,
+  mode: 'create' | 'edit',
+  tripStartDate: string | undefined,
+): FlightDraft[] {
   const typeDetails = seed?.typeDetails ?? {};
   const raw = typeDetails.flights;
   if (Array.isArray(raw) && raw.length > 0) {
@@ -191,7 +203,7 @@ function flightsFromSeed(seed: Partial<EntryDTO> | undefined, tripTimezone: stri
       },
     ];
   }
-  return [blankFlight(tripTimezone)];
+  return [blankFlight(tripTimezone, mode === 'create' ? (tripStartDate ?? '') : '')];
 }
 
 // Read-only, computed display of the gap between one Flight's arrival and
@@ -297,10 +309,15 @@ export function EntryForm({
   const typeDetails = seed?.typeDetails ?? {};
   const [roomInfo, setRoomInfo] = useState(str(typeDetails.roomInfo));
   const [baggageInfo, setBaggageInfo] = useState(str(typeDetails.baggageInfo));
-  const [flights, setFlights] = useState<FlightDraft[]>(() => flightsFromSeed(seed, tripTimezone));
+  const [flights, setFlights] = useState<FlightDraft[]>(() =>
+    flightsFromSeed(seed, tripTimezone, mode, tripStartDate),
+  );
 
   function addFlight() {
-    setFlights((current) => [...current, blankFlight(tripTimezone)]);
+    setFlights((current) => [
+      ...current,
+      blankFlight(tripTimezone, mode === 'create' ? (tripStartDate ?? '') : ''),
+    ]);
   }
   function updateFlight(index: number, patch: Partial<FlightDraft>) {
     setFlights((current) => current.map((f, i) => (i === index ? { ...f, ...patch } : f)));

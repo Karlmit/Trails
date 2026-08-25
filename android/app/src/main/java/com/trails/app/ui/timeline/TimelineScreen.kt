@@ -207,27 +207,16 @@ private fun DayRow(
                                 )
                             }
                             // User-requested: a Stay's check-in/check-out time as its
-                            // own line below the name, not folded into the title.
+                            // own line below the name, not folded into the title --
+                            // also carries Transport's own multi-line connecting-
+                            // itinerary breakdown, one flight/layover per line
+                            // (Compose's Text renders embedded "\n"s natively).
                             if (label.subtitle != null) {
                                 Text(
                                     label.subtitle,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TrailsColors.TextSoft,
                                 )
-                            }
-                            // User-requested: Transport's connecting-itinerary
-                            // breakdown -- one row per flight/layover, each with
-                            // its own right-aligned clock time or duration.
-                            label.itinerary?.forEach { row ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(row.left, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
-                                    if (row.right != null) {
-                                        Text(row.right, style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
-                                    }
-                                }
                             }
                         }
                     }

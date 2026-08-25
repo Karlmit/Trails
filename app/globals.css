@@ -893,28 +893,10 @@ p {
   font-size: 0.78rem;
   line-height: 1.3rem;
   margin-top: 1px;
-}
-
-/* User-requested: Transport's connecting-itinerary breakdown as one row
-   per flight/layover, each with its own right-aligned clock time or
-   layover duration -- replaces the old single pre-line string (each row
-   now needs its own left/right split, not just a line break). */
-.entry-chip-itinerary {
-  display: block;
-  font-size: 0.78rem;
-  line-height: 1.3rem;
-  margin-top: 1px;
-}
-
-.entry-chip-itinerary-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.entry-chip-itinerary-right {
-  flex-shrink: 0;
-  white-space: nowrap;
+  /* User-requested: Transport's own multi-line connecting-itinerary
+     subtitle (each flight/layover joined with \n) -- every other
+     subtitle is a single line already, so this has no effect there. */
+  white-space: pre-line;
 }
 
 .entry-chip-blog-cta {

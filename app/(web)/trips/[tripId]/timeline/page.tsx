@@ -88,19 +88,6 @@ interface DayLineLabel {
   title: string;
   subtitle: string | null;
   showSubtype: boolean;
-  // User-requested: Transport's connecting-itinerary breakdown -- each row
-  // is a flight (left: its number, right: whichever of its own Arrival/
-  // Departure clock time borders an adjacent layover) or a layover (left:
-  // the airport, right: the computed layover duration). Kept separate
-  // from `subtitle` (a single plain string, Stay's own check-in/check-out
-  // line) since each row here needs its own left/right split, not just a
-  // line break.
-  itinerary: ItineraryRow[] | null;
-}
-
-interface ItineraryRow {
-  left: string;
-  right: string | null;
 }
 
 // User-requested: a multi-day Stay's name repeated on every day it spans
@@ -144,7 +131,7 @@ interface FlightForTimeline {
 
 // User-requested: the layover's own line shows only the airport and the
 // computed duration now (the two clock times it used to show move onto
-// the bordering flights' own lines instead -- see transportItineraryRows).
+// the bordering flights' own lines instead -- see transportItinerarySubtitle).
 // Same naive literal-digit diff already used elsewhere for this pair (a
 // layover's arrival and the next departure happen at the same real
 // airport in the overwhelming common case, so no real timezone
@@ -160,21 +147,25 @@ function formatLayoverDuration(arrivalAt: string, departureAt: string): string |
   return `${hours}h ${minutes}m`;
 }
 
-function transportItineraryRows(typeDetails: unknown): ItineraryRow[] | null {
+// User-reported: the flight-number/airport line and its clock time or
+// layover duration must sit right next to each other, not spread apart to
+// the far right of the whole row (a flex `justify-content: space-between`
+// across the entire subtitle's width, tried first, put it right next to
+// the far-right Section badge column instead). Plain inline text, same
+// single-string-per-line shape every other subtitle already uses.
+function transportItinerarySubtitle(typeDetails: unknown): string | null {
   const details = typeDetails as { flights?: unknown } | null | undefined;
   const flights = Array.isArray(details?.flights) ? (details.flights as FlightForTimeline[]) : [];
   // A single Flight is today's exact plain behavior -- no breakdown needed.
   if (flights.length <= 1) return null;
 
-  const rows: ItineraryRow[] = [];
+  const lines: string[] = [];
   flights.forEach((flight, index) => {
     if (index > 0) {
       const prev = flights[index - 1];
       const location = prev.arrivalLocation || flight.departureLocation || '';
-      rows.push({
-        left: `⏱ ${location}`,
-        right: formatLayoverDuration(prev.arrivalAt, flight.departureAt),
-      });
+      const duration = formatLayoverDuration(prev.arrivalAt, flight.departureAt);
+      lines.push(`⏱ ${location}${duration ? ` ${duration}` : ''}`);
     }
     // A flight bordering a layover shows whichever of its own Arrival
     // (the layover right after it) or Departure (the layover right
@@ -183,26 +174,18 @@ function transportItineraryRows(typeDetails: unknown): ItineraryRow[] | null {
     const times: string[] = [];
     if (index > 0) times.push(`Departure: ${formatStopoverClock(flight.departureAt)}`);
     if (index < flights.length - 1) times.push(`Arrival: ${formatStopoverClock(flight.arrivalAt)}`);
-    rows.push({
-      left: flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`,
-      right: times.length > 0 ? `(${times.join(' · ')})` : null,
-    });
+    const flightLabel = flight.flightNumber ? `✈ ${flight.flightNumber}` : `✈ Flight ${index + 1}`;
+    lines.push(times.length > 0 ? `${flightLabel} (${times.join(' · ')})` : flightLabel);
   });
-  return rows;
+  return lines.join('\n');
 }
 
 function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel {
   if (line.entryType === 'STAY') {
     if (!line.isStart && !line.isEnd) {
-      return { hidden: true, title: '', subtitle: null, showSubtype: false, itinerary: null };
+      return { hidden: true, title: '', subtitle: null, showSubtype: false };
     }
-    return {
-      hidden: false,
-      title: line.title,
-      subtitle: stayEndpointSubtitle(line, tripTimezone),
-      showSubtype: false,
-      itinerary: null,
-    };
+    return { hidden: false, title: line.title, subtitle: stayEndpointSubtitle(line, tripTimezone), showSubtype: false };
   }
   if (line.entryType === 'TRANSPORT') {
     if (line.isStart) {
@@ -211,7 +194,7 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel
       const title = hasTime
         ? `${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
         : `${line.title} · Departure`;
-      return { hidden: false, title, subtitle: null, showSubtype: false, itinerary: transportItineraryRows(line.typeDetails) };
+      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails), showSubtype: false };
     }
     if (line.isEnd && line.endAt) {
       const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
@@ -219,11 +202,11 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string): DayLineLabel
       const title = hasTime
         ? `${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
         : `${line.title} · Arrival`;
-      return { hidden: false, title, subtitle: null, showSubtype: false, itinerary: null };
+      return { hidden: false, title, subtitle: null, showSubtype: false };
     }
-    return { hidden: false, title: line.title, subtitle: null, showSubtype: false, itinerary: null };
+    return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
   }
-  return { hidden: false, title: line.title, subtitle: null, showSubtype: true, itinerary: null };
+  return { hidden: false, title: line.title, subtitle: null, showSubtype: true };
 }
 
 // spec-timeline-git-graph: the path data for one branch segment, in
@@ -468,16 +451,6 @@ export default async function TimelinePage({ params }: PageProps) {
                           <span>{label.title}</span>
                           {label.subtitle && (
                             <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
-                          )}
-                          {label.itinerary && (
-                            <span className="entry-chip-itinerary text-soft">
-                              {label.itinerary.map((row, index) => (
-                                <span key={index} className="entry-chip-itinerary-row">
-                                  <span>{row.left}</span>
-                                  {row.right && <span className="entry-chip-itinerary-right">{row.right}</span>}
-                                </span>
-                              ))}
-                            </span>
                           )}
                           {label.showSubtype && line.subtype && (
                             <span className="text-soft"> · {subtypeLabel(line.subtype)}</span>
