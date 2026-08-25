@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Checklists list -->
+    <string name="checklist_empty_message">No checklists yet.\nStart a packing list or a pre-departure to-do.</string>
+    <string name="checklist_private_badge">Private</string>
+    <string name="checklist_items_done_count">%1$d/%2$d done</string>
+
+    <!-- Checklist detail -->
+    <string name="checklist_loading">Loading…</string>
+    <string name="checklist_detail_empty">Nothing on this list yet -- add the first thing below.</string>
+    <string name="checklist_remove_item_description">Remove item</string>
+    <string name="checklist_add_item_placeholder">Add an item…</string>
+    <string name="checklist_add_item_description">Add item</string>
+    <string name="checklist_error_add_item_failed">Failed to add item.</string>
+    <string name="checklist_error_delete_item_failed">Failed to delete item.</string>
+
+    <!-- Checklist edit -->
+    <string name="checklist_edit_title_new">New checklist</string>
+    <string name="checklist_edit_title_edit">Edit checklist</string>
+    <string name="checklist_edit_subtitle">Packing lists, pre-departure tasks, anything worth tracking.</string>
+    <string name="checklist_edit_label_title">Title</string>
+    <string name="checklist_edit_label_emoji">Emoji (optional)</string>
+    <string name="checklist_edit_label_private">Private -- only you can see this</string>
+    <string name="checklist_edit_delete_button">Delete checklist</string>
+    <string name="checklist_edit_delete_dialog_title">Delete this checklist?</string>
+    <string name="checklist_edit_delete_dialog_text">This cannot be undone.</string>
+    <string name="checklist_edit_delete_confirm_button">Delete</string>
+    <string name="checklist_edit_delete_cancel_button">Cancel</string>
+    <string name="checklist_edit_error_title_required">Title is required.</string>
+    <string name="checklist_edit_error_save_failed">Failed to save Checklist.</string>
+    <string name="checklist_edit_error_delete_failed">Failed to delete Checklist.</string>
+
+    <!-- Ideas list -->
+    <string name="idea_empty_message">No ideas yet.\nSomething worth doing on this trip? Pin it here.</string>
+    <string name="idea_no_section_label">No Section</string>
+    <string name="idea_show_less">Show less</string>
+    <string name="idea_read_more">Read more</string>
+    <string name="idea_open_in_maps">Open in Google Maps</string>
+    <string name="idea_priority_must_do">Must do</string>
+    <string name="idea_priority_would_like">Would like</string>
+    <string name="idea_priority_maybe">Maybe</string>
+    <string name="idea_weather_indoor">Indoor</string>
+    <string name="idea_weather_outdoor">Outdoor</string>
+    <string name="idea_weather_either">Either</string>
+
+    <!-- Idea edit -->
+    <string name="idea_edit_title_new">New idea</string>
+    <string name="idea_edit_title_edit">Edit idea</string>
+    <string name="idea_edit_subtitle">Something worth doing on this trip -- pin it here before you forget.</string>
+    <string name="idea_edit_label_title">Title *</string>
+    <string name="idea_edit_label_section">Section</string>
+    <string name="idea_edit_label_category">Category</string>
+    <string name="idea_edit_label_description">Description (optional)</string>
+    <string name="idea_edit_label_priority">Priority</string>
+    <string name="idea_edit_label_weather">Weather suitability</string>
+    <string name="idea_edit_label_location_address">Location address</string>
+    <string name="idea_edit_label_location_map_link">Google Maps link</string>
+    <string name="idea_edit_label_expense_amount">Est. expense</string>
+    <string name="idea_edit_label_expense_currency">Currency</string>
+    <string name="idea_edit_button_create">Create idea</string>
+    <string name="idea_edit_button_save">Save changes</string>
+    <string name="idea_edit_cover_photo_heading">Cover photo</string>
+    <string name="idea_edit_uploading_photo">Uploading…</string>
+    <string name="idea_edit_add_photo">+ Add photo</string>
+    <string name="idea_edit_links_heading">Links</string>
+    <string name="idea_edit_convert_button">Convert to Timeline Entry</string>
+    <string name="idea_edit_delete_button">Delete idea</string>
+    <string name="idea_edit_delete_dialog_title">Delete this Idea?</string>
+    <string name="idea_edit_delete_dialog_text">This cannot be undone.</string>
+    <string name="idea_edit_delete_confirm_button">Delete</string>
+    <string name="idea_edit_delete_cancel_button">Cancel</string>
+    <string name="idea_edit_convert_dialog_title">Convert to Timeline Entry?</string>
+    <string name="idea_edit_convert_dialog_text">This Idea will become a real Timeline Entry and disappear from Ideas.</string>
+    <string name="idea_edit_convert_confirm_button">Convert</string>
+    <string name="idea_edit_convert_cancel_button">Cancel</string>
+    <string name="idea_edit_error_title_required">Title is required.</string>
+    <string name="idea_edit_error_expense_currency_required">Estimated expense requires a currency.</string>
+    <string name="idea_edit_error_add_link_failed">Failed to add link.</string>
+    <string name="idea_edit_error_remove_link_failed">Failed to remove link.</string>
+    <string name="idea_edit_error_upload_photo_failed">Failed to upload photo.</string>
+    <string name="idea_edit_error_delete_photo_failed">Failed to delete photo.</string>
+    <string name="idea_edit_error_set_cover_photo_failed">Failed to set cover photo.</string>
+    <string name="idea_edit_error_save_failed">Failed to save Idea.</string>
+    <string name="idea_edit_error_delete_failed">Failed to delete Idea.</string>
+    <string name="idea_edit_error_convert_failed">Failed to convert Idea.</string>
+</resources>

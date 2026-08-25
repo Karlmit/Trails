@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.R
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
@@ -62,7 +64,7 @@ fun BlogListScreen(
         if (posts.isEmpty()) {
             EmptyState(
                 emoji = "📖",
-                message = "No posts published yet.\nWrite about the trip -- it'll show up here.",
+                message = stringResource(R.string.blog_empty_state),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
@@ -96,7 +98,7 @@ fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hi
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (entry == null) {
-            Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.blog_loading), modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
                 item {

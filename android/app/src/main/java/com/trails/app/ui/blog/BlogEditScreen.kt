@@ -39,10 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.R
 import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.ErrorBanner
@@ -65,9 +67,10 @@ fun BlogEditScreen(
     val photosById by viewModel.photosById.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    val untitledLabel = stringResource(R.string.blog_untitled_default)
 
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.insertImage(uri, queryDisplayName(context, uri))
+        if (uri != null) viewModel.insertImage(uri, queryDisplayName(context, uri), untitledLabel)
     }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
@@ -88,12 +91,21 @@ fun BlogEditScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenHeading(emoji = "📖", title = if (state.entryId == null) "New blog post" else "Edit blog post")
-        state.error?.let { ErrorBanner(it) }
+        ScreenHeading(
+            emoji = "📖",
+            title = if (state.entryId == null) stringResource(R.string.blog_new_post_title) else stringResource(R.string.blog_edit_post_title),
+        )
+        state.error?.let { error ->
+            val message = when (error) {
+                is BlogEditError.Message -> error.text
+                is BlogEditError.Resource -> stringResource(error.resId)
+            }
+            ErrorBanner(message)
+        }
         if (state.lostFormattingWarning) {
             Surface(color = TrailsColors.GoldLightest, shape = TrailsShapes.Input) {
                 Text(
-                    "This post has formatting (tables, code blocks, ...) from the web editor that this editor doesn't preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.",
+                    stringResource(R.string.blog_lost_formatting_warning),
                     color = TrailsColors.BrandDeep,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp),
@@ -101,13 +113,13 @@ fun BlogEditScreen(
             }
         }
 
-        LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
-        DatePickerField(label = "Date", isoDate = state.startAt.take(10), onDateChange = { viewModel.onStartAtChange("${it}T00:00:00.000Z") })
-        CheckboxRow(label = "Private (only visible to you)", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+        LabeledField(label = stringResource(R.string.blog_title_label), value = state.title, onValueChange = viewModel::onTitleChange)
+        DatePickerField(label = stringResource(R.string.blog_date_label), isoDate = state.startAt.take(10), onDateChange = { viewModel.onStartAtChange("${it}T00:00:00.000Z") })
+        CheckboxRow(label = stringResource(R.string.blog_private_label), checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
 
         HorizontalDivider()
         Text(
-            "Select text and tap B/I/U to format it, or place your cursor and tap one before typing. Use ¶/H1/H2/H3/•/1. to change a block's type.",
+            stringResource(R.string.blog_formatting_hint),
             style = MaterialTheme.typography.bodySmall,
             color = TrailsColors.TextSoft,
         )
@@ -153,14 +165,14 @@ fun BlogEditScreen(
                                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)),
                                 )
                                 IconButton(onClick = { viewModel.removeBlock(block.id) }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Remove image")
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
                                 }
                             }
                         } else {
                             Surface(color = TrailsColors.SurfaceCool, shape = TrailsShapes.Input) {
                                 Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                                    Text("Uploading image…", color = TrailsColors.TextSoft)
+                                    Text(stringResource(R.string.blog_uploading_image), color = TrailsColors.TextSoft)
                                 }
                             }
                         }
@@ -171,7 +183,7 @@ fun BlogEditScreen(
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage) {
-                Text(if (state.uploadingImage) "Uploading…" else "+ Add image")
+                Text(if (state.uploadingImage) stringResource(R.string.blog_uploading) else stringResource(R.string.blog_add_image))
             }
         }
 
@@ -180,14 +192,14 @@ fun BlogEditScreen(
         if (state.saving) {
             CircularProgressIndicator()
         } else {
-            PillButton(text = "Save", onClick = viewModel::save, modifier = Modifier.fillMaxWidth())
+            PillButton(text = stringResource(R.string.blog_save_button), onClick = { viewModel.save(untitledLabel) }, modifier = Modifier.fillMaxWidth())
             if (state.entryId != null) {
                 if (state.isPublished) {
-                    PillButton(text = "Unpublish", variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth())
+                    PillButton(text = stringResource(R.string.blog_unpublish_button), variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth())
                 } else {
-                    PillButton(text = "Publish", variant = PillButtonVariant.Outline, onClick = viewModel::publish, modifier = Modifier.fillMaxWidth())
+                    PillButton(text = stringResource(R.string.blog_publish_button), variant = PillButtonVariant.Outline, onClick = viewModel::publish, modifier = Modifier.fillMaxWidth())
                 }
-                PillButton(text = "Delete post", variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth())
+                PillButton(text = stringResource(R.string.blog_delete_post_button), variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -195,10 +207,10 @@ fun BlogEditScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete this Blog Post?") },
-            text = { Text("This cannot be undone.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.blog_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.blog_delete_confirm_text)) },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.blog_delete_confirm_button)) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.blog_cancel_button)) } },
         )
     }
 }
@@ -336,13 +348,13 @@ private fun TextBlockEditor(
                 ),
             )
             IconButton(onClick = onRemove) {
-                Icon(Icons.Filled.Close, contentDescription = "Remove block")
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_block_desc))
             }
         }
         val addLabel = when (block.kind) {
-            TextBlockKind.BULLET_LIST -> "+ Bullet"
-            TextBlockKind.NUMBERED_LIST -> "+ Number"
-            else -> "+ Paragraph"
+            TextBlockKind.BULLET_LIST -> stringResource(R.string.blog_add_bullet)
+            TextBlockKind.NUMBERED_LIST -> stringResource(R.string.blog_add_number)
+            else -> stringResource(R.string.blog_add_paragraph)
         }
         TextButton(onClick = onAddAfter) { Text(addLabel) }
     }

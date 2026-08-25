@@ -38,7 +38,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.time.Instant
@@ -200,7 +202,7 @@ fun ChipInputField(
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             Text(tag, modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp))
                             IconButton(onClick = { onRemove(tag) }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Filled.Close, contentDescription = "Remove $tag", modifier = Modifier.size(14.dp))
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.shared_remove_tag, tag), modifier = Modifier.size(14.dp))
                             }
                         }
                     }
@@ -213,7 +215,7 @@ fun ChipInputField(
                 onValueChange = { draft = it },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                placeholder = { Text("Add tag") },
+                placeholder = { Text(stringResource(R.string.shared_add_tag_placeholder)) },
                 shape = TrailsShapes.Input,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
@@ -230,7 +232,7 @@ fun ChipInputField(
                         draft = ""
                     }
                 },
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.shared_add_button)) }
         }
     }
 }
@@ -256,7 +258,7 @@ fun DatePickerField(
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
             trailingIcon = {
                 IconButton(onClick = { showPicker = true }) {
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Pick date")
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.shared_pick_date))
                 }
             },
             shape = TrailsShapes.Input,
@@ -282,9 +284,9 @@ fun DatePickerField(
                         onDateChange(date.format(DATE_FORMATTER))
                     }
                     showPicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.shared_ok_button)) }
             },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.shared_cancel_button)) } },
         ) { DatePicker(state = state) }
     }
 }
@@ -313,7 +315,7 @@ fun DateTimePickerField(
                 modifier = Modifier.weight(1f),
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Pick date")
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.shared_pick_date))
                     }
                 },
                 shape = TrailsShapes.Input,
@@ -331,7 +333,7 @@ fun DateTimePickerField(
                 modifier = Modifier.weight(1f).padding(start = 8.dp),
                 trailingIcon = {
                     IconButton(onClick = { showTimePicker = true }) {
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Pick time")
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.shared_pick_time))
                     }
                 },
                 shape = TrailsShapes.Input,
@@ -359,9 +361,9 @@ fun DateTimePickerField(
                         onDateTimeChange(combined.toString())
                     }
                     showDatePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.shared_ok_button)) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.shared_cancel_button)) } },
         ) { DatePicker(state = state) }
     }
 
@@ -375,9 +377,9 @@ fun DateTimePickerField(
                         .atZone(ZoneOffset.UTC).toInstant()
                     onDateTimeChange(combined.toString())
                     showTimePicker = false
-                }) { Text("OK") }
+                }) { Text(stringResource(R.string.shared_ok_button)) }
             },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text(stringResource(R.string.shared_cancel_button)) } },
             text = { TimePicker(state = state) },
         )
     }

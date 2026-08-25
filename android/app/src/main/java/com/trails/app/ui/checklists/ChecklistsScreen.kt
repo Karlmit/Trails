@@ -24,8 +24,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.data.ChecklistWithItems
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
@@ -49,7 +51,7 @@ fun ChecklistsScreen(padding: PaddingValues, onOpenChecklist: (String) -> Unit =
         if (checklists.isEmpty()) {
             EmptyState(
                 emoji = "🧳",
-                message = "No checklists yet.\nStart a packing list or a pre-departure to-do.",
+                message = stringResource(R.string.checklist_empty_message),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
@@ -96,7 +98,7 @@ private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onOpen: () -> 
                         ) {
                             Icon(Icons.Filled.Lock, contentDescription = null, tint = TrailsColors.BrandDeep, modifier = Modifier.size(12.dp))
                             Text(
-                                "Private",
+                                stringResource(R.string.checklist_private_badge),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TrailsColors.BrandDeep,
                                 modifier = Modifier.padding(start = 4.dp),
@@ -106,7 +108,7 @@ private fun ChecklistCard(checklistWithItems: ChecklistWithItems, onOpen: () -> 
                 }
             }
             Text(
-                "$checkedCount/${checklistWithItems.items.size} done",
+                stringResource(R.string.checklist_items_done_count, checkedCount, checklistWithItems.items.size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = TrailsColors.TextSoft,
                 modifier = Modifier.padding(top = 4.dp),

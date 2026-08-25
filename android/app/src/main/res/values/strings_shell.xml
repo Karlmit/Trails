@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Login -->
+    <string name="shell_login_title">Logga in</string>
+    <string name="shell_login_subtitle">Välkommen tillbaka till Trails.</string>
+    <string name="shell_login_username_label">Användarnamn</string>
+    <string name="shell_login_password_label">Lösenord</string>
+    <string name="shell_login_please_wait">Vänta…</string>
+    <string name="shell_login_submit">Logga in</string>
+    <string name="shell_login_missing_credentials">Användarnamn och lösenord krävs</string>
+    <string name="shell_login_failed">Inloggningen misslyckades</string>
+
+    <!-- Drawer / nav chrome -->
+    <string name="shell_drawer_all_trips">← Alla resor</string>
+    <string name="shell_travel_mode">Reseläge</string>
+    <string name="shell_cd_back">Tillbaka</string>
+    <string name="shell_cd_menu">Meny</string>
+    <string name="shell_cd_add">Lägg till</string>
+    <string name="shell_cd_edit">Redigera</string>
+    <string name="shell_cd_new_trip">Ny resa</string>
+
+    <!-- Screen titles -->
+    <string name="shell_title_timeline">Tidslinje</string>
+    <string name="shell_title_edit_entry">Redigera inlägg</string>
+    <string name="shell_title_sections">Avsnitt</string>
+    <string name="shell_title_edit_section">Redigera avsnitt</string>
+    <string name="shell_title_ideas">Idéer</string>
+    <string name="shell_title_edit_idea">Redigera idé</string>
+    <string name="shell_title_checklists">Checklistor</string>
+    <string name="shell_title_checklist">Checklista</string>
+    <string name="shell_title_new_checklist">Ny checklista</string>
+    <string name="shell_title_edit_checklist">Redigera checklista</string>
+    <string name="shell_title_important_info">Viktig information</string>
+    <string name="shell_title_edit_important_info">Redigera viktig information</string>
+    <string name="shell_title_blog">Blogg</string>
+    <string name="shell_title_edit_blog_post">Redigera blogginlägg</string>
+    <string name="shell_title_budget">Budget</string>
+    <string name="shell_title_documents">Dokument</string>
+    <string name="shell_overview">Översikt</string>
+    <string name="shell_title_blog_post">Blogginlägg</string>
+    <string name="shell_entry">Inlägg</string>
+    <string name="shell_idea">Idé</string>
+    <string name="shell_blog_post">Blogginlägg</string>
+    <string name="shell_save">Spara</string>
+
+    <!-- Trip list -->
+    <string name="shell_trips_empty">Inga resor än.\nTryck på + för att planera din första.</string>
+    <string name="shell_trip_saving_offline">Sparar resa + filer på den här enheten…</string>
+    <string name="shell_trip_save_offline_error">Det gick inte att spara resan offline – kontrollera din anslutning och försök igen.</string>
+    <string name="shell_trip_saved_offline">✓ Sparad på den här enheten</string>
+    <string name="shell_refresh">Uppdatera</string>
+    <string name="shell_save_offline">Spara offline</string>
+    <string name="shell_trip_sync_error">Det gick inte att uppdatera resorna</string>
+    <string name="shell_trip_date_range">%1$s → %2$s · %3$d dagar</string>
+</resources>

@@ -31,8 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
@@ -72,18 +74,19 @@ fun SectionEditScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        state.error?.let { ErrorBanner(it) }
+        val error = state.error ?: state.errorRes?.let { stringResource(it) }
+        error?.let { ErrorBanner(it) }
 
         TrailsCard {
             ScreenHeading(
                 emoji = state.emoji?.takeIf { it.isNotBlank() } ?: "🗂️",
-                title = if (isNew) "New section" else "Edit section",
-                subtitle = "A leg of the trip -- give it a name, dates, and a look of its own.",
+                title = if (isNew) stringResource(R.string.section_edit_title_new) else stringResource(R.string.section_edit_title_edit),
+                subtitle = stringResource(R.string.section_edit_subtitle),
             )
 
-            LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
-            DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
-            DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
+            LabeledField(label = stringResource(R.string.section_field_name), value = state.name, onValueChange = viewModel::onNameChange)
+            DatePickerField(label = stringResource(R.string.section_field_start_date), isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
+            DatePickerField(label = stringResource(R.string.section_field_end_date), isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
 
             ColorSwatchPicker(selected = state.color, onToggle = viewModel::onColorToggle)
             EmojiPicker(selected = state.emoji, onToggle = viewModel::onEmojiToggle)
@@ -92,7 +95,7 @@ fun SectionEditScreen(
                 CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
             } else {
                 PillButton(
-                    text = if (isNew) "Create section" else "Save changes",
+                    text = if (isNew) stringResource(R.string.section_action_create) else stringResource(R.string.section_action_save),
                     onClick = viewModel::save,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -101,7 +104,7 @@ fun SectionEditScreen(
 
         if (!isNew && !state.saving) {
             PillButton(
-                text = "Delete section",
+                text = stringResource(R.string.section_action_delete),
                 variant = PillButtonVariant.Danger,
                 onClick = { showDeleteConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -112,12 +115,12 @@ fun SectionEditScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete this Section?") },
-            text = { Text("This cannot be undone.") },
+            title = { Text(stringResource(R.string.section_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.section_delete_dialog_message)) },
             confirmButton = {
-                TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") }
+                TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.section_dialog_confirm_delete)) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.section_dialog_cancel)) } },
         )
     }
 }
@@ -127,7 +130,7 @@ fun SectionEditScreen(
 @Composable
 private fun ColorSwatchPicker(selected: String?, onToggle: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = "COLOR", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+        Text(text = stringResource(R.string.section_field_color), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
         FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
             SECTION_COLOR_OPTIONS.forEach { value ->
                 val isSelected = value == selected
@@ -149,7 +152,7 @@ private fun ColorSwatchPicker(selected: String?, onToggle: (String) -> Unit) {
 @Composable
 private fun EmojiPicker(selected: String?, onToggle: (String) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(text = "EMOJI", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+        Text(text = stringResource(R.string.section_field_emoji), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
         FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
             SECTION_EMOJI_OPTIONS.forEach { value ->
                 val isSelected = value == selected

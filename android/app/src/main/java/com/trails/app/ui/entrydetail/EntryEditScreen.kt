@@ -23,9 +23,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.DateTimePickerField
 import com.trails.app.ui.components.DropdownField
@@ -38,8 +40,8 @@ import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
-import com.trails.app.ui.timeline.graph.subtypeLabel
+import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
+import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 
 private fun entryTypeEmoji(entryType: String) = when (entryType) {
     "STAY" -> "🏨"
@@ -59,6 +61,31 @@ private fun asPickerInstant(value: String): String {
     if (value.isEmpty()) return value
     return runCatching { java.time.Instant.parse(value); value }
         .getOrElse { "${value}:00Z".takeIf { runCatching { java.time.Instant.parse(it) }.isSuccess } ?: value }
+}
+
+@Composable
+private fun newEntryTitleFor(entryType: String): String = when (entryType) {
+    "STAY" -> stringResource(R.string.timeline_new_entry_title_stay)
+    "TRANSPORT" -> stringResource(R.string.timeline_new_entry_title_transport)
+    "ACTIVITY" -> stringResource(R.string.timeline_new_entry_title_activity)
+    "NOTE" -> stringResource(R.string.timeline_new_entry_title_note)
+    else -> stringResource(R.string.timeline_new_entry_title_default)
+}
+
+@Composable
+private fun paymentStatusLabelFor(value: String): String = when (value) {
+    "Paid" -> stringResource(R.string.timeline_payment_status_paid)
+    "Unpaid" -> stringResource(R.string.timeline_payment_status_unpaid)
+    "" -> stringResource(R.string.timeline_payment_status_not_set)
+    else -> value
+}
+
+/** ViewModel-owned errors carry a @StringRes id (plus, for [EntryEditError.EndRequiredFor], the raw entryType to interpolate) instead of a raw String -- see EntryEditViewModel.kt's own doc comment on EntryEditError. */
+@Composable
+private fun errorMessage(error: EntryEditError): String = when (error) {
+    is EntryEditError.Fixed -> stringResource(error.resId)
+    is EntryEditError.EndRequiredFor -> stringResource(R.string.timeline_error_end_required, entryTypeLabelResolved(error.entryType))
+    is EntryEditError.Raw -> error.text
 }
 
 @Composable
@@ -90,48 +117,51 @@ fun EntryEditScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        state.error?.let { ErrorBanner(it) }
+        state.error?.let { ErrorBanner(errorMessage(it)) }
 
         TrailsCard {
         ScreenHeading(
             emoji = entryTypeEmoji(state.entryType),
-            title = if (isNew) "New ${ENTRY_TYPE_LABELS[state.entryType]?.lowercase() ?: "entry"}" else "Edit entry",
+            title = if (isNew) newEntryTitleFor(state.entryType) else stringResource(R.string.timeline_edit_entry_title),
         )
 
         if (state.entryId == null) {
+            val entryTypeLabels = ENTRY_TYPES.associateWith { entryTypeLabelResolved(it) }
             DropdownField(
-                label = "Type",
+                label = stringResource(R.string.timeline_field_type),
                 options = ENTRY_TYPES,
                 selected = state.entryType,
                 onSelected = viewModel::onEntryTypeChange,
-                optionLabel = { ENTRY_TYPE_LABELS[it] ?: it },
+                optionLabel = { entryTypeLabels[it] ?: it },
             )
         }
         if (!isNote) {
+            val subtypeOptions = subtypesFor(state.entryType)
+            val subtypeLabels = subtypeOptions.associateWith { subtypeLabelResolved(it) }
             DropdownField(
-                label = "Subtype",
-                options = subtypesFor(state.entryType),
+                label = stringResource(R.string.timeline_field_subtype),
+                options = subtypeOptions,
                 selected = state.subtype,
                 onSelected = viewModel::onSubtypeChange,
-                optionLabel = { subtypeLabel(it) },
+                optionLabel = { subtypeLabels[it] ?: it },
             )
         }
 
         if (isNote) {
-            LabeledField(label = "Title", value = state.title, onValueChange = viewModel::onTitleChange)
+            LabeledField(label = stringResource(R.string.timeline_field_title), value = state.title, onValueChange = viewModel::onTitleChange)
         } else {
-            LabeledField(label = "Location name (used as the title)", value = state.locationName, onValueChange = viewModel::onLocationNameChange)
+            LabeledField(label = stringResource(R.string.timeline_field_location_name), value = state.locationName, onValueChange = viewModel::onLocationNameChange)
         }
-        MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+        MultilineLabeledField(label = stringResource(R.string.timeline_field_description), value = state.description, onValueChange = viewModel::onDescriptionChange)
 
         // Transport no longer shows a top-level Departure/Arrival picker at
         // all -- Flight 1's own departure/arrival (below) becomes the
         // entry's own startAt/endAt (computed in EntryEditViewModel).
         if (!isTransport) {
-            DateTimePickerField(label = "Start", isoDateTime = state.startAt, onDateTimeChange = viewModel::onStartAtChange)
+            DateTimePickerField(label = stringResource(R.string.timeline_field_start), isoDateTime = state.startAt, onDateTimeChange = viewModel::onStartAtChange)
             if (!isNote) {
                 DateTimePickerField(
-                    label = if (isStay) "Check-out" else "End (optional)",
+                    label = if (isStay) stringResource(R.string.timeline_check_out) else stringResource(R.string.timeline_field_end_optional),
                     isoDateTime = state.endAt.ifBlank { state.startAt },
                     onDateTimeChange = viewModel::onEndAtChange,
                 )
@@ -139,21 +169,21 @@ fun EntryEditScreen(
         }
 
         if (!isNote) {
-            LabeledField(label = "Location address", value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
-            LabeledField(label = "Map link", value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
-            LabeledField(label = "Booking reference", value = state.bookingReference, onValueChange = viewModel::onBookingReferenceChange)
-            LabeledField(label = "Website", value = state.website, onValueChange = viewModel::onWebsiteChange)
-            LabeledField(label = "Booked via", value = state.bookedVia, onValueChange = viewModel::onBookedViaChange)
+            LabeledField(label = stringResource(R.string.timeline_field_location_address), value = state.locationAddress, onValueChange = viewModel::onLocationAddressChange)
+            LabeledField(label = stringResource(R.string.timeline_field_map_link), value = state.locationMapLink, onValueChange = viewModel::onLocationMapLinkChange)
+            LabeledField(label = stringResource(R.string.timeline_field_booking_reference), value = state.bookingReference, onValueChange = viewModel::onBookingReferenceChange)
+            LabeledField(label = stringResource(R.string.timeline_field_website), value = state.website, onValueChange = viewModel::onWebsiteChange)
+            LabeledField(label = stringResource(R.string.timeline_field_booked_via), value = state.bookedVia, onValueChange = viewModel::onBookedViaChange)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LabeledField(
-                    label = "Expense amount",
+                    label = stringResource(R.string.timeline_field_expense_amount),
                     value = state.expenseAmount,
                     onValueChange = viewModel::onExpenseAmountChange,
                     modifier = Modifier.weight(1f),
                     keyboardType = KeyboardType.Decimal,
                 )
-                LabeledField(label = "Currency", value = state.expenseCurrency, onValueChange = viewModel::onExpenseCurrencyChange, modifier = Modifier.weight(1f))
+                LabeledField(label = stringResource(R.string.timeline_field_currency), value = state.expenseCurrency, onValueChange = viewModel::onExpenseCurrencyChange, modifier = Modifier.weight(1f))
             }
             // Preserve any pre-existing value outside the closed Paid/Unpaid
             // set (e.g. an old "Partial") instead of silently discarding it
@@ -163,18 +193,19 @@ fun EntryEditScreen(
             } else {
                 PAYMENT_STATUSES
             }
+            val paymentStatusLabels = paymentStatusOptions.associateWith { paymentStatusLabelFor(it) }
             DropdownField(
-                label = "Payment status",
+                label = stringResource(R.string.timeline_field_payment_status),
                 options = paymentStatusOptions,
                 selected = state.expensePaymentStatus,
                 onSelected = viewModel::onExpensePaymentStatusChange,
-                optionLabel = { PAYMENT_STATUS_LABELS[it] ?: it },
+                optionLabel = { paymentStatusLabels[it] ?: it },
             )
-            LabeledField(label = "Payment note", value = state.expensePaymentNote, onValueChange = viewModel::onExpensePaymentNoteChange)
+            LabeledField(label = stringResource(R.string.timeline_field_payment_note), value = state.expensePaymentNote, onValueChange = viewModel::onExpensePaymentNoteChange)
         }
 
         if (isStay) {
-            LabeledField(label = "Room info", value = state.roomInfo, onValueChange = viewModel::onRoomInfoChange)
+            LabeledField(label = stringResource(R.string.timeline_field_room_info), value = state.roomInfo, onValueChange = viewModel::onRoomInfoChange)
         }
         if (isTransport) {
             // User-requested redesign: every leg -- including the first --
@@ -182,99 +213,104 @@ fun EntryEditScreen(
             // leg plus bare-bones stopovers for the rest. The gap between
             // two Flights is shown as a computed, read-only line rather
             // than separately entered data.
-            Text("FLIGHTS", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.timeline_field_flights).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
             state.flights.forEachIndexed { index, flight ->
                 TrailsCard {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Flight ${index + 1}", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+                        Text(stringResource(R.string.timeline_flight_number_fallback, index + 1), style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
                         if (index > 0) {
-                            TextButton(onClick = { viewModel.removeFlight(index) }) { Text("Remove") }
+                            TextButton(onClick = { viewModel.removeFlight(index) }) { Text(stringResource(R.string.timeline_remove)) }
                         }
                     }
                     LabeledField(
-                        label = "Departure location",
+                        label = stringResource(R.string.timeline_field_departure_location),
                         value = flight.departureLocation,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(departureLocation = it)) },
                     )
                     DateTimePickerField(
-                        label = "Departure",
+                        label = stringResource(R.string.timeline_departure),
                         isoDateTime = asPickerInstant(flight.departureAt),
                         onDateTimeChange = { viewModel.updateFlight(index, flight.copy(departureAt = it)) },
                     )
                     LabeledField(
-                        label = "Departure timezone (IANA, optional)",
+                        label = stringResource(R.string.timeline_field_departure_timezone),
                         value = flight.departureTimezone,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(departureTimezone = it)) },
                     )
                     LabeledField(
-                        label = "Arrival location",
+                        label = stringResource(R.string.timeline_field_arrival_location),
                         value = flight.arrivalLocation,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(arrivalLocation = it)) },
                     )
                     DateTimePickerField(
-                        label = "Arrival",
+                        label = stringResource(R.string.timeline_arrival),
                         isoDateTime = asPickerInstant(flight.arrivalAt),
                         onDateTimeChange = { viewModel.updateFlight(index, flight.copy(arrivalAt = it)) },
                     )
                     LabeledField(
-                        label = "Arrival timezone (IANA, optional)",
+                        label = stringResource(R.string.timeline_field_arrival_timezone),
                         value = flight.arrivalTimezone,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(arrivalTimezone = it)) },
                     )
                     LabeledField(
-                        label = "Flight number",
+                        label = stringResource(R.string.timeline_field_flight_number),
                         value = flight.flightNumber,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(flightNumber = it)) },
                     )
                     LabeledField(
-                        label = "Terminal",
+                        label = stringResource(R.string.timeline_field_terminal),
                         value = flight.terminal,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(terminal = it)) },
                     )
                     LabeledField(
-                        label = "Gate",
+                        label = stringResource(R.string.timeline_field_gate),
                         value = flight.gate,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(gate = it)) },
                     )
                     LabeledField(
-                        label = "Platform",
+                        label = stringResource(R.string.timeline_field_platform),
                         value = flight.platform,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(platform = it)) },
                     )
                     LabeledField(
-                        label = "Seat",
+                        label = stringResource(R.string.timeline_field_seat),
                         value = flight.seat,
                         onValueChange = { viewModel.updateFlight(index, flight.copy(seat = it)) },
                     )
                 }
                 if (index < state.flights.lastIndex) {
                     Text(
-                        stopoverGapLabel(flight, state.flights[index + 1]),
+                        stopoverGapLabel(
+                            flight,
+                            state.flights[index + 1],
+                            stringResource(R.string.timeline_stopover_at),
+                            stringResource(R.string.timeline_stopover),
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.TextSoft,
                     )
                 }
             }
-            TextButton(onClick = viewModel::addFlight) { Text("+ Add flight") }
+            TextButton(onClick = viewModel::addFlight) { Text(stringResource(R.string.timeline_add_flight)) }
 
-            LabeledField(label = "Baggage info", value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
+            LabeledField(label = stringResource(R.string.timeline_field_baggage_info), value = state.baggageInfo, onValueChange = viewModel::onBaggageInfoChange)
         }
 
-        LabeledField(label = "Contact name", value = state.contactName, onValueChange = viewModel::onContactNameChange)
-        LabeledField(label = "Contact phone", value = state.contactPhone, onValueChange = viewModel::onContactPhoneChange)
-        LabeledField(label = "Contact email", value = state.contactEmail, onValueChange = viewModel::onContactEmailChange)
-        MultilineLabeledField(label = "Notes", value = state.notes, onValueChange = viewModel::onNotesChange)
+        LabeledField(label = stringResource(R.string.timeline_field_contact_name), value = state.contactName, onValueChange = viewModel::onContactNameChange)
+        LabeledField(label = stringResource(R.string.timeline_field_contact_phone), value = state.contactPhone, onValueChange = viewModel::onContactPhoneChange)
+        LabeledField(label = stringResource(R.string.timeline_field_contact_email), value = state.contactEmail, onValueChange = viewModel::onContactEmailChange)
+        MultilineLabeledField(label = stringResource(R.string.timeline_field_notes), value = state.notes, onValueChange = viewModel::onNotesChange)
         if (state.entryId != null) {
-            MultilineLabeledField(label = "Post-trip notes", value = state.postTripNotes, onValueChange = viewModel::onPostTripNotesChange)
+            MultilineLabeledField(label = stringResource(R.string.timeline_field_post_trip_notes), value = state.postTripNotes, onValueChange = viewModel::onPostTripNotesChange)
         }
-        CheckboxRow(label = "Private -- only visible to you", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+        CheckboxRow(label = stringResource(R.string.timeline_field_private), checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
         LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
 
         if (state.saving) {
             CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
         } else {
             PillButton(
-                text = if (isNew) "Create entry" else "Save changes",
+                text = if (isNew) stringResource(R.string.timeline_create_entry) else stringResource(R.string.timeline_save_changes),
                 onClick = viewModel::save,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -283,7 +319,7 @@ fun EntryEditScreen(
 
         if (!isNew && !state.saving) {
             PillButton(
-                text = "Delete entry",
+                text = stringResource(R.string.timeline_delete_entry),
                 variant = PillButtonVariant.Danger,
                 onClick = { showDeleteConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -294,10 +330,10 @@ fun EntryEditScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete this entry?") },
-            text = { Text("This cannot be undone.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.timeline_delete_entry_confirm_title)) },
+            text = { Text(stringResource(R.string.timeline_delete_entry_confirm_body)) },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.timeline_delete)) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.timeline_cancel)) } },
         )
     }
 }

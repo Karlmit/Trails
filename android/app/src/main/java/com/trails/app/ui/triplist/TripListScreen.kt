@@ -3,6 +3,9 @@ package com.trails.app.ui.triplist
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +29,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.PillButton
@@ -42,6 +47,7 @@ fun TripListScreen(
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
     onOpenOverview: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     autoOpenActiveTrip: Boolean = false,
     onAutoOpenConsumed: () -> Unit = {},
     viewModel: TripListViewModel = hiltViewModel(),
@@ -68,6 +74,7 @@ fun TripListScreen(
         onOpenTrip = onOpenTrip,
         onAddTrip = onAddTrip,
         onOpenOverview = onOpenOverview,
+        onOpenSettings = onOpenSettings,
         onSaveOffline = viewModel::saveOffline,
         onDismissSaveOfflineError = viewModel::dismissSaveOfflineError,
         onRefresh = viewModel::refresh,
@@ -87,16 +94,29 @@ fun TripListContent(
     onOpenTrip: (String) -> Unit,
     onAddTrip: () -> Unit = {},
     onOpenOverview: (String) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onSaveOffline: (String) -> Unit = {},
     onDismissSaveOfflineError: (String) -> Unit = {},
     onRefresh: () -> Unit = {},
 ) {
     Scaffold(
         containerColor = TrailsColors.Canvas,
-        topBar = { TrailsTopBar() },
+        topBar = {
+            TrailsTopBar(
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.drawer_settings),
+                            tint = TrailsColors.Brand,
+                        )
+                    }
+                },
+            )
+        },
         floatingActionButton = {
             androidx.compose.material3.FloatingActionButton(onClick = onAddTrip) {
-                androidx.compose.material3.Icon(Icons.Filled.Add, contentDescription = "New Trip")
+                androidx.compose.material3.Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_new_trip))
             }
         },
     ) { padding ->
@@ -111,16 +131,17 @@ fun TripListContent(
                     color = TrailsColors.BrandAccent,
                 )
             } else if (state.trips.isEmpty()) {
-                if (state.syncError != null) {
+                val syncErrorText = state.syncError ?: state.syncErrorRes?.let { stringResource(it) }
+                if (syncErrorText != null) {
                     Text(
-                        state.syncError,
+                        syncErrorText,
                         modifier = Modifier.align(Alignment.Center).padding(24.dp),
                         color = TrailsColors.TextSoft,
                     )
                 } else {
                     com.trails.app.ui.components.EmptyState(
                         emoji = "🧳",
-                        message = "No trips yet.\nTap + to plan your first one.",
+                        message = stringResource(R.string.shell_trips_empty),
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -180,7 +201,7 @@ private fun TripCard(
                 )
             }
             Text(
-                "${trip.startDate} → ${trip.endDate} · ${trip.durationDays} days",
+                stringResource(R.string.shell_trip_date_range, trip.startDate, trip.endDate, trip.durationDays),
                 style = MaterialTheme.typography.bodySmall,
                 color = TrailsColors.TextSoft,
                 modifier = Modifier.padding(top = 4.dp),
@@ -189,14 +210,14 @@ private fun TripCard(
             // 'all trips' menu as a button on the trip" -- Overview is no
             // longer a drawer tab, this is its only entry point now.
             PillButton(
-                text = "Overview",
+                text = stringResource(R.string.shell_overview),
                 variant = PillButtonVariant.Outline,
                 onClick = onOpenOverview,
                 modifier = Modifier.padding(top = 10.dp),
             )
             if (hasSaveOfflineError) {
                 ErrorBanner(
-                    "Couldn't save this Trip offline -- check your connection and try again.",
+                    stringResource(R.string.shell_trip_save_offline_error),
                     modifier = Modifier.padding(top = 12.dp).clickable(onClick = onDismissError),
                 )
             }
@@ -208,7 +229,7 @@ private fun TripCard(
                     isSavingOffline -> {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
                         Text(
-                            "Saving Trip + files to this device…",
+                            stringResource(R.string.shell_trip_saving_offline),
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.TextSoft,
                             modifier = Modifier.padding(start = 8.dp),
@@ -229,20 +250,20 @@ private fun TripCard(
                             shape = com.trails.app.ui.theme.TrailsShapes.Pill,
                         ) {
                             Text(
-                                "✓ Saved to this device",
+                                stringResource(R.string.shell_trip_saved_offline),
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             )
                         }
                         Text(
-                            "Refresh",
+                            stringResource(R.string.shell_refresh),
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.BrandAccent,
                             modifier = Modifier.padding(start = 12.dp).clickable(onClick = onSaveOffline),
                         )
                     }
                     else -> {
-                        PillButton(text = "Save offline", variant = PillButtonVariant.Outline, onClick = onSaveOffline)
+                        PillButton(text = stringResource(R.string.shell_save_offline), variant = PillButtonVariant.Outline, onClick = onSaveOffline)
                     }
                 }
             }

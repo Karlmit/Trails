@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="blog_empty_state">Inga inlägg publicerade ännu.\nSkriv om resan så dyker det upp här.</string>
+    <string name="blog_loading">Laddar…</string>
+
+    <string name="blog_new_post_title">Nytt blogginlägg</string>
+    <string name="blog_edit_post_title">Redigera blogginlägg</string>
+    <string name="blog_lost_formatting_warning">Det här inlägget har formatering (tabeller, kodblock, …) från webbredigeraren som den här redigeraren inte bevarar -- om du sparar här plattas den till vanliga stycken. Text, rubriker, listor, fet/kursiv/understruken stil och bilder bevaras däremot.</string>
+    <string name="blog_title_label">Titel *</string>
+    <string name="blog_date_label">Datum</string>
+    <string name="blog_private_label">Privat (endast synlig för dig)</string>
+    <string name="blog_formatting_hint">Markera text och tryck på B/I/U för att formatera den, eller placera markören och tryck innan du skriver. Använd ¶/H1/H2/H3/•/1. för att ändra blockets typ.</string>
+
+    <string name="blog_remove_image_desc">Ta bort bild</string>
+    <string name="blog_uploading_image">Laddar upp bild…</string>
+    <string name="blog_uploading">Laddar upp…</string>
+    <string name="blog_add_image">+ Lägg till bild</string>
+
+    <string name="blog_save_button">Spara</string>
+    <string name="blog_unpublish_button">Avpublicera</string>
+    <string name="blog_publish_button">Publicera</string>
+    <string name="blog_delete_post_button">Ta bort inlägg</string>
+
+    <string name="blog_delete_confirm_title">Ta bort det här blogginlägget?</string>
+    <string name="blog_delete_confirm_text">Det här går inte att ångra.</string>
+    <string name="blog_delete_confirm_button">Ta bort</string>
+    <string name="blog_cancel_button">Avbryt</string>
+
+    <string name="blog_remove_block_desc">Ta bort block</string>
+    <string name="blog_add_bullet">+ Punkt</string>
+    <string name="blog_add_number">+ Nummer</string>
+    <string name="blog_add_paragraph">+ Stycke</string>
+
+    <string name="blog_untitled_default">Namnlös</string>
+    <string name="blog_error_upload_failed">Kunde inte ladda upp bilden.</string>
+    <string name="blog_error_title_required">Titel krävs.</string>
+    <string name="blog_error_save_failed">Det gick inte att spara blogginlägget.</string>
+    <string name="blog_error_publish_failed">Det gick inte att publicera.</string>
+    <string name="blog_error_unpublish_failed">Det gick inte att avpublicera.</string>
+    <string name="blog_error_delete_failed">Det gick inte att ta bort.</string>
+</resources>

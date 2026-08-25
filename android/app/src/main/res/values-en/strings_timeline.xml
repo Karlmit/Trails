@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TimelineScreen.kt -->
+    <string name="timeline_no_trip_data">No trip data yet</string>
+    <string name="timeline_no_sections_yet">No Sections yet.</string>
+    <string name="timeline_today_badge">TODAY</string>
+    <string name="timeline_no_entries">No entries yet</string>
+    <string name="timeline_read_post">Read post →</string>
+
+    <!-- TimelineFormat.kt -->
+    <string name="timeline_check_in">Check-in</string>
+    <string name="timeline_check_in_at">Check-in %1$s</string>
+    <string name="timeline_check_out">Check-out</string>
+    <string name="timeline_check_out_at">Check-out %1$s</string>
+    <string name="timeline_departure">Departure</string>
+    <string name="timeline_departure_at">Departure %1$s</string>
+    <string name="timeline_departure_colon">Departure: %1$s</string>
+    <string name="timeline_arrival">Arrival</string>
+    <string name="timeline_arrival_at">Arrival %1$s</string>
+    <string name="timeline_arrival_colon">Arrival: %1$s</string>
+    <string name="timeline_flight_number_fallback">Flight %1$d</string>
+    <string name="timeline_stopover">⏱ Stopover: %1$s–%2$s</string>
+    <string name="timeline_stopover_at">⏱ Stopover at %1$s: %2$s–%3$s</string>
+
+    <!-- TimelineColors.kt: subtype labels -->
+    <string name="timeline_subtype_hotel">Hotel</string>
+    <string name="timeline_subtype_hostel">Hostel</string>
+    <string name="timeline_subtype_resort">Resort</string>
+    <string name="timeline_subtype_apartment">Apartment</string>
+    <string name="timeline_subtype_villa">Villa</string>
+    <string name="timeline_subtype_guesthouse">Guesthouse</string>
+    <string name="timeline_subtype_other">Other</string>
+    <string name="timeline_subtype_flight">Flight</string>
+    <string name="timeline_subtype_train">Train</string>
+    <string name="timeline_subtype_ferry">Ferry</string>
+    <string name="timeline_subtype_bus">Bus</string>
+    <string name="timeline_subtype_car">Car</string>
+    <string name="timeline_subtype_taxi">Taxi</string>
+    <string name="timeline_subtype_transfer">Transfer</string>
+    <string name="timeline_subtype_tour">Tour</string>
+    <string name="timeline_subtype_restaurant">Restaurant</string>
+    <string name="timeline_subtype_attraction">Attraction</string>
+    <string name="timeline_subtype_event">Event</string>
+    <string name="timeline_subtype_beach">Beach</string>
+    <string name="timeline_subtype_hike">Hike</string>
+    <string name="timeline_subtype_museum">Museum</string>
+    <string name="timeline_subtype_shopping">Shopping</string>
+    <string name="timeline_subtype_nightlife">Nightlife</string>
+
+    <!-- TimelineColors.kt: entry type labels -->
+    <string name="timeline_entry_type_stay">Stay</string>
+    <string name="timeline_entry_type_transport">Transport</string>
+    <string name="timeline_entry_type_activity">Activity</string>
+    <string name="timeline_entry_type_note">Note</string>
+    <string name="timeline_entry_type_blog_post">Blog Post</string>
+
+    <!-- EntryDetailScreen.kt -->
+    <string name="timeline_loading">Loading…</string>
+    <string name="timeline_field_when">When</string>
+    <string name="timeline_field_location">Location</string>
+    <string name="timeline_open_in_maps">Open in Google Maps</string>
+    <string name="timeline_field_website">Website</string>
+    <string name="timeline_field_booking_reference">Booking reference</string>
+    <string name="timeline_field_booked_via">Booked via</string>
+    <string name="timeline_field_expense">Expense</string>
+    <string name="timeline_field_contact">Contact</string>
+    <string name="timeline_field_itinerary">Itinerary</string>
+    <string name="timeline_field_notes">Notes</string>
+    <string name="timeline_field_post_trip_notes">Post-trip notes</string>
+    <string name="timeline_photos_attachments">Photos &amp; attachments</string>
+    <string name="timeline_add_photo">+ Add photo</string>
+    <string name="timeline_add_attachment">+ Add attachment</string>
+    <string name="timeline_flight_terminal">Terminal %1$s</string>
+    <string name="timeline_flight_gate">Gate %1$s</string>
+    <string name="timeline_flight_platform">Platform %1$s</string>
+    <string name="timeline_flight_seat">Seat %1$s</string>
+
+    <!-- EntryEditScreen.kt / EntryEditViewModel.kt -->
+    <string name="timeline_new_entry_title_stay">New stay</string>
+    <string name="timeline_new_entry_title_transport">New transport</string>
+    <string name="timeline_new_entry_title_activity">New activity</string>
+    <string name="timeline_new_entry_title_note">New note</string>
+    <string name="timeline_new_entry_title_default">New entry</string>
+    <string name="timeline_edit_entry_title">Edit entry</string>
+    <string name="timeline_field_type">Type</string>
+    <string name="timeline_field_subtype">Subtype</string>
+    <string name="timeline_field_title">Title</string>
+    <string name="timeline_field_location_name">Location name (used as the title)</string>
+    <string name="timeline_field_description">Description (optional)</string>
+    <string name="timeline_field_start">Start</string>
+    <string name="timeline_field_end_optional">End (optional)</string>
+    <string name="timeline_field_location_address">Location address</string>
+    <string name="timeline_field_map_link">Map link</string>
+    <string name="timeline_field_expense_amount">Expense amount</string>
+    <string name="timeline_field_currency">Currency</string>
+    <string name="timeline_field_payment_status">Payment status</string>
+    <string name="timeline_payment_status_not_set">Not set</string>
+    <string name="timeline_payment_status_paid">Paid</string>
+    <string name="timeline_payment_status_unpaid">Unpaid</string>
+    <string name="timeline_field_payment_note">Payment note</string>
+    <string name="timeline_field_room_info">Room info</string>
+    <string name="timeline_field_flights">Flights</string>
+    <string name="timeline_remove">Remove</string>
+    <string name="timeline_field_departure_location">Departure location</string>
+    <string name="timeline_field_departure_timezone">Departure timezone (IANA, optional)</string>
+    <string name="timeline_field_arrival_location">Arrival location</string>
+    <string name="timeline_field_arrival_timezone">Arrival timezone (IANA, optional)</string>
+    <string name="timeline_field_flight_number">Flight number</string>
+    <string name="timeline_field_terminal">Terminal</string>
+    <string name="timeline_field_gate">Gate</string>
+    <string name="timeline_field_platform">Platform</string>
+    <string name="timeline_field_seat">Seat</string>
+    <string name="timeline_add_flight">+ Add flight</string>
+    <string name="timeline_field_baggage_info">Baggage info</string>
+    <string name="timeline_field_contact_name">Contact name</string>
+    <string name="timeline_field_contact_phone">Contact phone</string>
+    <string name="timeline_field_contact_email">Contact email</string>
+    <string name="timeline_field_private">Private -- only visible to you</string>
+    <string name="timeline_create_entry">Create entry</string>
+    <string name="timeline_save_changes">Save changes</string>
+    <string name="timeline_delete_entry">Delete entry</string>
+    <string name="timeline_delete_entry_confirm_title">Delete this entry?</string>
+    <string name="timeline_delete_entry_confirm_body">This cannot be undone.</string>
+    <string name="timeline_delete">Delete</string>
+    <string name="timeline_cancel">Cancel</string>
+    <string name="timeline_error_title_required">Title/location is required.</string>
+    <string name="timeline_error_flight_times_required">At least one Flight needs both a departure and arrival date/time.</string>
+    <string name="timeline_error_start_required">A start date &amp; time is required.</string>
+    <string name="timeline_error_end_required">An end date &amp; time is required for %1$s.</string>
+    <string name="timeline_error_expense_both">Expense requires both an amount and a currency, or neither.</string>
+    <string name="timeline_error_add_link_failed">Failed to add link.</string>
+    <string name="timeline_error_remove_link_failed">Failed to remove link.</string>
+    <string name="timeline_error_save_entry_failed">Failed to save entry.</string>
+    <string name="timeline_error_delete_entry_failed">Failed to delete entry.</string>
+</resources>

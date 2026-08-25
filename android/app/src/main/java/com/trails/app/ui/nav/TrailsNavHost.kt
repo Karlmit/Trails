@@ -1,15 +1,20 @@
 package com.trails.app.ui.nav
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -24,6 +30,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.trails.app.R
+import com.trails.app.ui.settings.SettingsScreen
 import com.trails.app.ui.blog.BlogDetailScreen
 import com.trails.app.ui.blog.BlogEditScreen
 import com.trails.app.ui.blog.BlogListScreen
@@ -52,6 +60,7 @@ import com.trails.app.ui.triplist.TripListScreen
 
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_TRIPS = "trips"
+private const val ROUTE_SETTINGS = "settings"
 private const val ARG_TRIP_ID = "tripId"
 private const val ARG_ENTRY_ID = "entryId"
 private const val ARG_SECTION_ID = "sectionId"
@@ -72,9 +81,33 @@ private val CHECKLISTS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.CHECK
 private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/important-info/${infoId ?: NEW_ID}/edit"
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 
+/**
+ * Settings isn't Trip-scoped, so it can't use TripDrawerScaffold (which
+ * requires a tripId) -- a minimal back-arrow Scaffold, same title-bar look,
+ * following TripDrawerScaffold's own showBackButton styling.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsRoute(onBack: () -> Unit) {
+    Scaffold(
+        containerColor = TrailsColors.Canvas,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings_title), color = TrailsColors.Brand) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.shell_cd_back), tint = TrailsColors.Brand)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),
+            )
+        },
+    ) { padding -> SettingsScreen(padding) }
+}
+
 @Composable
 private fun AddFab(onClick: () -> Unit) {
-    FloatingActionButton(onClick = onClick) { Icon(Icons.Filled.Add, contentDescription = "Add") }
+    FloatingActionButton(onClick = onClick) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
 }
 
 /** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet (so it doesn't belong as a Timeline Entry until converted), and a Blog Post goes through its own editor, not the generic Entry one. */
@@ -82,11 +115,11 @@ private fun AddFab(onClick: () -> Unit) {
 private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onAddBlogPost: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     androidx.compose.foundation.layout.Box {
-        FloatingActionButton(onClick = { expanded = true }) { Icon(Icons.Filled.Add, contentDescription = "Add") }
+        FloatingActionButton(onClick = { expanded = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text("Entry") }, onClick = { expanded = false; onAddEntry() })
-            DropdownMenuItem(text = { Text("Idea") }, onClick = { expanded = false; onAddIdea() })
-            DropdownMenuItem(text = { Text("Blog Post") }, onClick = { expanded = false; onAddBlogPost() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.shell_entry)) }, onClick = { expanded = false; onAddEntry() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.shell_idea)) }, onClick = { expanded = false; onAddIdea() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.shell_blog_post)) }, onClick = { expanded = false; onAddBlogPost() })
         }
     }
 }
@@ -122,9 +155,14 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
                 },
                 onAddTrip = { navController.navigate("trips/new/edit") },
                 onOpenOverview = { tripId -> navController.navigate("trip/$tripId/overview") },
+                onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
                 autoOpenActiveTrip = autoOpenActiveTripPending,
                 onAutoOpenConsumed = { autoOpenActiveTripPending = false },
             )
+        }
+
+        composable(ROUTE_SETTINGS) {
+            SettingsRoute(onBack = { navController.popBackStack() })
         }
 
         composable("trips/new/edit") {
@@ -144,7 +182,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.TIMELINE, "Timeline", navController,
+                tripId, TripTab.TIMELINE, stringResource(R.string.shell_title_timeline), navController,
                 floatingActionButton = {
                     AddEntryOrIdeaFab(
                         onAddEntry = { navController.navigate(entryEditRoute(tripId, null)) },
@@ -168,7 +206,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.TIMELINE, "Edit Entry", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, TripTab.TIMELINE, stringResource(R.string.shell_title_edit_entry), navController, showBackButton = true) { padding ->
                 EntryEditScreen(padding, onDone = { navController.popBackStack() })
             }
         }
@@ -179,7 +217,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.SECTIONS, "Sections", navController,
+                tripId, TripTab.SECTIONS, stringResource(R.string.shell_title_sections), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(sectionEditRoute(tripId, null)) }) },
             ) { padding ->
                 SectionsScreen(padding, onOpenSection = { id -> navController.navigate(sectionEditRoute(tripId, id)) })
@@ -194,7 +232,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.SECTIONS, "Edit Section", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, TripTab.SECTIONS, stringResource(R.string.shell_title_edit_section), navController, showBackButton = true) { padding ->
                 SectionEditScreen(padding, onDone = { navController.popBackStack() })
             }
         }
@@ -205,7 +243,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.IDEAS, "Ideas", navController,
+                tripId, TripTab.IDEAS, stringResource(R.string.shell_title_ideas), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(ideaEditRoute(tripId, null)) }) },
             ) { padding ->
                 IdeasScreen(padding, onOpenIdea = { id -> navController.navigate(ideaEditRoute(tripId, id)) })
@@ -220,7 +258,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.IDEAS, "Edit Idea", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, TripTab.IDEAS, stringResource(R.string.shell_title_edit_idea), navController, showBackButton = true) { padding ->
                 IdeaEditScreen(padding, onDone = { navController.popBackStack() })
             }
         }
@@ -231,7 +269,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.CHECKLISTS, "Checklists", navController,
+                tripId, TripTab.CHECKLISTS, stringResource(R.string.shell_title_checklists), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(checklistEditRoute(tripId, null)) }) },
             ) { padding ->
                 ChecklistsScreen(padding, onOpenChecklist = { id -> navController.navigate(checklistDetailRoute(tripId, id)) })
@@ -256,11 +294,11 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             val checklistWithItems by detailViewModel.checklist.collectAsState()
             TripDrawerScaffold(
                 tripId, TripTab.CHECKLISTS,
-                checklistWithItems?.checklist?.title ?: "Checklist",
+                checklistWithItems?.checklist?.title ?: stringResource(R.string.shell_title_checklist),
                 navController, showBackButton = true,
                 actions = {
                     IconButton(onClick = { navController.navigate(checklistEditRoute(tripId, checklistId)) }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Edit", tint = TrailsColors.Brand)
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shell_cd_edit), tint = TrailsColors.Brand)
                     }
                 },
             ) { padding -> ChecklistDetailScreen(padding, viewModel = detailViewModel) }
@@ -291,11 +329,11 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             }
             TripDrawerScaffold(
                 tripId, TripTab.CHECKLISTS,
-                if (editState.checklistId == null) "New Checklist" else "Edit Checklist",
+                if (editState.checklistId == null) stringResource(R.string.shell_title_new_checklist) else stringResource(R.string.shell_title_edit_checklist),
                 navController, showBackButton = true,
                 actions = {
                     TextButton(onClick = editViewModel::save, enabled = !editState.saving) {
-                        Text("Save", color = TrailsColors.Brand)
+                        Text(stringResource(R.string.shell_save), color = TrailsColors.Brand)
                     }
                 },
             ) { padding ->
@@ -313,7 +351,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.IMPORTANT_INFO, "Important Info", navController,
+                tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_important_info), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(infoEditRoute(tripId, null)) }) },
             ) { padding ->
                 ImportantInfoScreen(padding, onOpenItem = { id -> navController.navigate(infoEditRoute(tripId, id)) })
@@ -328,7 +366,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.IMPORTANT_INFO, "Edit Important Info", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_edit_important_info), navController, showBackButton = true) { padding ->
                 ImportantInfoEditScreen(padding, onDone = { navController.popBackStack() })
             }
         }
@@ -339,7 +377,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.BLOG, "Blog", navController,
+                tripId, TripTab.BLOG, stringResource(R.string.shell_title_blog), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(blogEditRoute(tripId, null)) }) },
             ) { padding ->
                 BlogListScreen(padding, onOpenPost = { entryId -> navController.navigate(blogDetailRoute(tripId, entryId)) })
@@ -354,7 +392,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.BLOG, "Edit Blog Post", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, TripTab.BLOG, stringResource(R.string.shell_title_edit_blog_post), navController, showBackButton = true) { padding ->
                 BlogEditScreen(padding, onDone = { navController.popBackStack() })
             }
         }
@@ -364,7 +402,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.BUDGET, "Budget", navController) { padding ->
+            TripDrawerScaffold(tripId, TripTab.BUDGET, stringResource(R.string.shell_title_budget), navController) { padding ->
                 BudgetScreen(padding, onOpenEntry = { _, entryId -> navController.navigate(entryDetailRoute(tripId, entryId)) })
             }
         }
@@ -374,7 +412,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.DOCUMENTS, "Documents", navController) { padding -> DocumentsScreen(padding) }
+            TripDrawerScaffold(tripId, TripTab.DOCUMENTS, stringResource(R.string.shell_title_documents), navController) { padding -> DocumentsScreen(padding) }
         }
 
         composable(
@@ -386,7 +424,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             // button on TripListScreen's own card instead), so no
             // TripTab to highlight and a back arrow rather than the
             // hamburger, matching Travel Mode's own equally-tab-less route.
-            TripDrawerScaffold(tripId, null, "Overview", navController, showBackButton = true) { padding ->
+            TripDrawerScaffold(tripId, null, stringResource(R.string.shell_overview), navController, showBackButton = true) { padding ->
                 OverviewScreen(padding, onEdit = { navController.navigate("trip/$tripId/edit") })
             }
         }
@@ -396,7 +434,7 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, null, "Travel Mode", navController) { padding ->
+            TripDrawerScaffold(tripId, null, stringResource(R.string.shell_travel_mode), navController) { padding ->
                 TravelModeScreen(padding, onOpenEntry = { _, entryId -> navController.navigate(entryDetailRoute(tripId, entryId)) })
             }
         }
@@ -411,10 +449,10 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             val entryId = backStackEntry.arguments?.getString(ARG_ENTRY_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.TIMELINE, "Entry", navController, showBackButton = true,
+                tripId, TripTab.TIMELINE, stringResource(R.string.shell_entry), navController, showBackButton = true,
                 floatingActionButton = {
                     androidx.compose.material3.FloatingActionButton(onClick = { navController.navigate(entryEditRoute(tripId, entryId)) }) {
-                        androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                        androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shell_cd_edit))
                     }
                 },
             ) { padding ->
@@ -432,10 +470,10 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             val entryId = backStackEntry.arguments?.getString(ARG_ENTRY_ID).orEmpty()
             TripDrawerScaffold(
-                tripId, TripTab.BLOG, "Blog post", navController, showBackButton = true,
+                tripId, TripTab.BLOG, stringResource(R.string.shell_title_blog_post), navController, showBackButton = true,
                 floatingActionButton = {
                     androidx.compose.material3.FloatingActionButton(onClick = { navController.navigate(blogEditRoute(tripId, entryId)) }) {
-                        androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                        androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shell_cd_edit))
                     }
                 },
             ) { padding ->

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Swedish (default) strings for Sections, Important Info, Documents,
+     Budget, Travel Mode, and Overview/Trip Edit. -->
+<resources>
+    <!-- Sections -->
+    <string name="section_empty_state">Inga sektioner än.\nDela upp resan i etapper -- en stad, en sträcka, ett hus.</string>
+    <string name="section_edit_title_new">Ny sektion</string>
+    <string name="section_edit_title_edit">Redigera sektion</string>
+    <string name="section_edit_subtitle">En etapp av resan -- ge den ett namn, datum och en egen look.</string>
+    <string name="section_field_name">Namn</string>
+    <string name="section_field_start_date">Startdatum</string>
+    <string name="section_field_end_date">Slutdatum</string>
+    <string name="section_field_color">FÄRG</string>
+    <string name="section_field_emoji">EMOJI</string>
+    <string name="section_action_create">Skapa sektion</string>
+    <string name="section_action_save">Spara ändringar</string>
+    <string name="section_action_delete">Ta bort sektion</string>
+    <string name="section_delete_dialog_title">Ta bort den här sektionen?</string>
+    <string name="section_delete_dialog_message">Det här går inte att ångra.</string>
+    <string name="section_dialog_confirm_delete">Ta bort</string>
+    <string name="section_dialog_cancel">Avbryt</string>
+    <string name="section_error_required">Namn, startdatum och slutdatum krävs.</string>
+    <string name="section_error_save_failed">Det gick inte att spara sektionen.</string>
+    <string name="section_error_delete_failed">Det gick inte att ta bort sektionen.</string>
+
+    <!-- Important Info -->
+    <string name="info_empty_state">Ingen viktig info än.\nAdresser, referenser, plan B -- samla den här.</string>
+    <string name="info_move_up_description">Flytta upp</string>
+    <string name="info_move_down_description">Flytta ner</string>
+    <string name="info_edit_title_new">Ny viktig info</string>
+    <string name="info_edit_title_edit">Redigera viktig info</string>
+    <string name="info_edit_subtitle">Sånt ingen vill leta efter -- adresser, referenser, plan B.</string>
+    <string name="info_field_title">Titel *</string>
+    <string name="info_field_description">Beskrivning</string>
+    <string name="info_field_emoji">Emoji (valfritt)</string>
+    <string name="info_field_private">Privat -- dold för gäster</string>
+    <string name="info_action_create">Skapa</string>
+    <string name="info_action_save">Spara ändringar</string>
+    <string name="info_documents_photos_heading">Dokument och foton</string>
+    <string name="info_add_photo">+ Lägg till foto</string>
+    <string name="info_add_document">+ Lägg till dokument</string>
+    <string name="info_action_delete">Ta bort</string>
+    <string name="info_delete_dialog_title">Ta bort det här objektet?</string>
+    <string name="info_delete_dialog_message">Det här går inte att ångra.</string>
+    <string name="info_dialog_confirm_delete">Ta bort</string>
+    <string name="info_dialog_cancel">Avbryt</string>
+    <string name="info_error_title_required">Titel krävs.</string>
+    <string name="info_error_add_tag_failed">Det gick inte att lägga till taggen.</string>
+    <string name="info_error_remove_tag_failed">Det gick inte att ta bort taggen.</string>
+    <string name="info_error_upload_photo_failed">Det gick inte att ladda upp fotot.</string>
+    <string name="info_error_delete_photo_failed">Det gick inte att ta bort fotot.</string>
+    <string name="info_error_upload_document_failed">Det gick inte att ladda upp dokumentet.</string>
+    <string name="info_error_add_link_failed">Det gick inte att lägga till länken.</string>
+    <string name="info_error_remove_link_failed">Det gick inte att ta bort länken.</string>
+    <string name="info_error_save_failed">Det gick inte att spara.</string>
+    <string name="info_error_delete_failed">Det gick inte att ta bort.</string>
+
+    <!-- Documents -->
+    <string name="document_empty_state">Inga dokument än.\nBiljetter, kuponger, bekräftelser -- ladda upp dem här.</string>
+    <string name="document_size_bytes">%1$d B</string>
+    <string name="document_size_kb">%1$d KB</string>
+    <string name="document_size_mb">%1$.1f MB</string>
+
+    <!-- Budget -->
+    <string name="budget_empty_state">Inga utgifter registrerade än.\nLägg till en på en post så dyker den upp här.</string>
+    <string name="budget_line_total">Totalt: %1$.2f %2$s</string>
+    <string name="budget_line_unpaid">Obetalt: %1$.2f %2$s</string>
+
+    <!-- Travel Mode -->
+    <string name="travelmode_empty_upcoming">Resan har inte börjat än.\nReseläget vaknar till liv när du är på väg.</string>
+    <string name="travelmode_empty_completed">Resan är slut.\nHoppas den var bra.</string>
+    <string name="travelmode_loading">Laddar…</string>
+    <string name="travelmode_right_now_title">🧭 Just nu</string>
+    <string name="travelmode_up_next_title">⏭️ Härnäst</string>
+    <string name="travelmode_today_itinerary_title">📅 Dagens fullständiga program</string>
+    <string name="travelmode_label_section">Sektion</string>
+    <string name="travelmode_label_stay">Boende</string>
+    <string name="travelmode_label_activity">Aktivitet</string>
+    <string name="travelmode_label_next_up">Härnäst</string>
+    <string name="travelmode_label_next_transport">Nästa transport</string>
+    <string name="travelmode_label_next_activity">Nästa aktivitet</string>
+    <string name="travelmode_label_next_stay">Nästa boende</string>
+    <string name="travelmode_no_entries_today">Inget på tidslinjen för idag.</string>
+    <string name="travelmode_no_section_today">Ingen sektion täcker idag</string>
+    <string name="travelmode_nothing_scheduled">Inget inplanerat</string>
+    <string name="travelmode_map_link">Karta</string>
+
+    <!-- Overview / Trip Edit -->
+    <string name="overview_loading">Laddar…</string>
+    <string name="overview_timezone_label">Tidszon: %1$s</string>
+    <string name="overview_date_range_days">%1$s → %2$s · %3$d dagar</string>
+    <string name="overview_action_edit_trip">Redigera resa</string>
+    <string name="overview_topbar_title_new">Ny resa</string>
+    <string name="overview_topbar_title_edit">Redigera resa</string>
+    <string name="overview_back_description">Tillbaka</string>
+    <string name="overview_edit_title_new">Ny resa</string>
+    <string name="overview_edit_title_details">Resedetaljer</string>
+    <string name="overview_edit_subtitle">Vart du ska och när -- allt annat bygger på det här.</string>
+    <string name="overview_field_name">Namn</string>
+    <string name="overview_field_destination">Destination (valfritt)</string>
+    <string name="overview_field_start_date">Startdatum</string>
+    <string name="overview_field_end_date">Slutdatum</string>
+    <string name="overview_field_timezone">Tidszon (IANA, t.ex. Europe/Stockholm)</string>
+    <string name="overview_field_description">Beskrivning (valfritt)</string>
+    <string name="overview_field_pinned_active">Markera som aktiv</string>
+    <string name="overview_action_create_trip">Skapa resa</string>
+    <string name="overview_action_save_changes">Spara ändringar</string>
+    <string name="overview_action_delete_trip">Ta bort resa</string>
+    <string name="overview_delete_trip_dialog_title">Ta bort den här resan?</string>
+    <string name="overview_delete_trip_dialog_message">Det här tar bort resan och allt i den. Det går inte att ångra.</string>
+    <string name="overview_dialog_confirm_delete">Ta bort</string>
+    <string name="overview_dialog_cancel">Avbryt</string>
+    <string name="overview_error_required">Namn, startdatum, slutdatum och tidszon krävs.</string>
+    <string name="overview_error_invalid_timezone">\"%1$s\" är inte en giltig IANA-tidszon (t.ex. Europe/Stockholm).</string>
+    <string name="overview_error_save_failed">Det gick inte att spara resan.</string>
+    <string name="overview_error_delete_failed">Det gick inte att ta bort resan.</string>
+</resources>

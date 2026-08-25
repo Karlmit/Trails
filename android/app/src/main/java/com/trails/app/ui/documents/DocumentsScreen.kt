@@ -15,11 +15,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.components.ScreenHeading
@@ -39,7 +42,7 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
         if (groups.isEmpty()) {
             EmptyState(
                 emoji = "📎",
-                message = "No documents yet.\nTickets, vouchers, confirmations -- upload them here.",
+                message = stringResource(R.string.document_empty_state),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
@@ -85,8 +88,10 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
     }
 }
 
+@Composable
+@ReadOnlyComposable
 private fun formatSize(bytes: Int): String = when {
-    bytes < 1024 -> "$bytes B"
-    bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-    else -> "%.1f MB".format(bytes / (1024f * 1024f))
+    bytes < 1024 -> stringResource(R.string.document_size_bytes, bytes)
+    bytes < 1024 * 1024 -> stringResource(R.string.document_size_kb, bytes / 1024)
+    else -> stringResource(R.string.document_size_mb, bytes / (1024f * 1024f))
 }

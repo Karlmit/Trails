@@ -22,8 +22,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.data.entity.SectionEntity
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
@@ -41,7 +43,7 @@ fun SectionsScreen(padding: PaddingValues, onOpenSection: (String?) -> Unit = {}
         if (sections.isEmpty()) {
             EmptyState(
                 emoji = "🗂️",
-                message = "No sections yet.\nSplit the trip into legs -- a city, a leg, a house.",
+                message = stringResource(R.string.section_empty_state),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {

@@ -30,17 +30,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.R
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import java.io.File
-
-private val PRIORITY_LABELS = mapOf("MUST_DO" to "Must do", "WOULD_LIKE" to "Would like", "MAYBE" to "Maybe")
-private val WEATHER_LABELS = mapOf("INDOOR" to "Indoor", "OUTDOOR" to "Outdoor", "EITHER" to "Either")
 
 /** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx's default Section grouping, plus create/edit via [onOpenIdea]. */
 @Composable
@@ -52,15 +51,16 @@ fun IdeasScreen(padding: PaddingValues, onOpenIdea: (String?) -> Unit = {}, view
         if (groups.isEmpty()) {
             EmptyState(
                 emoji = "💡",
-                message = "No ideas yet.\nSomething worth doing on this trip? Pin it here.",
+                message = stringResource(R.string.idea_empty_message),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
+            val noSectionLabel = stringResource(R.string.idea_no_section_label)
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
                         Text(
-                            group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: "No Section",
+                            group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: noSectionLabel,
                             style = MaterialTheme.typography.titleSmall,
                             color = TrailsColors.TextSoft,
                             modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
@@ -103,7 +103,7 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
                         PriorityBadge(idea.priority)
                         Text(
-                            WEATHER_LABELS[idea.weatherSuitability] ?: idea.weatherSuitability,
+                            IDEA_WEATHER_LABEL_RES[idea.weatherSuitability]?.let { stringResource(it) } ?: idea.weatherSuitability,
                             style = MaterialTheme.typography.bodySmall,
                             color = TrailsColors.TextSoft,
                         )
@@ -128,7 +128,7 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
             val hasMore = idea.category != null || idea.locationAddress != null || idea.locationMapLink != null
             if (hasMore) {
                 Text(
-                    if (expanded) "Show less" else "Read more",
+                    if (expanded) stringResource(R.string.idea_show_less) else stringResource(R.string.idea_read_more),
                     style = MaterialTheme.typography.bodySmall,
                     color = TrailsColors.BrandAccent,
                     modifier = Modifier.padding(top = 8.dp).clickable { expanded = !expanded },
@@ -145,7 +145,7 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                     idea.locationMapLink?.let { link ->
                         val context = androidx.compose.ui.platform.LocalContext.current
                         Text(
-                            "Open in Google Maps",
+                            stringResource(R.string.idea_open_in_maps),
                             style = MaterialTheme.typography.bodyMedium,
                             color = TrailsColors.BrandAccent,
                             modifier = Modifier.padding(top = 4.dp).clickable { com.trails.app.util.openExternalUrl(context, link) },
@@ -166,7 +166,7 @@ private fun PriorityBadge(priority: String) {
     }
     Surface(color = bg, contentColor = fg, shape = TrailsShapes.Pill) {
         Text(
-            PRIORITY_LABELS[priority] ?: priority,
+            IDEA_PRIORITY_LABEL_RES[priority]?.let { stringResource(it) } ?: priority,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
         )

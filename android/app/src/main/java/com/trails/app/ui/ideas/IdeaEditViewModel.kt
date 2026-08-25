@@ -1,9 +1,11 @@
 package com.trails.app.ui.ideas
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.IdeaCategoryStore
 import com.trails.app.data.IdeaRepository
@@ -36,9 +38,20 @@ private const val OWNER_TYPE = "IDEA"
 private const val DEFAULT_CURRENCY = "SEK"
 
 val IDEA_PRIORITIES = listOf("MUST_DO", "WOULD_LIKE", "MAYBE")
-val IDEA_PRIORITY_LABELS = mapOf("MUST_DO" to "Must do", "WOULD_LIKE" to "Would like", "MAYBE" to "Maybe")
+// Value -> @StringRes rather than a raw label String, since these are
+// referenced from Composables (IdeasScreen, IdeaEditScreen) that resolve
+// them via stringResource for localization.
+val IDEA_PRIORITY_LABEL_RES = mapOf(
+    "MUST_DO" to R.string.idea_priority_must_do,
+    "WOULD_LIKE" to R.string.idea_priority_would_like,
+    "MAYBE" to R.string.idea_priority_maybe,
+)
 val IDEA_WEATHER_SUITABILITY = listOf("INDOOR", "OUTDOOR", "EITHER")
-val IDEA_WEATHER_LABELS = mapOf("INDOOR" to "Indoor", "OUTDOOR" to "Outdoor", "EITHER" to "Either")
+val IDEA_WEATHER_LABEL_RES = mapOf(
+    "INDOOR" to R.string.idea_weather_indoor,
+    "OUTDOOR" to R.string.idea_weather_outdoor,
+    "EITHER" to R.string.idea_weather_either,
+)
 
 data class IdeaEditState(
     val ideaId: String? = null,
@@ -56,7 +69,12 @@ data class IdeaEditState(
     val links: List<LinkFieldItem> = emptyList(),
     val uploadingPhoto: Boolean = false,
     val saving: Boolean = false,
+    // `error` carries dynamic (network/exception) text; `errorRes` carries
+    // one of this ViewModel's own hardcoded messages -- as a @StringRes so
+    // IdeaEditScreen can localize it via stringResource (a Compose API this
+    // ViewModel can't call directly). Only one is ever set at a time.
     val error: String? = null,
+    @StringRes val errorRes: Int? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
     val converted: Boolean = false,
@@ -185,7 +203,12 @@ class IdeaEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.createLink(OWNER_TYPE, ownerId, url, label) }
                 .onSuccess { created -> _state.value = _state.value.copy(links = _state.value.links + LinkFieldItem(created.id, created.url, created.label)) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add link.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_add_link_failed else null,
+                    )
+                }
         }
     }
 
@@ -194,7 +217,12 @@ class IdeaEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.deleteLink(id) }
                 .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == id }) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove link.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_remove_link_failed else null,
+                    )
+                }
         }
     }
 
@@ -222,14 +250,18 @@ class IdeaEditViewModel @Inject constructor(
 
     fun uploadPhoto(uri: Uri, filename: String) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(uploadingPhoto = true, error = null)
+            _state.value = _state.value.copy(uploadingPhoto = true, error = null, errorRes = null)
             runCatching {
                 val ownerId = ensureIdeaId()
                 documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename)
             }.onSuccess {
                 _state.value = _state.value.copy(uploadingPhoto = false)
             }.onFailure { e ->
-                _state.value = _state.value.copy(uploadingPhoto = false, error = e.message ?: "Failed to upload photo.")
+                _state.value = _state.value.copy(
+                    uploadingPhoto = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.idea_edit_error_upload_photo_failed else null,
+                )
             }
         }
     }
@@ -237,14 +269,24 @@ class IdeaEditViewModel @Inject constructor(
     fun deletePhoto(photoId: String) {
         viewModelScope.launch {
             runCatching { documentsRepository.deletePhoto(photoId) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to delete photo.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_delete_photo_failed else null,
+                    )
+                }
         }
     }
 
     fun markPhotoPrimary(photoId: String) {
         viewModelScope.launch {
             runCatching { documentsRepository.markPhotoPrimary(photoId) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to set cover photo.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_set_cover_photo_failed else null,
+                    )
+                }
         }
     }
 
@@ -274,7 +316,7 @@ class IdeaEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         if (current.title.isBlank()) {
-            _state.value = current.copy(error = "Title is required.")
+            _state.value = current.copy(error = null, errorRes = R.string.idea_edit_error_title_required)
             return
         }
         // Currency defaults to SEK even with no amount entered (so it's
@@ -284,10 +326,10 @@ class IdeaEditViewModel @Inject constructor(
         // alone (still just the default, amount never touched) must not
         // block saving.
         if (current.estimatedExpenseAmount.isNotBlank() && current.estimatedExpenseCurrency.isBlank()) {
-            _state.value = current.copy(error = "Estimated expense requires a currency.")
+            _state.value = current.copy(error = null, errorRes = R.string.idea_edit_error_expense_currency_required)
             return
         }
-        _state.value = current.copy(saving = true, error = null)
+        _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching {
                 if (current.ideaId == null) {
@@ -302,28 +344,44 @@ class IdeaEditViewModel @Inject constructor(
                 // same choice ChecklistEditScreen makes for items.
                 _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Idea.")
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.idea_edit_error_save_failed else null,
+                )
             }
         }
     }
 
     fun delete() {
         val id = _state.value.ideaId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { repository.delete(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete Idea.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_delete_failed else null,
+                    )
+                }
         }
     }
 
     fun convertToEntry() {
         val id = _state.value.ideaId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { repository.convertToEntry(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, converted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to convert Idea.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.idea_edit_error_convert_failed else null,
+                    )
+                }
         }
     }
 }

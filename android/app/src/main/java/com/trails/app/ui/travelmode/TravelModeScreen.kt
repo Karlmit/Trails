@@ -19,8 +19,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.data.entity.TimelineEntryEntity
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
@@ -44,35 +46,35 @@ fun TravelModeScreen(
             EmptyState(
                 emoji = if (state.tripStatus == "UPCOMING") "⏳" else if (state.tripStatus == "COMPLETED") "🏁" else "🧭",
                 message = if (state.tripStatus == "UPCOMING") {
-                    "This trip hasn't started yet.\nTravel Mode wakes up once you're on the move."
+                    stringResource(R.string.travelmode_empty_upcoming)
                 } else if (state.tripStatus == "COMPLETED") {
-                    "This trip has ended.\nHope it was a good one."
+                    stringResource(R.string.travelmode_empty_completed)
                 } else {
-                    "Loading…"
+                    stringResource(R.string.travelmode_loading)
                 },
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 item {
-                    InfoCard("🧭 Right now") {
-                        LabeledValue("Section", state.currentSectionName ?: "No Section covers today")
-                        LabeledEntry("Stay", state.currentStay, onOpenEntry)
-                        LabeledEntry("Activity", state.currentActivity, onOpenEntry)
+                    InfoCard(stringResource(R.string.travelmode_right_now_title)) {
+                        LabeledValue(stringResource(R.string.travelmode_label_section), state.currentSectionName ?: stringResource(R.string.travelmode_no_section_today))
+                        LabeledEntry(stringResource(R.string.travelmode_label_stay), state.currentStay, onOpenEntry)
+                        LabeledEntry(stringResource(R.string.travelmode_label_activity), state.currentActivity, onOpenEntry)
                     }
                 }
                 item {
-                    InfoCard("⏭️ Up next") {
-                        LabeledEntry("Next up", state.nextOverall, onOpenEntry)
-                        LabeledEntry("Next Transport", state.nextTransport, onOpenEntry)
-                        LabeledEntry("Next Activity", state.nextActivity, onOpenEntry)
-                        LabeledEntry("Next Stay", state.nextStay, onOpenEntry)
+                    InfoCard(stringResource(R.string.travelmode_up_next_title)) {
+                        LabeledEntry(stringResource(R.string.travelmode_label_next_up), state.nextOverall, onOpenEntry)
+                        LabeledEntry(stringResource(R.string.travelmode_label_next_transport), state.nextTransport, onOpenEntry)
+                        LabeledEntry(stringResource(R.string.travelmode_label_next_activity), state.nextActivity, onOpenEntry)
+                        LabeledEntry(stringResource(R.string.travelmode_label_next_stay), state.nextStay, onOpenEntry)
                     }
                 }
                 item {
-                    InfoCard("📅 Today's full itinerary") {
+                    InfoCard(stringResource(R.string.travelmode_today_itinerary_title)) {
                         if (state.todaysEntries.isEmpty()) {
-                            Text("Nothing on the Timeline for today.", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+                            Text(stringResource(R.string.travelmode_no_entries_today), style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
                         } else {
                             state.todaysEntries.forEach { entry ->
                                 EntryRow(entry, onOpenEntry, modifier = Modifier.padding(top = 8.dp))
@@ -113,7 +115,7 @@ private fun LabeledEntry(label: String, entry: TimelineEntryEntity?, onOpenEntry
     Column(modifier = Modifier.padding(bottom = 10.dp)) {
         Text(label.uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
         if (entry == null) {
-            Text("Nothing scheduled", style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.travelmode_nothing_scheduled), style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft)
         } else {
             EntryRow(entry, onOpenEntry)
         }
@@ -142,7 +144,7 @@ private fun EntryRow(entry: TimelineEntryEntity, onOpenEntry: (String, String) -
         }
         if (mapsUrl != null) {
             Text(
-                "Map",
+                stringResource(R.string.travelmode_map_link),
                 style = MaterialTheme.typography.labelLarge,
                 color = TrailsColors.BrandAccent,
                 modifier = Modifier.clickable { com.trails.app.util.openExternalUrl(context, mapsUrl) },

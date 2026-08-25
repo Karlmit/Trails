@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_none">None</string>
+    <string name="shared_remove_option_from_list">Remove %1$s from list</string>
+    <string name="shared_new_category_placeholder">New category</string>
+    <string name="shared_add_button">Add</string>
+    <string name="shared_add_new_option">+ Add new</string>
+
+    <string name="shared_add_tag_placeholder">Add tag</string>
+    <string name="shared_remove_tag">Remove %1$s</string>
+    <string name="shared_pick_date">Pick date</string>
+    <string name="shared_pick_time">Pick time</string>
+    <string name="shared_ok_button">OK</string>
+    <string name="shared_cancel_button">Cancel</string>
+
+    <string name="shared_links_label">LINKS</string>
+    <string name="shared_remove_link">Remove link</string>
+    <string name="shared_url_placeholder">https://…</string>
+    <string name="shared_link_label_placeholder">Label (optional)</string>
+
+    <string name="shared_tags_label">TAGS</string>
+</resources>

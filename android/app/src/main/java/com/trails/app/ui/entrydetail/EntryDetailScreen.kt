@@ -27,14 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.R
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.ui.timeline.graph.ENTRY_TYPE_LABELS
-import com.trails.app.ui.timeline.graph.subtypeLabel
+import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
+import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 import com.trails.app.util.entryMapsUrl
 import com.trails.app.util.openCachedFile
 import com.trails.app.util.openExternalUrl
@@ -69,7 +71,7 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
         modifier = Modifier.padding(padding).fillMaxSize(),
     ) {
         if (entry == null) {
-            Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.timeline_loading), modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
             return@PullToRefreshScreen
         }
         Column(
@@ -81,14 +83,14 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                     emoji = entryTypeEmoji(entry.entryType),
                     title = entry.title,
                     subtitle = buildString {
-                        append(ENTRY_TYPE_LABELS[entry.entryType] ?: entry.entryType)
-                        entry.subtype?.let { append(" · ${subtypeLabel(it)}") }
+                        append(entryTypeLabelResolved(entry.entryType))
+                        entry.subtype?.let { append(" · ${subtypeLabelResolved(it)}") }
                     },
                 )
-                Field("When", "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}")
+                Field(stringResource(R.string.timeline_field_when), "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}")
                 if (entry.locationName != null || entry.locationAddress != null) {
                     Column {
-                        Text("LOCATION", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        Text(stringResource(R.string.timeline_field_location).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
                         Text(
                             listOfNotNull(entry.locationName, entry.locationAddress).joinToString(" · "),
                             style = MaterialTheme.typography.bodyLarge,
@@ -96,7 +98,7 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         )
                         entryMapsUrl(entry.locationAddress, entry.locationName)?.let { url ->
                             Text(
-                                "Open in Google Maps",
+                                stringResource(R.string.timeline_open_in_maps),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TrailsColors.BrandAccent,
                                 modifier = Modifier.padding(top = 2.dp).clickable { openExternalUrl(context, url) },
@@ -104,10 +106,10 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         }
                     }
                 }
-                entry.bookingReference?.let { Field("Booking reference", it) }
+                entry.bookingReference?.let { Field(stringResource(R.string.timeline_field_booking_reference), it) }
                 entry.website?.let { website ->
                     Column {
-                        Text("WEBSITE", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        Text(stringResource(R.string.timeline_field_website).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
                         Text(
                             website,
                             style = MaterialTheme.typography.bodyLarge,
@@ -116,17 +118,17 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         )
                     }
                 }
-                entry.bookedVia?.let { Field("Booked via", it) }
+                entry.bookedVia?.let { Field(stringResource(R.string.timeline_field_booked_via), it) }
                 if (entry.expenseAmount != null) {
                     Field(
-                        "Expense",
+                        stringResource(R.string.timeline_field_expense),
                         "${entry.expenseAmount} ${entry.expenseCurrency ?: ""}" +
                             (entry.expensePaymentStatus?.let { " · $it" } ?: "") +
                             (entry.expensePaymentNote?.let { " · $it" } ?: ""),
                     )
                 }
                 if (entry.contactName != null || entry.contactPhone != null || entry.contactEmail != null) {
-                    Field("Contact", listOfNotNull(entry.contactName, entry.contactPhone, entry.contactEmail).joinToString(" · "))
+                    Field(stringResource(R.string.timeline_field_contact), listOfNotNull(entry.contactName, entry.contactPhone, entry.contactEmail).joinToString(" · "))
                 }
                 state.typeDetails.forEach { (key, value) ->
                     if (value.isNotBlank()) Field(key, value)
@@ -138,18 +140,19 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                 // TransportFlights.kt's own comment.
                 if (state.flights.size > 1) {
                     Column {
-                        Text("ITINERARY", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        Text(stringResource(R.string.timeline_field_itinerary).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
                         state.flights.forEachIndexed { index, flight ->
                             Text(
-                                flight.flightNumber.takeIf { it.isNotBlank() }?.let { "✈ $it" } ?: "✈ Flight ${index + 1}",
+                                flight.flightNumber.takeIf { it.isNotBlank() }?.let { "✈ $it" }
+                                    ?: "✈ " + stringResource(R.string.timeline_flight_number_fallback, index + 1),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = TrailsColors.Text,
                             )
                             val details = listOfNotNull(
-                                flight.terminal.takeIf { it.isNotBlank() }?.let { "Terminal $it" },
-                                flight.gate.takeIf { it.isNotBlank() }?.let { "Gate $it" },
-                                flight.platform.takeIf { it.isNotBlank() }?.let { "Platform $it" },
-                                flight.seat.takeIf { it.isNotBlank() }?.let { "Seat $it" },
+                                flight.terminal.takeIf { it.isNotBlank() }?.let { stringResource(R.string.timeline_flight_terminal, it) },
+                                flight.gate.takeIf { it.isNotBlank() }?.let { stringResource(R.string.timeline_flight_gate, it) },
+                                flight.platform.takeIf { it.isNotBlank() }?.let { stringResource(R.string.timeline_flight_platform, it) },
+                                flight.seat.takeIf { it.isNotBlank() }?.let { stringResource(R.string.timeline_flight_seat, it) },
                             ).joinToString(" · ")
                             val departure = listOf(flight.departureLocation, formatStopoverDateTime(flight.departureAt)).filter { it.isNotBlank() }.joinToString(" ")
                             val arrival = listOf(flight.arrivalLocation, formatStopoverDateTime(flight.arrivalAt)).filter { it.isNotBlank() }.joinToString(" ")
@@ -163,7 +166,12 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                             }
                             if (index < state.flights.lastIndex) {
                                 Text(
-                                    stopoverGapLabel(flight, state.flights[index + 1]),
+                                    stopoverGapLabel(
+                                        flight,
+                                        state.flights[index + 1],
+                                        stringResource(R.string.timeline_stopover_at),
+                                        stringResource(R.string.timeline_stopover),
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = TrailsColors.TextSoft,
                                 )
@@ -171,15 +179,15 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         }
                     }
                 }
-                entry.notes?.let { Field("Notes", it) }
-                entry.postTripNotes?.let { Field("Post-trip notes", it) }
+                entry.notes?.let { Field(stringResource(R.string.timeline_field_notes), it) }
+                entry.postTripNotes?.let { Field(stringResource(R.string.timeline_field_post_trip_notes), it) }
             }
 
             TrailsCard {
-                ScreenHeading(emoji = "📎", title = "Photos & attachments")
+                ScreenHeading(emoji = "📎", title = stringResource(R.string.timeline_photos_attachments))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "+ Add photo",
+                        stringResource(R.string.timeline_add_photo),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
                         modifier = Modifier.padding(end = 20.dp).clickable {
@@ -187,7 +195,7 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         },
                     )
                     Text(
-                        "+ Add attachment",
+                        stringResource(R.string.timeline_add_attachment),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
                         modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },

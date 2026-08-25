@@ -32,9 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.trails.app.R
 import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.LabeledField
@@ -87,13 +89,14 @@ fun ImportantInfoEditScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        state.error?.let { ErrorBanner(it) }
+        val error = state.error ?: state.errorRes?.let { stringResource(it) }
+        error?.let { ErrorBanner(it) }
 
         TrailsCard {
             ScreenHeading(
                 emoji = "📌",
-                title = if (isNew) "New important info" else "Edit important info",
-                subtitle = "The stuff nobody wants to dig for -- addresses, references, the plan B.",
+                title = if (isNew) stringResource(R.string.info_edit_title_new) else stringResource(R.string.info_edit_title_edit),
+                subtitle = stringResource(R.string.info_edit_subtitle),
             )
 
             // Deliberately just Title/Description/Private -- user-reported: "too
@@ -102,10 +105,10 @@ fun ImportantInfoEditScreen(
             // resends whatever an existing item already has stored for them
             // (see loadIfEditing/save), so no old data is lost by an edit that
             // never meant to touch them.
-            LabeledField(label = "Title *", value = state.title, onValueChange = viewModel::onTitleChange)
-            MultilineLabeledField(label = "Description", value = state.content, onValueChange = viewModel::onContentChange)
-            LabeledField(label = "Emoji (optional)", value = state.emoji, onValueChange = viewModel::onEmojiChange)
-            CheckboxRow(label = "Private -- hidden from Guests", checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
+            LabeledField(label = stringResource(R.string.info_field_title), value = state.title, onValueChange = viewModel::onTitleChange)
+            MultilineLabeledField(label = stringResource(R.string.info_field_description), value = state.content, onValueChange = viewModel::onContentChange)
+            LabeledField(label = stringResource(R.string.info_field_emoji), value = state.emoji, onValueChange = viewModel::onEmojiChange)
+            CheckboxRow(label = stringResource(R.string.info_field_private), checked = state.isPrivate, onCheckedChange = viewModel::onIsPrivateChange)
             LinksEditor(links = state.links, onAdd = viewModel::addLink, onRemove = viewModel::removeLink)
 
             // User-requested: Tags/Documents/Photos are only addable once
@@ -118,7 +121,7 @@ fun ImportantInfoEditScreen(
                 CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
             } else {
                 PillButton(
-                    text = if (isNew) "Create" else "Save changes",
+                    text = if (isNew) stringResource(R.string.info_action_create) else stringResource(R.string.info_action_save),
                     onClick = viewModel::save,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -127,10 +130,10 @@ fun ImportantInfoEditScreen(
 
         if (!isNew) {
             TrailsCard {
-                ScreenHeading(emoji = "📎", title = "Documents & photos")
+                ScreenHeading(emoji = "📎", title = stringResource(R.string.info_documents_photos_heading))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "+ Add photo",
+                        stringResource(R.string.info_add_photo),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
                         modifier = Modifier.padding(end = 20.dp).clickable {
@@ -138,7 +141,7 @@ fun ImportantInfoEditScreen(
                         },
                     )
                     Text(
-                        "+ Add document",
+                        stringResource(R.string.info_add_document),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
                         modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },
@@ -178,7 +181,7 @@ fun ImportantInfoEditScreen(
 
         if (!isNew && !state.saving) {
             PillButton(
-                text = "Delete",
+                text = stringResource(R.string.info_action_delete),
                 variant = PillButtonVariant.Danger,
                 onClick = { showDeleteConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -189,10 +192,10 @@ fun ImportantInfoEditScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete this item?") },
-            text = { Text("This cannot be undone.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.info_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.info_delete_dialog_message)) },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.info_dialog_confirm_delete)) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.info_dialog_cancel)) } },
         )
     }
 }

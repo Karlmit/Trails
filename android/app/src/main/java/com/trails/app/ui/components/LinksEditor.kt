@@ -20,7 +20,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -42,7 +44,7 @@ fun LinksEditor(
     var labelDraft by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(text = "LINKS", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+        Text(text = stringResource(R.string.shared_links_label), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
         links.forEach { link ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -55,7 +57,7 @@ fun LinksEditor(
                     }
                 }
                 IconButton(onClick = { onRemove(link) }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove link")
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.shared_remove_link))
                 }
             }
         }
@@ -65,7 +67,7 @@ fun LinksEditor(
                 onValueChange = { urlDraft = it },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                placeholder = { Text("https://…") },
+                placeholder = { Text(stringResource(R.string.shared_url_placeholder)) },
                 shape = TrailsShapes.Input,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
@@ -81,7 +83,7 @@ fun LinksEditor(
                 onValueChange = { labelDraft = it },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                placeholder = { Text("Label (optional)") },
+                placeholder = { Text(stringResource(R.string.shared_link_label_placeholder)) },
                 shape = TrailsShapes.Input,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
@@ -100,7 +102,7 @@ fun LinksEditor(
                     }
                 },
                 modifier = Modifier.padding(start = 4.dp),
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.shared_add_button)) }
         }
     }
 }

@@ -1,9 +1,11 @@
 package com.trails.app.ui.importantinfo
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.LinksTagsRepository
@@ -46,7 +48,12 @@ data class ImportantInfoEditState(
     val tags: List<TagFieldItem> = emptyList(),
     val uploadingPhoto: Boolean = false,
     val saving: Boolean = false,
+    // Dynamic, server-provided error text (e.g. from a thrown exception) --
+    // takes precedence over [errorRes] when non-null.
     val error: String? = null,
+    // Known, statically-translated error case -- resolved to text by the
+    // Composable via stringResource(), since a ViewModel can't call it.
+    @StringRes val errorRes: Int? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -115,7 +122,7 @@ class ImportantInfoEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.createTag(OWNER_TYPE, ownerId, text) }
                 .onSuccess { created -> _state.value = _state.value.copy(tags = _state.value.tags + TagFieldItem(created.id, created.text)) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add tag.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_add_tag_failed else null) }
         }
     }
 
@@ -123,24 +130,30 @@ class ImportantInfoEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.deleteTag(tag.id) }
                 .onSuccess { _state.value = _state.value.copy(tags = _state.value.tags.filterNot { it.id == tag.id }) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove tag.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_remove_tag_failed else null) }
         }
     }
 
     fun uploadPhoto(uri: Uri, filename: String) {
         val ownerId = infoId ?: return
         viewModelScope.launch {
-            _state.value = _state.value.copy(uploadingPhoto = true, error = null)
+            _state.value = _state.value.copy(uploadingPhoto = true, error = null, errorRes = null)
             runCatching { documentsRepository.uploadPhoto(OWNER_TYPE, ownerId, uri, filename) }
                 .onSuccess { _state.value = _state.value.copy(uploadingPhoto = false) }
-                .onFailure { e -> _state.value = _state.value.copy(uploadingPhoto = false, error = e.message ?: "Failed to upload photo.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        uploadingPhoto = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.info_error_upload_photo_failed else null,
+                    )
+                }
         }
     }
 
     fun deletePhoto(photoId: String) {
         viewModelScope.launch {
             runCatching { documentsRepository.deletePhoto(photoId) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to delete photo.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_delete_photo_failed else null) }
         }
     }
 
@@ -148,7 +161,7 @@ class ImportantInfoEditViewModel @Inject constructor(
         val ownerId = infoId ?: return
         viewModelScope.launch {
             runCatching { documentsRepository.uploadAttachment(tripId, OWNER_TYPE, ownerId, uri, filename) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to upload document.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_upload_document_failed else null) }
         }
     }
 
@@ -172,7 +185,7 @@ class ImportantInfoEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.createLink(OWNER_TYPE, ownerId, url, label) }
                 .onSuccess { created -> _state.value = _state.value.copy(links = _state.value.links + LinkFieldItem(created.id, created.url, created.label)) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add link.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_add_link_failed else null) }
         }
     }
 
@@ -184,7 +197,7 @@ class ImportantInfoEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.deleteLink(link.id) }
                 .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == link.id }) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove link.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_remove_link_failed else null) }
         }
     }
 
@@ -220,10 +233,10 @@ class ImportantInfoEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         if (current.title.isBlank()) {
-            _state.value = current.copy(error = "Title is required.")
+            _state.value = current.copy(error = null, errorRes = R.string.info_error_title_required)
             return
         }
-        _state.value = current.copy(saving = true, error = null)
+        _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching {
                 if (current.infoId == null) {
@@ -251,18 +264,28 @@ class ImportantInfoEditViewModel @Inject constructor(
                 }
                 _state.value = _state.value.copy(saving = false, saved = true, infoId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save.")
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.info_error_save_failed else null,
+                )
             }
         }
     }
 
     fun delete() {
         val id = _state.value.infoId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { repository.delete(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.info_error_delete_failed else null,
+                    )
+                }
         }
     }
 }

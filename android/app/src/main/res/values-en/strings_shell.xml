@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Login -->
+    <string name="shell_login_title">Log in</string>
+    <string name="shell_login_subtitle">Welcome back to Trails.</string>
+    <string name="shell_login_username_label">Username</string>
+    <string name="shell_login_password_label">Password</string>
+    <string name="shell_login_please_wait">Please wait…</string>
+    <string name="shell_login_submit">Log in</string>
+    <string name="shell_login_missing_credentials">Username and password are required</string>
+    <string name="shell_login_failed">Login failed</string>
+
+    <!-- Drawer / nav chrome -->
+    <string name="shell_drawer_all_trips">← All Trips</string>
+    <string name="shell_travel_mode">Travel Mode</string>
+    <string name="shell_cd_back">Back</string>
+    <string name="shell_cd_menu">Menu</string>
+    <string name="shell_cd_add">Add</string>
+    <string name="shell_cd_edit">Edit</string>
+    <string name="shell_cd_new_trip">New Trip</string>
+
+    <!-- Screen titles -->
+    <string name="shell_title_timeline">Timeline</string>
+    <string name="shell_title_edit_entry">Edit Entry</string>
+    <string name="shell_title_sections">Sections</string>
+    <string name="shell_title_edit_section">Edit Section</string>
+    <string name="shell_title_ideas">Ideas</string>
+    <string name="shell_title_edit_idea">Edit Idea</string>
+    <string name="shell_title_checklists">Checklists</string>
+    <string name="shell_title_checklist">Checklist</string>
+    <string name="shell_title_new_checklist">New Checklist</string>
+    <string name="shell_title_edit_checklist">Edit Checklist</string>
+    <string name="shell_title_important_info">Important Info</string>
+    <string name="shell_title_edit_important_info">Edit Important Info</string>
+    <string name="shell_title_blog">Blog</string>
+    <string name="shell_title_edit_blog_post">Edit Blog Post</string>
+    <string name="shell_title_budget">Budget</string>
+    <string name="shell_title_documents">Documents</string>
+    <string name="shell_overview">Overview</string>
+    <string name="shell_title_blog_post">Blog post</string>
+    <string name="shell_entry">Entry</string>
+    <string name="shell_idea">Idea</string>
+    <string name="shell_blog_post">Blog Post</string>
+    <string name="shell_save">Save</string>
+
+    <!-- Trip list -->
+    <string name="shell_trips_empty">No trips yet.\nTap + to plan your first one.</string>
+    <string name="shell_trip_saving_offline">Saving Trip + files to this device…</string>
+    <string name="shell_trip_save_offline_error">Couldn\'t save this Trip offline -- check your connection and try again.</string>
+    <string name="shell_trip_saved_offline">✓ Saved to this device</string>
+    <string name="shell_refresh">Refresh</string>
+    <string name="shell_save_offline">Save offline</string>
+    <string name="shell_trip_sync_error">Could not refresh trips</string>
+    <string name="shell_trip_date_range">%1$s → %2$s · %3$d days</string>
+</resources>

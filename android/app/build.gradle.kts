@@ -112,6 +112,9 @@ room {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    // Multi-language support: per-app language switching (AppCompatDelegate
+    // .setApplicationLocales) -- see MainActivity's AppCompatActivity swap.
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.activity.compose)

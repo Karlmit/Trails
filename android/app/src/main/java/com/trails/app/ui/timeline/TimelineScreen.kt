@@ -27,8 +27,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.timeline.graph.TimelineDayWithEntries
@@ -38,7 +40,7 @@ import com.trails.app.ui.timeline.graph.formatDayLabel
 import com.trails.app.ui.timeline.graph.graphWidthFor
 import com.trails.app.ui.timeline.graph.sectionBandColor
 import com.trails.app.ui.timeline.graph.sectionSolidColor
-import com.trails.app.ui.timeline.graph.subtypeLabel
+import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 
 /**
  * The GitKraken-style branch/merge graph -- ported 1:1 from
@@ -61,13 +63,13 @@ fun TimelineScreen(
                 color = TrailsColors.BrandAccent,
             )
         } else if (trip == null || layout == null) {
-            Text("No trip data yet", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.timeline_no_trip_data), modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
         } else {
             val graphWidth = graphWidthFor(layout.laneCount)
             Column(modifier = Modifier.fillMaxSize()) {
                 if (state.sections.isEmpty()) {
                     Text(
-                        "No Sections yet.",
+                        stringResource(R.string.timeline_no_sections_yet),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.TextSoft,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -170,7 +172,7 @@ private fun DayRow(
             }
             if (day.day.isToday) {
                 Text(
-                    "TODAY",
+                    stringResource(R.string.timeline_today_badge),
                     style = MaterialTheme.typography.labelMedium,
                     color = TrailsColors.Gold,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -178,7 +180,7 @@ private fun DayRow(
             }
             if (day.lines.isEmpty()) {
                 Text(
-                    "No entries yet",
+                    stringResource(R.string.timeline_no_entries),
                     style = MaterialTheme.typography.bodyMedium,
                     color = TrailsColors.TextSoft,
                 )
@@ -199,8 +201,8 @@ private fun DayRow(
                                 Text(
                                     buildString {
                                         append(label.title)
-                                        if (label.showSubtype && line.subtype != null) append(" · ${subtypeLabel(line.subtype)}")
-                                        if (isBlog) append(" Read post →")
+                                        if (label.showSubtype && line.subtype != null) append(" · ${subtypeLabelResolved(line.subtype)}")
+                                        if (isBlog) append(" " + stringResource(R.string.timeline_read_post))
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,

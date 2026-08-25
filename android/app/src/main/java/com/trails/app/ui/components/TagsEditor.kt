@@ -22,7 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -38,7 +40,7 @@ fun TagsEditor(
 ) {
     var draft by remember { mutableStateOf("") }
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(text = "TAGS", style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+        Text(text = stringResource(R.string.shared_tags_label), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
         FlowRow(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
             tags.forEach { tag ->
                 Surface(
@@ -50,7 +52,7 @@ fun TagsEditor(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(tag.text, modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 6.dp))
                         IconButton(onClick = { onRemove(tag) }, modifier = Modifier.padding(end = 2.dp)) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove ${tag.text}")
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.shared_remove_tag, tag.text))
                         }
                     }
                 }
@@ -62,7 +64,7 @@ fun TagsEditor(
                 onValueChange = { draft = it },
                 modifier = Modifier.fillMaxWidth(0.7f),
                 singleLine = true,
-                placeholder = { Text("Add tag") },
+                placeholder = { Text(stringResource(R.string.shared_add_tag_placeholder)) },
                 shape = TrailsShapes.Input,
             )
             TextButton(
@@ -73,7 +75,7 @@ fun TagsEditor(
                         draft = ""
                     }
                 },
-            ) { Text("Add") }
+            ) { Text(stringResource(R.string.shared_add_button)) }
         }
     }
 }

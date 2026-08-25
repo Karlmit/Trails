@@ -17,11 +17,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.sync.SyncScheduler
@@ -65,7 +67,7 @@ fun OverviewScreen(padding: PaddingValues, onEdit: () -> Unit = {}, viewModel: O
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         val t = trip
         if (t == null) {
-            Text("Loading…", modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.overview_loading), modifier = Modifier.align(Alignment.Center), color = TrailsColors.TextSoft)
         } else {
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -80,19 +82,19 @@ fun OverviewScreen(padding: PaddingValues, onEdit: () -> Unit = {}, viewModel: O
                         Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text)
                     }
                     Text(
-                        "${t.startDate} → ${t.endDate} · ${t.durationDays} days",
+                        stringResource(R.string.overview_date_range_days, t.startDate, t.endDate, t.durationDays),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.TextSoft,
                     )
                     Text(
-                        "Timezone: ${t.timezone}",
+                        stringResource(R.string.overview_timezone_label, t.timezone),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.TextSoft,
                     )
                     t.description?.let {
                         Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text, modifier = Modifier.padding(top = 8.dp))
                     }
-                    PillButton(text = "Edit trip", variant = PillButtonVariant.Outline, onClick = onEdit, modifier = Modifier.fillMaxWidth())
+                    PillButton(text = stringResource(R.string.overview_action_edit_trip), variant = PillButtonVariant.Outline, onClick = onEdit, modifier = Modifier.fillMaxWidth())
                 }
             }
         }

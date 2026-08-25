@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Checklists list -->
+    <string name="checklist_empty_message">Inga checklistor än.\nStarta en packlista eller en att-göra-lista inför avresan.</string>
+    <string name="checklist_private_badge">Privat</string>
+    <string name="checklist_items_done_count">%1$d/%2$d klara</string>
+
+    <!-- Checklist detail -->
+    <string name="checklist_loading">Laddar…</string>
+    <string name="checklist_detail_empty">Inget på listan än -- lägg till det första nedan.</string>
+    <string name="checklist_remove_item_description">Ta bort punkt</string>
+    <string name="checklist_add_item_placeholder">Lägg till en punkt…</string>
+    <string name="checklist_add_item_description">Lägg till punkt</string>
+    <string name="checklist_error_add_item_failed">Det gick inte att lägga till punkten.</string>
+    <string name="checklist_error_delete_item_failed">Det gick inte att ta bort punkten.</string>
+
+    <!-- Checklist edit -->
+    <string name="checklist_edit_title_new">Ny checklista</string>
+    <string name="checklist_edit_title_edit">Redigera checklista</string>
+    <string name="checklist_edit_subtitle">Packlistor, göromål inför avresan, allt som är värt att hålla koll på.</string>
+    <string name="checklist_edit_label_title">Titel</string>
+    <string name="checklist_edit_label_emoji">Emoji (valfritt)</string>
+    <string name="checklist_edit_label_private">Privat -- bara du kan se den här</string>
+    <string name="checklist_edit_delete_button">Ta bort checklista</string>
+    <string name="checklist_edit_delete_dialog_title">Ta bort den här checklistan?</string>
+    <string name="checklist_edit_delete_dialog_text">Detta går inte att ångra.</string>
+    <string name="checklist_edit_delete_confirm_button">Ta bort</string>
+    <string name="checklist_edit_delete_cancel_button">Avbryt</string>
+    <string name="checklist_edit_error_title_required">Titel krävs.</string>
+    <string name="checklist_edit_error_save_failed">Det gick inte att spara checklistan.</string>
+    <string name="checklist_edit_error_delete_failed">Det gick inte att ta bort checklistan.</string>
+
+    <!-- Ideas list -->
+    <string name="idea_empty_message">Inga idéer än.\nNågot värt att göra på resan? Spara det här.</string>
+    <string name="idea_no_section_label">Ingen sektion</string>
+    <string name="idea_show_less">Visa mindre</string>
+    <string name="idea_read_more">Läs mer</string>
+    <string name="idea_open_in_maps">Öppna i Google Maps</string>
+    <string name="idea_priority_must_do">Måste göras</string>
+    <string name="idea_priority_would_like">Skulle vilja</string>
+    <string name="idea_priority_maybe">Kanske</string>
+    <string name="idea_weather_indoor">Inomhus</string>
+    <string name="idea_weather_outdoor">Utomhus</string>
+    <string name="idea_weather_either">Oavsett väder</string>
+
+    <!-- Idea edit -->
+    <string name="idea_edit_title_new">Ny idé</string>
+    <string name="idea_edit_title_edit">Redigera idé</string>
+    <string name="idea_edit_subtitle">Något värt att göra på resan -- spara det här innan du glömmer.</string>
+    <string name="idea_edit_label_title">Titel *</string>
+    <string name="idea_edit_label_section">Sektion</string>
+    <string name="idea_edit_label_category">Kategori</string>
+    <string name="idea_edit_label_description">Beskrivning (valfritt)</string>
+    <string name="idea_edit_label_priority">Prioritet</string>
+    <string name="idea_edit_label_weather">Väderlämplighet</string>
+    <string name="idea_edit_label_location_address">Adress</string>
+    <string name="idea_edit_label_location_map_link">Länk till Google Maps</string>
+    <string name="idea_edit_label_expense_amount">Ber. kostnad</string>
+    <string name="idea_edit_label_expense_currency">Valuta</string>
+    <string name="idea_edit_button_create">Skapa idé</string>
+    <string name="idea_edit_button_save">Spara ändringar</string>
+    <string name="idea_edit_cover_photo_heading">Omslagsbild</string>
+    <string name="idea_edit_uploading_photo">Laddar upp…</string>
+    <string name="idea_edit_add_photo">+ Lägg till bild</string>
+    <string name="idea_edit_links_heading">Länkar</string>
+    <string name="idea_edit_convert_button">Gör om till en tidslinjehändelse</string>
+    <string name="idea_edit_delete_button">Ta bort idé</string>
+    <string name="idea_edit_delete_dialog_title">Ta bort den här idén?</string>
+    <string name="idea_edit_delete_dialog_text">Detta går inte att ångra.</string>
+    <string name="idea_edit_delete_confirm_button">Ta bort</string>
+    <string name="idea_edit_delete_cancel_button">Avbryt</string>
+    <string name="idea_edit_convert_dialog_title">Gör om till en tidslinjehändelse?</string>
+    <string name="idea_edit_convert_dialog_text">Idén blir en riktig tidslinjehändelse och försvinner från Idéer.</string>
+    <string name="idea_edit_convert_confirm_button">Gör om</string>
+    <string name="idea_edit_convert_cancel_button">Avbryt</string>
+    <string name="idea_edit_error_title_required">Titel krävs.</string>
+    <string name="idea_edit_error_expense_currency_required">En beräknad kostnad kräver en valuta.</string>
+    <string name="idea_edit_error_add_link_failed">Det gick inte att lägga till länken.</string>
+    <string name="idea_edit_error_remove_link_failed">Det gick inte att ta bort länken.</string>
+    <string name="idea_edit_error_upload_photo_failed">Det gick inte att ladda upp bilden.</string>
+    <string name="idea_edit_error_delete_photo_failed">Det gick inte att ta bort bilden.</string>
+    <string name="idea_edit_error_set_cover_photo_failed">Det gick inte att ange omslagsbild.</string>
+    <string name="idea_edit_error_save_failed">Det gick inte att spara idén.</string>
+    <string name="idea_edit_error_delete_failed">Det gick inte att ta bort idén.</string>
+    <string name="idea_edit_error_convert_failed">Det gick inte att göra om idén.</string>
+</resources>

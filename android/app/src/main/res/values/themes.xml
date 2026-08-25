@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Trails" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Multi-language support: AppCompatActivity requires a Theme.AppCompat
+         descendant (checked at setContentView time, which Compose's
+         setContent{} triggers internally); ships inside the appcompat
+         artifact itself, no Material Components dependency needed. Non
+         DayNight, to preserve this app's existing fixed-light behavior. -->
+    <style name="Theme.Trails" parent="Theme.AppCompat.Light.NoActionBar" />
 </resources>

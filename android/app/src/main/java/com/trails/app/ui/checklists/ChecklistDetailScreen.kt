@@ -28,9 +28,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
@@ -42,9 +44,11 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
     val checklistWithItems by viewModel.checklist.collectAsState()
     val newItemText by viewModel.newItemText.collectAsState()
     val error by viewModel.error.collectAsState()
+    val errorRes by viewModel.errorRes.collectAsState()
+    val errorText = error ?: errorRes?.let { stringResource(it) }
 
     val scrollState = rememberScrollState()
-    LaunchedEffect(error) { if (error != null) scrollState.animateScrollTo(0) }
+    LaunchedEffect(errorText) { if (errorText != null) scrollState.animateScrollTo(0) }
 
     Column(
         modifier = Modifier
@@ -54,11 +58,11 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        error?.let { ErrorBanner(it) }
+        errorText?.let { ErrorBanner(it) }
 
         val cwi = checklistWithItems
         if (cwi == null) {
-            Text("Loading…", color = TrailsColors.TextSoft)
+            Text(stringResource(R.string.checklist_loading), color = TrailsColors.TextSoft)
         } else {
             TrailsCard {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -73,7 +77,7 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
 
                 if (cwi.items.isEmpty()) {
                     Text(
-                        "Nothing on this list yet -- add the first thing below.",
+                        stringResource(R.string.checklist_detail_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.TextSoft,
                     )
@@ -98,7 +102,7 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
                                     }
                                 }
                                 IconButton(onClick = { viewModel.deleteItem(item.id) }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Remove item", tint = TrailsColors.TextSoft)
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.checklist_remove_item_description), tint = TrailsColors.TextSoft)
                                 }
                             }
                         }
@@ -111,7 +115,7 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
                         onValueChange = viewModel::onNewItemTextChange,
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        placeholder = { Text("Add an item…") },
+                        placeholder = { Text(stringResource(R.string.checklist_add_item_placeholder)) },
                         shape = TrailsShapes.Input,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = TrailsColors.BrandAccent,
@@ -125,7 +129,7 @@ fun ChecklistDetailScreen(padding: PaddingValues, viewModel: ChecklistDetailView
                         modifier = Modifier.padding(start = 8.dp).size(44.dp),
                         colors = IconButtonDefaults.filledIconButtonColors(containerColor = TrailsColors.BrandAccent, contentColor = TrailsColors.TextOnDark),
                     ) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add item")
+                        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.checklist_add_item_description))
                     }
                 }
             }

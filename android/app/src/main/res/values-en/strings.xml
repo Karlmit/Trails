@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Trails</string>
+
+    <string name="settings_title">Settings</string>
+    <string name="settings_language_label">Language</string>
+    <string name="settings_language_description">Choose the language Trails is displayed in.</string>
+    <string name="settings_language_swedish">Swedish</string>
+    <string name="settings_language_english">English</string>
+    <string name="drawer_settings">Settings</string>
+</resources>

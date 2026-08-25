@@ -6,6 +6,9 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import java.time.Month
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * User-requested redesign: every leg of a Transport entry -- including the
@@ -120,8 +123,10 @@ fun parseFlatTypeDetails(typeDetailsJson: String?): Map<String, String> {
 fun formatStopoverDateTime(value: String): String {
     val match = Regex("\\d{4}-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})").find(value) ?: return value
     val (month, day, hour, minute) = match.destructured
-    val monthNames = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    val monthName = month.toIntOrNull()?.let { monthNames.getOrNull(it - 1) } ?: month
+    // Locale-aware month abbreviation (same java.time convention already
+    // used by TimelineFormat.kt's formatDayLabel) instead of a hardcoded
+    // English-only month name list.
+    val monthName = month.toIntOrNull()?.let { runCatching { Month.of(it).getDisplayName(TextStyle.SHORT, Locale.getDefault()) }.getOrNull() } ?: month
     return "$monthName ${day.toIntOrNull() ?: day}, $hour:$minute"
 }
 
@@ -132,8 +137,17 @@ fun formatStopoverDateTime(value: String): String {
  * arrival and the next leg's departure happen at the same real airport in
  * the overwhelming common case.
  */
-fun stopoverGapLabel(prev: FlightDraft, next: FlightDraft): String {
+// Not @Composable, deliberately -- takes the two resolved format templates
+// (stringResource(R.string.timeline_stopover_at)/timeline_stopover) as plain
+// parameters instead of resolving them itself, so this stays a pure,
+// directly unit-testable function (see TransportFlightsTest.kt).
+fun stopoverGapLabel(prev: FlightDraft, next: FlightDraft, stopoverAtTemplate: String, stopoverTemplate: String): String {
     val location = prev.arrivalLocation.trim().ifEmpty { next.departureLocation.trim() }
-    val suffix = if (location.isNotEmpty()) " at $location" else ""
-    return "⏱ Stopover$suffix: ${formatStopoverClock(prev.arrivalAt)}–${formatStopoverClock(next.departureAt)}"
+    val from = formatStopoverClock(prev.arrivalAt)
+    val to = formatStopoverClock(next.departureAt)
+    return if (location.isNotEmpty()) {
+        String.format(stopoverAtTemplate, location, from, to)
+    } else {
+        String.format(stopoverTemplate, from, to)
+    }
 }

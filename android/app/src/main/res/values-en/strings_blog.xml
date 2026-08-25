@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="blog_empty_state">No posts published yet.\nWrite about the trip -- it\'ll show up here.</string>
+    <string name="blog_loading">Loading…</string>
+
+    <string name="blog_new_post_title">New blog post</string>
+    <string name="blog_edit_post_title">Edit blog post</string>
+    <string name="blog_lost_formatting_warning">This post has formatting (tables, code blocks, …) from the web editor that this editor doesn\'t preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.</string>
+    <string name="blog_title_label">Title *</string>
+    <string name="blog_date_label">Date</string>
+    <string name="blog_private_label">Private (only visible to you)</string>
+    <string name="blog_formatting_hint">Select text and tap B/I/U to format it, or place your cursor and tap one before typing. Use ¶/H1/H2/H3/•/1. to change a block\'s type.</string>
+
+    <string name="blog_remove_image_desc">Remove image</string>
+    <string name="blog_uploading_image">Uploading image…</string>
+    <string name="blog_uploading">Uploading…</string>
+    <string name="blog_add_image">+ Add image</string>
+
+    <string name="blog_save_button">Save</string>
+    <string name="blog_unpublish_button">Unpublish</string>
+    <string name="blog_publish_button">Publish</string>
+    <string name="blog_delete_post_button">Delete post</string>
+
+    <string name="blog_delete_confirm_title">Delete this Blog Post?</string>
+    <string name="blog_delete_confirm_text">This cannot be undone.</string>
+    <string name="blog_delete_confirm_button">Delete</string>
+    <string name="blog_cancel_button">Cancel</string>
+
+    <string name="blog_remove_block_desc">Remove block</string>
+    <string name="blog_add_bullet">+ Bullet</string>
+    <string name="blog_add_number">+ Number</string>
+    <string name="blog_add_paragraph">+ Paragraph</string>
+
+    <string name="blog_untitled_default">Untitled</string>
+    <string name="blog_error_upload_failed">Could not upload this image.</string>
+    <string name="blog_error_title_required">Title is required.</string>
+    <string name="blog_error_save_failed">Failed to save Blog Post.</string>
+    <string name="blog_error_publish_failed">Failed to publish.</string>
+    <string name="blog_error_unpublish_failed">Failed to unpublish.</string>
+    <string name="blog_error_delete_failed">Failed to delete.</string>
+</resources>

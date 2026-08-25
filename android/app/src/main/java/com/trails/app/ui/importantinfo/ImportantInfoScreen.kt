@@ -25,8 +25,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
@@ -43,7 +45,7 @@ fun ImportantInfoScreen(padding: PaddingValues, onOpenItem: (String?) -> Unit = 
         if (items.isEmpty()) {
             EmptyState(
                 emoji = "📌",
-                message = "No important info yet.\nAddresses, references, the plan B -- keep it here.",
+                message = stringResource(R.string.info_empty_state),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
@@ -89,10 +91,10 @@ private fun ImportantInfoCard(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
                     IconButton(onClick = { onMove("up") }, enabled = !isFirst) {
-                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", tint = if (isFirst) TrailsColors.TextSoft else TrailsColors.Brand)
+                        Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.info_move_up_description), tint = if (isFirst) TrailsColors.TextSoft else TrailsColors.Brand)
                     }
                     IconButton(onClick = { onMove("down") }, enabled = !isLast) {
-                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", tint = if (isLast) TrailsColors.TextSoft else TrailsColors.Brand)
+                        Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.info_move_down_description), tint = if (isLast) TrailsColors.TextSoft else TrailsColors.Brand)
                     }
                 }
             }

@@ -1,8 +1,10 @@
 package com.trails.app.ui.overview
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.network.dto.TripRequest
@@ -28,7 +30,15 @@ data class TripEditState(
     // launch) as ACTIVE regardless of its dates.
     val pinnedActive: Boolean = false,
     val saving: Boolean = false,
+    // Dynamic, server-provided error text (e.g. from a thrown exception) --
+    // takes precedence over [errorRes] when non-null.
     val error: String? = null,
+    // Known, statically-translated error case -- resolved to text by the
+    // Composable via stringResource(), since a ViewModel can't call it.
+    // [overview_error_invalid_timezone] takes a %1$s format arg; the
+    // Composable passes [timezone] for it and other errorRes values simply
+    // ignore the unused extra argument.
+    @StringRes val errorRes: Int? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -76,14 +86,14 @@ class TripEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         if (current.name.isBlank() || current.startDate.isBlank() || current.endDate.isBlank() || current.timezone.isBlank()) {
-            _state.value = current.copy(error = "Name, start date, end date, and timezone are required.")
+            _state.value = current.copy(error = null, errorRes = R.string.overview_error_required)
             return
         }
         if (runCatching { ZoneId.of(current.timezone) }.isFailure) {
-            _state.value = current.copy(error = "\"${current.timezone}\" isn't a valid IANA timezone (e.g. Europe/Stockholm).")
+            _state.value = current.copy(error = null, errorRes = R.string.overview_error_invalid_timezone)
             return
         }
-        _state.value = current.copy(saving = true, error = null)
+        _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             val request = TripRequest(
                 name = current.name.trim(),
@@ -100,18 +110,28 @@ class TripEditViewModel @Inject constructor(
             }.onSuccess { result ->
                 _state.value = _state.value.copy(saving = false, saved = true, tripId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Trip.")
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.overview_error_save_failed else null,
+                )
             }
         }
     }
 
     fun delete() {
         val id = _state.value.tripId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { repository.deleteTrip(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete Trip.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.overview_error_delete_failed else null,
+                    )
+                }
         }
     }
 }

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English override strings for Sections, Important Info, Documents,
+     Budget, Travel Mode, and Overview/Trip Edit. -->
+<resources>
+    <!-- Sections -->
+    <string name="section_empty_state">No sections yet.\nSplit the trip into legs -- a city, a leg, a house.</string>
+    <string name="section_edit_title_new">New section</string>
+    <string name="section_edit_title_edit">Edit section</string>
+    <string name="section_edit_subtitle">A leg of the trip -- give it a name, dates, and a look of its own.</string>
+    <string name="section_field_name">Name</string>
+    <string name="section_field_start_date">Start date</string>
+    <string name="section_field_end_date">End date</string>
+    <string name="section_field_color">COLOR</string>
+    <string name="section_field_emoji">EMOJI</string>
+    <string name="section_action_create">Create section</string>
+    <string name="section_action_save">Save changes</string>
+    <string name="section_action_delete">Delete section</string>
+    <string name="section_delete_dialog_title">Delete this Section?</string>
+    <string name="section_delete_dialog_message">This cannot be undone.</string>
+    <string name="section_dialog_confirm_delete">Delete</string>
+    <string name="section_dialog_cancel">Cancel</string>
+    <string name="section_error_required">Name, start date, and end date are required.</string>
+    <string name="section_error_save_failed">Failed to save Section.</string>
+    <string name="section_error_delete_failed">Failed to delete Section.</string>
+
+    <!-- Important Info -->
+    <string name="info_empty_state">No important info yet.\nAddresses, references, the plan B -- keep it here.</string>
+    <string name="info_move_up_description">Move up</string>
+    <string name="info_move_down_description">Move down</string>
+    <string name="info_edit_title_new">New important info</string>
+    <string name="info_edit_title_edit">Edit important info</string>
+    <string name="info_edit_subtitle">The stuff nobody wants to dig for -- addresses, references, the plan B.</string>
+    <string name="info_field_title">Title *</string>
+    <string name="info_field_description">Description</string>
+    <string name="info_field_emoji">Emoji (optional)</string>
+    <string name="info_field_private">Private -- hidden from Guests</string>
+    <string name="info_action_create">Create</string>
+    <string name="info_action_save">Save changes</string>
+    <string name="info_documents_photos_heading">Documents &amp; photos</string>
+    <string name="info_add_photo">+ Add photo</string>
+    <string name="info_add_document">+ Add document</string>
+    <string name="info_action_delete">Delete</string>
+    <string name="info_delete_dialog_title">Delete this item?</string>
+    <string name="info_delete_dialog_message">This cannot be undone.</string>
+    <string name="info_dialog_confirm_delete">Delete</string>
+    <string name="info_dialog_cancel">Cancel</string>
+    <string name="info_error_title_required">Title is required.</string>
+    <string name="info_error_add_tag_failed">Failed to add tag.</string>
+    <string name="info_error_remove_tag_failed">Failed to remove tag.</string>
+    <string name="info_error_upload_photo_failed">Failed to upload photo.</string>
+    <string name="info_error_delete_photo_failed">Failed to delete photo.</string>
+    <string name="info_error_upload_document_failed">Failed to upload document.</string>
+    <string name="info_error_add_link_failed">Failed to add link.</string>
+    <string name="info_error_remove_link_failed">Failed to remove link.</string>
+    <string name="info_error_save_failed">Failed to save.</string>
+    <string name="info_error_delete_failed">Failed to delete.</string>
+
+    <!-- Documents -->
+    <string name="document_empty_state">No documents yet.\nTickets, vouchers, confirmations -- upload them here.</string>
+    <string name="document_size_bytes">%1$d B</string>
+    <string name="document_size_kb">%1$d KB</string>
+    <string name="document_size_mb">%1$.1f MB</string>
+
+    <!-- Budget -->
+    <string name="budget_empty_state">No expenses recorded yet.\nAdd one to an Entry and it\'ll show up here.</string>
+    <string name="budget_line_total">Total: %1$.2f %2$s</string>
+    <string name="budget_line_unpaid">Unpaid: %1$.2f %2$s</string>
+
+    <!-- Travel Mode -->
+    <string name="travelmode_empty_upcoming">This trip hasn\'t started yet.\nTravel Mode wakes up once you\'re on the move.</string>
+    <string name="travelmode_empty_completed">This trip has ended.\nHope it was a good one.</string>
+    <string name="travelmode_loading">Loading…</string>
+    <string name="travelmode_right_now_title">🧭 Right now</string>
+    <string name="travelmode_up_next_title">⏭️ Up next</string>
+    <string name="travelmode_today_itinerary_title">📅 Today\'s full itinerary</string>
+    <string name="travelmode_label_section">Section</string>
+    <string name="travelmode_label_stay">Stay</string>
+    <string name="travelmode_label_activity">Activity</string>
+    <string name="travelmode_label_next_up">Next up</string>
+    <string name="travelmode_label_next_transport">Next Transport</string>
+    <string name="travelmode_label_next_activity">Next Activity</string>
+    <string name="travelmode_label_next_stay">Next Stay</string>
+    <string name="travelmode_no_entries_today">Nothing on the Timeline for today.</string>
+    <string name="travelmode_no_section_today">No Section covers today</string>
+    <string name="travelmode_nothing_scheduled">Nothing scheduled</string>
+    <string name="travelmode_map_link">Map</string>
+
+    <!-- Overview / Trip Edit -->
+    <string name="overview_loading">Loading…</string>
+    <string name="overview_timezone_label">Timezone: %1$s</string>
+    <string name="overview_date_range_days">%1$s → %2$s · %3$d days</string>
+    <string name="overview_action_edit_trip">Edit trip</string>
+    <string name="overview_topbar_title_new">New Trip</string>
+    <string name="overview_topbar_title_edit">Edit Trip</string>
+    <string name="overview_back_description">Back</string>
+    <string name="overview_edit_title_new">New trip</string>
+    <string name="overview_edit_title_details">Trip details</string>
+    <string name="overview_edit_subtitle">Where you\'re going and when -- everything else builds on this.</string>
+    <string name="overview_field_name">Name</string>
+    <string name="overview_field_destination">Destination (optional)</string>
+    <string name="overview_field_start_date">Start date</string>
+    <string name="overview_field_end_date">End date</string>
+    <string name="overview_field_timezone">Timezone (IANA, e.g. Europe/Stockholm)</string>
+    <string name="overview_field_description">Description (optional)</string>
+    <string name="overview_field_pinned_active">Mark as active</string>
+    <string name="overview_action_create_trip">Create trip</string>
+    <string name="overview_action_save_changes">Save changes</string>
+    <string name="overview_action_delete_trip">Delete trip</string>
+    <string name="overview_delete_trip_dialog_title">Delete this Trip?</string>
+    <string name="overview_delete_trip_dialog_message">This deletes the Trip and everything in it. This cannot be undone.</string>
+    <string name="overview_dialog_confirm_delete">Delete</string>
+    <string name="overview_dialog_cancel">Cancel</string>
+    <string name="overview_error_required">Name, start date, end date, and timezone are required.</string>
+    <string name="overview_error_invalid_timezone">\"%1$s\" isn\'t a valid IANA timezone (e.g. Europe/Stockholm).</string>
+    <string name="overview_error_save_failed">Failed to save Trip.</string>
+    <string name="overview_error_delete_failed">Failed to delete Trip.</string>
+</resources>

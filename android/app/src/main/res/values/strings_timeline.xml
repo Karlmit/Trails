@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TimelineScreen.kt -->
+    <string name="timeline_no_trip_data">Ingen resedata än</string>
+    <string name="timeline_no_sections_yet">Inga sektioner än.</string>
+    <string name="timeline_today_badge">IDAG</string>
+    <string name="timeline_no_entries">Inga poster än</string>
+    <string name="timeline_read_post">Läs inlägg →</string>
+
+    <!-- TimelineFormat.kt -->
+    <string name="timeline_check_in">Incheckning</string>
+    <string name="timeline_check_in_at">Incheckning %1$s</string>
+    <string name="timeline_check_out">Utcheckning</string>
+    <string name="timeline_check_out_at">Utcheckning %1$s</string>
+    <string name="timeline_departure">Avgång</string>
+    <string name="timeline_departure_at">Avgång %1$s</string>
+    <string name="timeline_departure_colon">Avgång: %1$s</string>
+    <string name="timeline_arrival">Ankomst</string>
+    <string name="timeline_arrival_at">Ankomst %1$s</string>
+    <string name="timeline_arrival_colon">Ankomst: %1$s</string>
+    <string name="timeline_flight_number_fallback">Flyg %1$d</string>
+    <string name="timeline_stopover">⏱ Uppehåll: %1$s–%2$s</string>
+    <string name="timeline_stopover_at">⏱ Uppehåll vid %1$s: %2$s–%3$s</string>
+
+    <!-- TimelineColors.kt: subtype labels -->
+    <string name="timeline_subtype_hotel">Hotell</string>
+    <string name="timeline_subtype_hostel">Vandrarhem</string>
+    <string name="timeline_subtype_resort">Resort</string>
+    <string name="timeline_subtype_apartment">Lägenhet</string>
+    <string name="timeline_subtype_villa">Villa</string>
+    <string name="timeline_subtype_guesthouse">Gästhus</string>
+    <string name="timeline_subtype_other">Övrigt</string>
+    <string name="timeline_subtype_flight">Flyg</string>
+    <string name="timeline_subtype_train">Tåg</string>
+    <string name="timeline_subtype_ferry">Färja</string>
+    <string name="timeline_subtype_bus">Buss</string>
+    <string name="timeline_subtype_car">Bil</string>
+    <string name="timeline_subtype_taxi">Taxi</string>
+    <string name="timeline_subtype_transfer">Transfer</string>
+    <string name="timeline_subtype_tour">Guidad tur</string>
+    <string name="timeline_subtype_restaurant">Restaurang</string>
+    <string name="timeline_subtype_attraction">Sevärdhet</string>
+    <string name="timeline_subtype_event">Evenemang</string>
+    <string name="timeline_subtype_beach">Strand</string>
+    <string name="timeline_subtype_hike">Vandring</string>
+    <string name="timeline_subtype_museum">Museum</string>
+    <string name="timeline_subtype_shopping">Shopping</string>
+    <string name="timeline_subtype_nightlife">Nattliv</string>
+
+    <!-- TimelineColors.kt: entry type labels -->
+    <string name="timeline_entry_type_stay">Boende</string>
+    <string name="timeline_entry_type_transport">Transport</string>
+    <string name="timeline_entry_type_activity">Aktivitet</string>
+    <string name="timeline_entry_type_note">Anteckning</string>
+    <string name="timeline_entry_type_blog_post">Blogginlägg</string>
+
+    <!-- EntryDetailScreen.kt -->
+    <string name="timeline_loading">Läser in…</string>
+    <string name="timeline_field_when">När</string>
+    <string name="timeline_field_location">Plats</string>
+    <string name="timeline_open_in_maps">Öppna i Google Maps</string>
+    <string name="timeline_field_website">Webbplats</string>
+    <string name="timeline_field_booking_reference">Bokningsreferens</string>
+    <string name="timeline_field_booked_via">Bokad via</string>
+    <string name="timeline_field_expense">Utgift</string>
+    <string name="timeline_field_contact">Kontakt</string>
+    <string name="timeline_field_itinerary">Resplan</string>
+    <string name="timeline_field_notes">Anteckningar</string>
+    <string name="timeline_field_post_trip_notes">Anteckningar efter resan</string>
+    <string name="timeline_photos_attachments">Foton och bilagor</string>
+    <string name="timeline_add_photo">+ Lägg till foto</string>
+    <string name="timeline_add_attachment">+ Lägg till bilaga</string>
+    <string name="timeline_flight_terminal">Terminal %1$s</string>
+    <string name="timeline_flight_gate">Gate %1$s</string>
+    <string name="timeline_flight_platform">Spår %1$s</string>
+    <string name="timeline_flight_seat">Plats %1$s</string>
+
+    <!-- EntryEditScreen.kt / EntryEditViewModel.kt -->
+    <string name="timeline_new_entry_title_stay">Nytt boende</string>
+    <string name="timeline_new_entry_title_transport">Ny transport</string>
+    <string name="timeline_new_entry_title_activity">Ny aktivitet</string>
+    <string name="timeline_new_entry_title_note">Ny anteckning</string>
+    <string name="timeline_new_entry_title_default">Ny post</string>
+    <string name="timeline_edit_entry_title">Redigera post</string>
+    <string name="timeline_field_type">Typ</string>
+    <string name="timeline_field_subtype">Undertyp</string>
+    <string name="timeline_field_title">Titel</string>
+    <string name="timeline_field_location_name">Platsnamn (används som titel)</string>
+    <string name="timeline_field_description">Beskrivning (valfritt)</string>
+    <string name="timeline_field_start">Start</string>
+    <string name="timeline_field_end_optional">Slut (valfritt)</string>
+    <string name="timeline_field_location_address">Adress</string>
+    <string name="timeline_field_map_link">Kartlänk</string>
+    <string name="timeline_field_expense_amount">Belopp</string>
+    <string name="timeline_field_currency">Valuta</string>
+    <string name="timeline_field_payment_status">Betalningsstatus</string>
+    <string name="timeline_payment_status_not_set">Inte angivet</string>
+    <string name="timeline_payment_status_paid">Betald</string>
+    <string name="timeline_payment_status_unpaid">Obetald</string>
+    <string name="timeline_field_payment_note">Betalningsanteckning</string>
+    <string name="timeline_field_room_info">Ruminformation</string>
+    <string name="timeline_field_flights">Flyg</string>
+    <string name="timeline_remove">Ta bort</string>
+    <string name="timeline_field_departure_location">Avgångsplats</string>
+    <string name="timeline_field_departure_timezone">Avgångstidszon (IANA, valfritt)</string>
+    <string name="timeline_field_arrival_location">Ankomstplats</string>
+    <string name="timeline_field_arrival_timezone">Ankomsttidszon (IANA, valfritt)</string>
+    <string name="timeline_field_flight_number">Flygnummer</string>
+    <string name="timeline_field_terminal">Terminal</string>
+    <string name="timeline_field_gate">Gate</string>
+    <string name="timeline_field_platform">Spår</string>
+    <string name="timeline_field_seat">Plats</string>
+    <string name="timeline_add_flight">+ Lägg till flyg</string>
+    <string name="timeline_field_baggage_info">Bagageinformation</string>
+    <string name="timeline_field_contact_name">Kontaktnamn</string>
+    <string name="timeline_field_contact_phone">Kontakttelefon</string>
+    <string name="timeline_field_contact_email">Kontakt-e-post</string>
+    <string name="timeline_field_private">Privat – endast synligt för dig</string>
+    <string name="timeline_create_entry">Skapa post</string>
+    <string name="timeline_save_changes">Spara ändringar</string>
+    <string name="timeline_delete_entry">Ta bort post</string>
+    <string name="timeline_delete_entry_confirm_title">Ta bort denna post?</string>
+    <string name="timeline_delete_entry_confirm_body">Detta kan inte ångras.</string>
+    <string name="timeline_delete">Ta bort</string>
+    <string name="timeline_cancel">Avbryt</string>
+    <string name="timeline_error_title_required">Titel/plats krävs.</string>
+    <string name="timeline_error_flight_times_required">Minst ett flyg behöver både avgångs- och ankomsttid.</string>
+    <string name="timeline_error_start_required">Startdatum och starttid krävs.</string>
+    <string name="timeline_error_end_required">Slutdatum och sluttid krävs för %1$s.</string>
+    <string name="timeline_error_expense_both">Utgift kräver både ett belopp och en valuta, eller inget av det.</string>
+    <string name="timeline_error_add_link_failed">Det gick inte att lägga till länken.</string>
+    <string name="timeline_error_remove_link_failed">Det gick inte att ta bort länken.</string>
+    <string name="timeline_error_save_entry_failed">Det gick inte att spara posten.</string>
+    <string name="timeline_error_delete_entry_failed">Det gick inte att ta bort posten.</string>
+</resources>

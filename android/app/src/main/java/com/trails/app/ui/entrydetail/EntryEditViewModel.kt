@@ -1,5 +1,6 @@
 package com.trails.app.ui.entrydetail
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +12,7 @@ import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.StayEntryRequest
 import com.trails.app.network.dto.TimelineEntryWriteRequest
 import com.trails.app.network.dto.TransportEntryRequest
+import com.trails.app.R
 import com.trails.app.network.dto.diffFields
 import com.trails.app.ui.components.LinkFieldItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,13 +45,28 @@ val ACTIVITY_SUBTYPES = listOf(
 // "Paid" or "Unpaid" into the old free-text field, so those are the two
 // canonical values plus "" for not-set.
 val PAYMENT_STATUSES = listOf("", "Paid", "Unpaid")
-val PAYMENT_STATUS_LABELS = mapOf("" to "Not set", "Paid" to "Paid", "Unpaid" to "Unpaid")
 
 fun subtypesFor(entryType: String): List<String> = when (entryType) {
     "STAY" -> STAY_SUBTYPES
     "TRANSPORT" -> TRANSPORT_SUBTYPES
     "ACTIVITY" -> ACTIVITY_SUBTYPES
     else -> emptyList()
+}
+
+/**
+ * ViewModels can't call stringResource() (a Compose API), so a validation/
+ * failure message is carried as one of these instead of a raw String --
+ * EntryEditScreen.kt's own errorMessage() resolves it to display text.
+ * [EndRequiredFor] is the one case needing an interpolated, itself-
+ * translated argument (the entry type name); [Raw] carries an already-
+ * final string -- either a real (inherently untranslatable) exception
+ * message, or the one remaining hardcoded fallback for a failure with no
+ * exception message at all.
+ */
+sealed class EntryEditError {
+    data class Fixed(@StringRes val resId: Int) : EntryEditError()
+    data class EndRequiredFor(val entryType: String) : EntryEditError()
+    data class Raw(val text: String) : EntryEditError()
 }
 
 data class EntryEditState(
@@ -89,7 +106,7 @@ data class EntryEditState(
     val flights: List<FlightDraft> = listOf(FlightDraft()),
     val links: List<LinkFieldItem> = emptyList(),
     val saving: Boolean = false,
-    val error: String? = null,
+    val error: EntryEditError? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -256,7 +273,7 @@ class EntryEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.createLink(OWNER_TYPE, ownerId, url, label) }
                 .onSuccess { created -> _state.value = _state.value.copy(links = _state.value.links + LinkFieldItem(created.id, created.url, created.label)) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to add link.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_add_link_failed)) }
         }
     }
 
@@ -268,7 +285,7 @@ class EntryEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { linksTagsRepository.deleteLink(link.id) }
                 .onSuccess { _state.value = _state.value.copy(links = _state.value.links.filterNot { it.id == link.id }) }
-                .onFailure { e -> _state.value = _state.value.copy(error = e.message ?: "Failed to remove link.") }
+                .onFailure { e -> _state.value = _state.value.copy(error = e.message?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_remove_link_failed)) }
         }
     }
 
@@ -402,25 +419,25 @@ class EntryEditViewModel @Inject constructor(
         val current = _state.value
         val effectiveTitle = if (current.entryType == "NOTE") current.title else current.locationName
         if (effectiveTitle.isBlank()) {
-            _state.value = current.copy(error = "Title/location is required.")
+            _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_title_required))
             return
         }
         // Transport's own startAt/endAt are no longer directly editable --
         // at least one Flight needs both of its own times set instead.
         if (current.entryType == "TRANSPORT") {
             if (validFlightsOf(current).isEmpty()) {
-                _state.value = current.copy(error = "At least one Flight needs both a departure and arrival date/time.")
+                _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_flight_times_required))
                 return
             }
         } else if (current.startAt.isBlank()) {
-            _state.value = current.copy(error = "A start date & time is required.")
+            _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_start_required))
             return
         } else if (current.entryType != "NOTE" && current.entryType != "ACTIVITY" && current.endAt.isBlank()) {
-            _state.value = current.copy(error = "An end date & time is required for ${current.entryType}.")
+            _state.value = current.copy(error = EntryEditError.EndRequiredFor(current.entryType))
             return
         }
         if (current.entryType != "NOTE" && current.expenseAmount.isNotBlank() != current.expenseCurrency.isNotBlank()) {
-            _state.value = current.copy(error = "Expense requires both an amount and a currency, or neither.")
+            _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_expense_both))
             return
         }
         _state.value = current.copy(saving = true, error = null)
@@ -437,7 +454,7 @@ class EntryEditViewModel @Inject constructor(
                 }
                 _state.value = _state.value.copy(saving = false, saved = true, entryId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save entry.")
+                _state.value = _state.value.copy(saving = false, error = e.message?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_save_entry_failed))
             }
         }
     }
@@ -448,7 +465,7 @@ class EntryEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.deleteTimelineEntry(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete entry.") }
+                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_delete_entry_failed)) }
         }
     }
 }

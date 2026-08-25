@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Multi-language support: Swedish (default/fallback) strings for the
+     shared/reusable Composables in ui/components/. Overridden by
+     values-en/strings_shared_components.xml. Kept in a separate file
+     (rather than values/strings.xml) so parallel agents extracting strings
+     from other parts of the app don't collide on the same file. -->
+<resources>
+    <string name="shared_none">Ingen</string>
+    <string name="shared_remove_option_from_list">Ta bort %1$s från listan</string>
+    <string name="shared_new_category_placeholder">Ny kategori</string>
+    <string name="shared_add_button">Lägg till</string>
+    <string name="shared_add_new_option">+ Lägg till ny</string>
+
+    <string name="shared_add_tag_placeholder">Lägg till tagg</string>
+    <string name="shared_remove_tag">Ta bort %1$s</string>
+    <string name="shared_pick_date">Välj datum</string>
+    <string name="shared_pick_time">Välj tid</string>
+    <string name="shared_ok_button">OK</string>
+    <string name="shared_cancel_button">Avbryt</string>
+
+    <string name="shared_links_label">LÄNKAR</string>
+    <string name="shared_remove_link">Ta bort länk</string>
+    <string name="shared_url_placeholder">https://…</string>
+    <string name="shared_link_label_placeholder">Etikett (valfritt)</string>
+
+    <string name="shared_tags_label">TAGGAR</string>
+</resources>

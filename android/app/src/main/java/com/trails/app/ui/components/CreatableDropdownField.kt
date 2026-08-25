@@ -25,7 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
@@ -58,8 +60,9 @@ fun CreatableDropdownField(
             onExpandedChange = { expanded = it },
             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         ) {
+            val noneLabel = stringResource(R.string.shared_none)
             OutlinedTextField(
-                value = selected ?: "None",
+                value = selected ?: noneLabel,
                 onValueChange = {},
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth().menuAnchor(),
@@ -73,14 +76,14 @@ fun CreatableDropdownField(
                 ),
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false; addingNew = false }) {
-                DropdownMenuItem(text = { Text("None") }, onClick = { onSelected(null); expanded = false })
+                DropdownMenuItem(text = { Text(noneLabel) }, onClick = { onSelected(null); expanded = false })
                 options.forEach { option ->
                     DropdownMenuItem(
                         text = {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(option, modifier = Modifier.weight(1f))
                                 IconButton(onClick = { onRemoveOption(option) }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Remove $option from list")
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.shared_remove_option_from_list, option))
                                 }
                             }
                         },
@@ -94,7 +97,7 @@ fun CreatableDropdownField(
                             onValueChange = { newValue = it },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
-                            placeholder = { Text("New category") },
+                            placeholder = { Text(stringResource(R.string.shared_new_category_placeholder)) },
                             shape = TrailsShapes.Input,
                         )
                         TextButton(onClick = {
@@ -106,10 +109,10 @@ fun CreatableDropdownField(
                             newValue = ""
                             addingNew = false
                             expanded = false
-                        }) { Text("Add") }
+                        }) { Text(stringResource(R.string.shared_add_button)) }
                     }
                 } else {
-                    DropdownMenuItem(text = { Text("+ Add new") }, onClick = { addingNew = true })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.shared_add_new_option)) }, onClick = { addingNew = true })
                 }
             }
         }

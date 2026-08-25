@@ -1,5 +1,8 @@
 package com.trails.app.ui.timeline.graph
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.trails.app.R
 import com.trails.app.ui.entrydetail.formatStopoverClock
 import com.trails.app.ui.entrydetail.parseFlights
 import java.time.Instant
@@ -44,22 +47,23 @@ data class DayLineLabel(val hidden: Boolean, val title: String, val subtitle: St
 // now only visible on its check-in/check-out days, each with its own time
 // as a subtitle below the name (rather than folded into one inline string
 // the way Transport's Departure/Arrival still is).
+@Composable
 private fun stayEndpointSubtitle(line: TimelineDayLine, tripTimezone: String): String {
     val parts = mutableListOf<String>()
     if (line.isStart) {
         val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
         parts += if (hour != 0 || minute != 0) {
-            "Check-in ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}"
+            stringResource(R.string.timeline_check_in_at, formatHHMM(line.startAt, line.startTimezone, tripTimezone))
         } else {
-            "Check-in"
+            stringResource(R.string.timeline_check_in)
         }
     }
     if (line.isEnd && line.endAt != null) {
         val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
         parts += if (hour != 0 || minute != 0) {
-            "Check-out ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}"
+            stringResource(R.string.timeline_check_out_at, formatHHMM(line.endAt, line.endTimezone, tripTimezone))
         } else {
-            "Check-out"
+            stringResource(R.string.timeline_check_out)
         }
     }
     return parts.joinToString(" · ")
@@ -92,6 +96,7 @@ private fun formatLayoverDuration(arrivalAt: String, departureAt: String): Strin
 // the far right of the whole row -- plain inline text, same single-string-
 // per-line shape every other subtitle already uses. Mirrors
 // app/(web)/trips/[tripId]/timeline/page.tsx::transportItinerarySubtitle.
+@Composable
 private fun transportItinerarySubtitle(typeDetailsJson: String?): String? {
     val flights = parseFlights(typeDetailsJson)
     // A single Flight is today's exact plain behavior -- no breakdown needed.
@@ -110,15 +115,20 @@ private fun transportItinerarySubtitle(typeDetailsJson: String?): String? {
         // before it) clock time that layover needs -- both, for the rare
         // flight with a layover on each side.
         val times = mutableListOf<String>()
-        if (index > 0) times += "Departure: ${formatStopoverClock(flight.departureAt)}"
-        if (index < flights.size - 1) times += "Arrival: ${formatStopoverClock(flight.arrivalAt)}"
-        val flightLabel = if (flight.flightNumber.isNotBlank()) "✈ ${flight.flightNumber}" else "✈ Flight ${index + 1}"
+        if (index > 0) times += stringResource(R.string.timeline_departure_colon, formatStopoverClock(flight.departureAt))
+        if (index < flights.size - 1) times += stringResource(R.string.timeline_arrival_colon, formatStopoverClock(flight.arrivalAt))
+        val flightLabel = if (flight.flightNumber.isNotBlank()) {
+            "✈ ${flight.flightNumber}"
+        } else {
+            "✈ " + stringResource(R.string.timeline_flight_number_fallback, index + 1)
+        }
         lines += if (times.isNotEmpty()) "$flightLabel (${times.joinToString(" · ")})" else flightLabel
     }
     return lines.joinToString("\n")
 }
 
 /** lib/(web)/trips/[tripId]/timeline/page.tsx::dayLineLabel */
+@Composable
 fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
     if (line.entryType == "STAY") {
         if (!line.isStart && !line.isEnd) {
@@ -135,18 +145,18 @@ fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
         if (line.isStart) {
             val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
             val title = if (hour != 0 || minute != 0) {
-                "${line.title} · Departure ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}"
+                "${line.title} · " + stringResource(R.string.timeline_departure_at, formatHHMM(line.startAt, line.startTimezone, tripTimezone))
             } else {
-                "${line.title} · Departure"
+                "${line.title} · " + stringResource(R.string.timeline_departure)
             }
             return DayLineLabel(hidden = false, title = title, subtitle = transportItinerarySubtitle(line.typeDetailsJson), showSubtype = false)
         }
         if (line.isEnd && line.endAt != null) {
             val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
             val title = if (hour != 0 || minute != 0) {
-                "${line.title} · Arrival ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}"
+                "${line.title} · " + stringResource(R.string.timeline_arrival_at, formatHHMM(line.endAt, line.endTimezone, tripTimezone))
             } else {
-                "${line.title} · Arrival"
+                "${line.title} · " + stringResource(R.string.timeline_arrival)
             }
             return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false)
         }

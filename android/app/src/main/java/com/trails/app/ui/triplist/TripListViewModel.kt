@@ -1,8 +1,10 @@
 package com.trails.app.ui.triplist
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
+import com.trails.app.R
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.sync.SyncScheduler
@@ -19,7 +21,12 @@ import javax.inject.Inject
 data class TripListUiState(
     val trips: List<TripEntity> = emptyList(),
     val isSyncing: Boolean = false,
+    // Dynamic, exception-provided sync error text -- takes precedence over
+    // [syncErrorRes] when non-null.
     val syncError: String? = null,
+    // Known, statically-translated sync error case -- resolved to text by
+    // the Composable via stringResource(), since a ViewModel can't call it.
+    @StringRes val syncErrorRes: Int? = null,
     // tripId -> currently running a "Save offline" full sync.
     val savingOfflineIds: Set<String> = emptySet(),
     // tripId -> the last "Save offline" attempt for it actually failed --
@@ -34,7 +41,7 @@ class TripListViewModel @Inject constructor(
     private val syncScheduler: SyncScheduler,
 ) : ViewModel() {
 
-    private data class SyncState(val isSyncing: Boolean, val error: String?)
+    private data class SyncState(val isSyncing: Boolean, val error: String?, @StringRes val errorRes: Int? = null)
 
     private val syncState = MutableStateFlow(SyncState(isSyncing = false, error = null))
     private val savingOfflineIds = MutableStateFlow<Set<String>>(emptySet())
@@ -46,7 +53,14 @@ class TripListViewModel @Inject constructor(
         savingOfflineIds,
         saveOfflineErrorIds,
     ) { trips, sync, saving, saveErrors ->
-        TripListUiState(trips = trips, isSyncing = sync.isSyncing, syncError = sync.error, savingOfflineIds = saving, saveOfflineErrorIds = saveErrors)
+        TripListUiState(
+            trips = trips,
+            isSyncing = sync.isSyncing,
+            syncError = sync.error,
+            syncErrorRes = sync.errorRes,
+            savingOfflineIds = saving,
+            saveOfflineErrorIds = saveErrors,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TripListUiState())
 
     init {
@@ -62,7 +76,11 @@ class TripListViewModel @Inject constructor(
             } catch (e: Exception) {
                 // A failed refresh while offline is expected, not fatal --
                 // whatever trips are already cached below stay fully usable.
-                syncState.value = SyncState(isSyncing = false, error = e.message ?: "Could not refresh trips")
+                syncState.value = SyncState(
+                    isSyncing = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.shell_trip_sync_error else null,
+                )
             }
         }
     }

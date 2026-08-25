@@ -1,8 +1,10 @@
 package com.trails.app.ui.checklists
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.ChecklistRepository
 import com.trails.app.data.ChecklistWithItems
 import com.trails.app.network.dto.ChecklistItemRequest
@@ -37,8 +39,20 @@ class ChecklistDetailViewModel @Inject constructor(
     private val _newItemText = MutableStateFlow("")
     val newItemText: StateFlow<String> = _newItemText
 
+    // Two fields because an error can come from either a network/exception
+    // message (arbitrary runtime text -- can't be a string resource) or one
+    // of this ViewModel's own hardcoded fallback messages (must be a
+    // @StringRes so ChecklistDetailScreen can localize it via
+    // stringResource -- ViewModels can't call that Compose API directly).
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+    private val _errorRes = MutableStateFlow<Int?>(null)
+    val errorRes: StateFlow<Int?> = _errorRes
+
+    private fun setError(e: Throwable, @StringRes fallback: Int) {
+        _error.value = e.message
+        _errorRes.value = if (e.message == null) fallback else null
+    }
 
     fun onNewItemTextChange(value: String) {
         _newItemText.value = value
@@ -50,14 +64,14 @@ class ChecklistDetailViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.createChecklistItem(ChecklistItemRequest(checklistId = checklistId, text = text)) }
                 .onSuccess { _newItemText.value = "" }
-                .onFailure { e -> _error.value = e.message ?: "Failed to add item." }
+                .onFailure { e -> setError(e, R.string.checklist_error_add_item_failed) }
         }
     }
 
     fun deleteItem(itemId: String) {
         viewModelScope.launch {
             runCatching { repository.deleteChecklistItem(itemId) }
-                .onFailure { e -> _error.value = e.message ?: "Failed to delete item." }
+                .onFailure { e -> setError(e, R.string.checklist_error_delete_item_failed) }
         }
     }
 
@@ -70,5 +84,6 @@ class ChecklistDetailViewModel @Inject constructor(
 
     fun dismissError() {
         _error.value = null
+        _errorRes.value = null
     }
 }

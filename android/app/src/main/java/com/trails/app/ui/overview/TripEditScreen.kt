@@ -28,8 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.CheckboxRow
 import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.ErrorBanner
@@ -62,14 +64,14 @@ fun TripEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        if (state.tripId == null) "New Trip" else "Edit Trip",
+                        if (state.tripId == null) stringResource(R.string.overview_topbar_title_new) else stringResource(R.string.overview_topbar_title_edit),
                         color = TrailsColors.Brand,
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TrailsColors.Brand)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.overview_back_description), tint = TrailsColors.Brand)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),
@@ -85,26 +87,27 @@ fun TripEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            state.error?.let { ErrorBanner(it) }
+            val error = state.error ?: state.errorRes?.let { stringResource(it, state.timezone) }
+            error?.let { ErrorBanner(it) }
 
             TrailsCard {
                 ScreenHeading(
                     emoji = "🧳",
-                    title = if (isNew) "New trip" else "Trip details",
-                    subtitle = "Where you're going and when -- everything else builds on this.",
+                    title = if (isNew) stringResource(R.string.overview_edit_title_new) else stringResource(R.string.overview_edit_title_details),
+                    subtitle = stringResource(R.string.overview_edit_subtitle),
                 )
 
-                LabeledField(label = "Name", value = state.name, onValueChange = viewModel::onNameChange)
-                LabeledField(label = "Destination (optional)", value = state.destination, onValueChange = viewModel::onDestinationChange)
-                DatePickerField(label = "Start date", isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
-                DatePickerField(label = "End date", isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
-                LabeledField(label = "Timezone (IANA, e.g. Europe/Stockholm)", value = state.timezone, onValueChange = viewModel::onTimezoneChange)
-                MultilineLabeledField(label = "Description (optional)", value = state.description, onValueChange = viewModel::onDescriptionChange)
+                LabeledField(label = stringResource(R.string.overview_field_name), value = state.name, onValueChange = viewModel::onNameChange)
+                LabeledField(label = stringResource(R.string.overview_field_destination), value = state.destination, onValueChange = viewModel::onDestinationChange)
+                DatePickerField(label = stringResource(R.string.overview_field_start_date), isoDate = state.startDate, onDateChange = viewModel::onStartDateChange)
+                DatePickerField(label = stringResource(R.string.overview_field_end_date), isoDate = state.endDate, onDateChange = viewModel::onEndDateChange)
+                LabeledField(label = stringResource(R.string.overview_field_timezone), value = state.timezone, onValueChange = viewModel::onTimezoneChange)
+                MultilineLabeledField(label = stringResource(R.string.overview_field_description), value = state.description, onValueChange = viewModel::onDescriptionChange)
                 // User-requested: a manual override so this Trip reads as
                 // Active regardless of its dates -- the Android app
                 // auto-opens the single Active trip's Timeline on launch.
                 CheckboxRow(
-                    label = "Mark as active",
+                    label = stringResource(R.string.overview_field_pinned_active),
                     checked = state.pinnedActive,
                     onCheckedChange = viewModel::onPinnedActiveChange,
                 )
@@ -113,7 +116,7 @@ fun TripEditScreen(
                     CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
                 } else {
                     PillButton(
-                        text = if (isNew) "Create trip" else "Save changes",
+                        text = if (isNew) stringResource(R.string.overview_action_create_trip) else stringResource(R.string.overview_action_save_changes),
                         onClick = viewModel::save,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -122,7 +125,7 @@ fun TripEditScreen(
 
             if (!isNew && !state.saving) {
                 PillButton(
-                    text = "Delete trip",
+                    text = stringResource(R.string.overview_action_delete_trip),
                     variant = PillButtonVariant.Danger,
                     onClick = { showDeleteConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -134,10 +137,10 @@ fun TripEditScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete this Trip?") },
-            text = { Text("This deletes the Trip and everything in it. This cannot be undone.") },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.overview_delete_trip_dialog_title)) },
+            text = { Text(stringResource(R.string.overview_delete_trip_dialog_message)) },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.overview_dialog_confirm_delete)) } },
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.overview_dialog_cancel)) } },
         )
     }
 }

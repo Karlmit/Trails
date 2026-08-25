@@ -1,6 +1,10 @@
 package com.trails.app.ui.timeline.graph
 
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 
 // Ported from lib/section-colors.ts's PALETTE/SOLID_PALETTE (the auto-cycled
@@ -80,3 +84,60 @@ val ENTRY_TYPE_LABELS = mapOf(
     "STAY" to "Stay", "TRANSPORT" to "Transport", "ACTIVITY" to "Activity",
     "NOTE" to "Note", "BLOG_POST" to "Blog Post",
 )
+
+// Localized counterparts of SUBTYPE_LABELS/ENTRY_TYPE_LABELS above -- kept as
+// separate additive maps (rather than replacing the plain-String ones) since
+// those are also consumed from a couple of ViewModels and other screens
+// outside this batch that can't call stringResource(); this batch's own
+// Composables (TimelineScreen/EntryDetailScreen/EntryEditScreen) resolve
+// through [subtypeLabelResolved]/[entryTypeLabelResolved] instead.
+private val SUBTYPE_LABEL_RES: Map<String, Int> = mapOf(
+    "HOTEL" to R.string.timeline_subtype_hotel,
+    "HOSTEL" to R.string.timeline_subtype_hostel,
+    "RESORT" to R.string.timeline_subtype_resort,
+    "APARTMENT" to R.string.timeline_subtype_apartment,
+    "VILLA" to R.string.timeline_subtype_villa,
+    "GUESTHOUSE" to R.string.timeline_subtype_guesthouse,
+    "STAY_OTHER" to R.string.timeline_subtype_other,
+    "FLIGHT" to R.string.timeline_subtype_flight,
+    "TRAIN" to R.string.timeline_subtype_train,
+    "FERRY" to R.string.timeline_subtype_ferry,
+    "BUS" to R.string.timeline_subtype_bus,
+    "CAR" to R.string.timeline_subtype_car,
+    "TAXI" to R.string.timeline_subtype_taxi,
+    "TRANSFER" to R.string.timeline_subtype_transfer,
+    "TRANSPORT_OTHER" to R.string.timeline_subtype_other,
+    "TOUR" to R.string.timeline_subtype_tour,
+    "RESTAURANT" to R.string.timeline_subtype_restaurant,
+    "ATTRACTION" to R.string.timeline_subtype_attraction,
+    "EVENT" to R.string.timeline_subtype_event,
+    "BEACH" to R.string.timeline_subtype_beach,
+    "HIKE" to R.string.timeline_subtype_hike,
+    "MUSEUM" to R.string.timeline_subtype_museum,
+    "SHOPPING" to R.string.timeline_subtype_shopping,
+    "NIGHTLIFE" to R.string.timeline_subtype_nightlife,
+    "ACTIVITY_OTHER" to R.string.timeline_subtype_other,
+)
+
+@StringRes
+private fun subtypeLabelRes(value: String): Int? = SUBTYPE_LABEL_RES[value]
+
+private val ENTRY_TYPE_LABEL_RES: Map<String, Int> = mapOf(
+    "STAY" to R.string.timeline_entry_type_stay,
+    "TRANSPORT" to R.string.timeline_entry_type_transport,
+    "ACTIVITY" to R.string.timeline_entry_type_activity,
+    "NOTE" to R.string.timeline_entry_type_note,
+    "BLOG_POST" to R.string.timeline_entry_type_blog_post,
+)
+
+@Composable
+fun subtypeLabelResolved(value: String): String {
+    val resId = subtypeLabelRes(value)
+    return if (resId != null) stringResource(resId) else value
+}
+
+@Composable
+fun entryTypeLabelResolved(value: String): String {
+    val resId = ENTRY_TYPE_LABEL_RES[value]
+    return if (resId != null) stringResource(resId) else value
+}

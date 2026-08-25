@@ -1,8 +1,10 @@
 package com.trails.app.ui.checklists
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.ChecklistRepository
 import com.trails.app.data.ChecklistWithItems
 import com.trails.app.network.dto.ChecklistRequest
@@ -23,7 +25,12 @@ data class ChecklistEditState(
     val emoji: String = "",
     val isPrivate: Boolean = false,
     val saving: Boolean = false,
+    // `error` carries dynamic (network/exception) text; `errorRes` carries
+    // one of this ViewModel's own hardcoded messages -- as a @StringRes so
+    // ChecklistEditScreen can localize it via stringResource (a Compose API
+    // this ViewModel can't call directly). Only one is ever set at a time.
     val error: String? = null,
+    @StringRes val errorRes: Int? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -56,10 +63,10 @@ class ChecklistEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         if (current.title.isBlank()) {
-            _state.value = current.copy(error = "Title is required.")
+            _state.value = current.copy(error = null, errorRes = R.string.checklist_edit_error_title_required)
             return
         }
-        _state.value = current.copy(saving = true, error = null)
+        _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             val request = ChecklistRequest(
                 tripId = tripId,
@@ -72,7 +79,11 @@ class ChecklistEditViewModel @Inject constructor(
             }.onSuccess { result ->
                 _state.value = _state.value.copy(saving = false, saved = true, checklistId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Checklist.")
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.checklist_edit_error_save_failed else null,
+                )
             }
         }
     }
@@ -82,11 +93,17 @@ class ChecklistEditViewModel @Inject constructor(
     // screen now, never the Detail/view screen.
     fun deleteChecklist() {
         val id = _state.value.checklistId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { repository.deleteChecklist(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete Checklist.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.checklist_edit_error_delete_failed else null,
+                    )
+                }
         }
     }
 }

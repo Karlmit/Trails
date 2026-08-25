@@ -95,18 +95,31 @@ class TransportFlightsTest {
         assertEquals("Sep 5, 22:00", formatStopoverDateTime("2026-09-05T22:00:00Z"))
     }
 
+    // Multi-language support: stopoverGapLabel takes its two format templates
+    // as plain parameters (rather than resolving them itself via
+    // stringResource) specifically so it stays a pure function these tests
+    // can call directly -- these are the English (values-en) templates.
+    private val stopoverAtTemplate = "⏱ Stopover at %1\$s: %2\$s–%3\$s"
+    private val stopoverTemplate = "⏱ Stopover: %1\$s–%2\$s"
+
     @Test
     fun `stopoverGapLabel prefers the earlier flight's own arrival location`() {
         val first = FlightDraft(arrivalLocation = "Dubai (DXB)", arrivalAt = "2026-08-03T14:00")
         val second = FlightDraft(departureLocation = "Dubai Intl", departureAt = "2026-08-03T15:30")
-        assertEquals("⏱ Stopover at Dubai (DXB): 14:00–15:30", stopoverGapLabel(first, second))
+        assertEquals(
+            "⏱ Stopover at Dubai (DXB): 14:00–15:30",
+            stopoverGapLabel(first, second, stopoverAtTemplate, stopoverTemplate),
+        )
     }
 
     @Test
     fun `stopoverGapLabel falls back to the next flight's departure location`() {
         val first = FlightDraft(arrivalAt = "2026-08-03T14:00")
         val second = FlightDraft(departureLocation = "Dubai (DXB)", departureAt = "2026-08-03T15:30")
-        assertEquals("⏱ Stopover at Dubai (DXB): 14:00–15:30", stopoverGapLabel(first, second))
+        assertEquals(
+            "⏱ Stopover at Dubai (DXB): 14:00–15:30",
+            stopoverGapLabel(first, second, stopoverAtTemplate, stopoverTemplate),
+        )
     }
 
     // Bug-fix regression: a `flights` JsonArray must never blank

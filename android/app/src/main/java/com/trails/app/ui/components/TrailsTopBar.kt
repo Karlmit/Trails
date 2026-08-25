@@ -2,6 +2,7 @@ package com.trails.app.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,7 +26,7 @@ import com.trails.app.ui.theme.TrailsColors
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TrailsTopBar(title: String? = null) {
+fun TrailsTopBar(title: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -41,6 +42,7 @@ fun TrailsTopBar(title: String? = null) {
                 )
             }
         },
+        actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = TrailsColors.Surface,
             titleContentColor = TrailsColors.Brand,

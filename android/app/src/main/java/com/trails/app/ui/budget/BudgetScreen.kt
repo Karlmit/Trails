@@ -20,8 +20,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.trails.app.R
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
@@ -41,7 +43,7 @@ fun BudgetScreen(
         if (groups.isEmpty()) {
             EmptyState(
                 emoji = "💰",
-                message = "No expenses recorded yet.\nAdd one to an Entry and it'll show up here.",
+                message = stringResource(R.string.budget_empty_state),
                 modifier = Modifier.align(Alignment.Center),
             )
         } else {
@@ -58,13 +60,13 @@ fun BudgetScreen(
                                 Text("💰 ${group.currency}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        "Total: %.2f %s".format(group.total, group.currency),
+                                        stringResource(R.string.budget_line_total, group.total, group.currency),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = TrailsColors.TextSoft,
                                     )
                                     if (group.unpaidTotal > 0.0) {
                                         Text(
-                                            "Unpaid: %.2f %s".format(group.unpaidTotal, group.currency),
+                                            stringResource(R.string.budget_line_unpaid, group.unpaidTotal, group.currency),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = TrailsColors.Text,
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,

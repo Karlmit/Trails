@@ -27,13 +27,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.trails.app.R
 import com.trails.app.ui.components.TripStatusBadge
 import com.trails.app.ui.theme.TrailsColors
 import kotlinx.coroutines.launch
 
 private const val ROUTE_TRIPS = "trips"
+private const val ROUTE_SETTINGS = "settings"
 
 /**
  * Mirrors TripTabs.tsx's mobile hamburger-drawer collapse -- one drawer
@@ -101,7 +104,7 @@ fun TripDrawerScaffold(
                     HorizontalDivider()
                 }
                 NavigationDrawerItem(
-                    label = { Text("← All Trips") },
+                    label = { Text(stringResource(R.string.shell_drawer_all_trips)) },
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
@@ -127,12 +130,22 @@ fun TripDrawerScaffold(
                 if (trip?.status == "ACTIVE") {
                     HorizontalDivider()
                     NavigationDrawerItem(
-                        label = { Text("Travel Mode") },
+                        label = { Text(stringResource(R.string.shell_travel_mode)) },
                         selected = false,
                         onClick = { navigateTo("travel-mode") },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
                     )
                 }
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    label = { Text(stringResource(R.string.drawer_settings)) },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(ROUTE_SETTINGS)
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                )
             }
         },
     ) {
@@ -150,7 +163,7 @@ fun TripDrawerScaffold(
                         ) {
                             Icon(
                                 if (showBackButton) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Menu,
-                                contentDescription = if (showBackButton) "Back" else "Menu",
+                                contentDescription = if (showBackButton) stringResource(R.string.shell_cd_back) else stringResource(R.string.shell_cd_menu),
                                 tint = TrailsColors.Brand,
                             )
                         }

@@ -1,9 +1,11 @@
 package com.trails.app.ui.blog
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.TripRepository
@@ -28,6 +30,18 @@ import javax.inject.Inject
 
 private const val OWNER_TYPE = "TIMELINE_ENTRY"
 
+/**
+ * A ViewModel can't call `stringResource()` (Compose-only), so a hardcoded
+ * literal error/status message is represented as a [Resource] the
+ * Composable resolves via `stringResource(id)`, while a message that
+ * genuinely came from a thrown exception (`e.message`, not under this
+ * app's translation control) stays a plain [Message].
+ */
+sealed class BlogEditError {
+    data class Message(val text: String) : BlogEditError()
+    data class Resource(@StringRes val resId: Int) : BlogEditError()
+}
+
 data class BlogEditState(
     val entryId: String? = null,
     val title: String = "",
@@ -38,7 +52,7 @@ data class BlogEditState(
     val isPublished: Boolean = false,
     val saving: Boolean = false,
     val uploadingImage: Boolean = false,
-    val error: String? = null,
+    val error: BlogEditError? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -137,7 +151,7 @@ class BlogEditViewModel @Inject constructor(
     }
 
     /** Lazily creates the Draft on the very first image (or explicit save) -- same convention as BlogPostForm.tsx's own ensurePostId. */
-    private suspend fun ensurePostId(): String {
+    private suspend fun ensurePostId(untitledLabel: String): String {
         _state.value.entryId?.let { return it }
         creatingPostId?.let { return it.await() }
 
@@ -148,7 +162,7 @@ class BlogEditViewModel @Inject constructor(
             val tripStartDate = runCatching { tripRepository.observeTrip(tripId).first()?.startDate }.getOrNull()
             val request = BlogPostRequest(
                 tripId = tripId,
-                title = current.title.trim().ifEmpty { "Untitled" },
+                title = current.title.trim().ifEmpty { untitledLabel },
                 description = null,
                 startAt = current.startAt.ifBlank { tripStartDate ?: LocalDate.now().toString() },
                 isPrivate = current.isPrivate,
@@ -165,31 +179,32 @@ class BlogEditViewModel @Inject constructor(
         }
     }
 
-    fun insertImage(uri: Uri, filename: String) {
+    fun insertImage(uri: Uri, filename: String, untitledLabel: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(uploadingImage = true, error = null)
             runCatching {
-                val postId = ensurePostId()
+                val postId = ensurePostId(untitledLabel)
                 documentsRepository.uploadPhoto(OWNER_TYPE, postId, uri, filename)
             }.onSuccess { photo ->
                 val newBlock = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
                 _state.value = _state.value.copy(uploadingImage = false, blocks = _state.value.blocks + newBlock)
             }.onFailure { e ->
-                _state.value = _state.value.copy(uploadingImage = false, error = e.message ?: "Could not upload this image.")
+                val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_upload_failed)
+                _state.value = _state.value.copy(uploadingImage = false, error = error)
             }
         }
     }
 
-    fun save() {
+    fun save(untitledLabel: String) {
         val current = _state.value
         if (current.title.isBlank()) {
-            _state.value = current.copy(error = "Title is required.")
+            _state.value = current.copy(error = BlogEditError.Resource(R.string.blog_error_title_required))
             return
         }
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
             runCatching {
-                val postId = ensurePostId()
+                val postId = ensurePostId(untitledLabel)
                 val request = BlogPostRequest(
                     tripId = tripId,
                     title = current.title.trim(),
@@ -201,7 +216,8 @@ class BlogEditViewModel @Inject constructor(
             }.onSuccess { result ->
                 _state.value = _state.value.copy(saving = false, saved = true, entryId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Blog Post.")
+                val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_save_failed)
+                _state.value = _state.value.copy(saving = false, error = error)
             }
         }
     }
@@ -212,7 +228,10 @@ class BlogEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.publishBlogPost(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, saved = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to publish.") }
+                .onFailure { e ->
+                    val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_publish_failed)
+                    _state.value = _state.value.copy(saving = false, error = error)
+                }
         }
     }
 
@@ -222,7 +241,10 @@ class BlogEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.unpublishBlogPost(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to unpublish.") }
+                .onFailure { e ->
+                    val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_unpublish_failed)
+                    _state.value = _state.value.copy(saving = false, error = error)
+                }
         }
     }
 
@@ -232,7 +254,10 @@ class BlogEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { repository.deleteTimelineEntry(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete.") }
+                .onFailure { e ->
+                    val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_delete_failed)
+                    _state.value = _state.value.copy(saving = false, error = error)
+                }
         }
     }
 }

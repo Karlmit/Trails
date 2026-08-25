@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Multi-language support: this is the app's fallback/default resource
+     set (Swedish; see themes.xml/AndroidManifest for the rest of the
+     per-app-language setup), overridden by values-en/strings.xml. -->
 <resources>
     <string name="app_name">Trails</string>
+
+    <string name="settings_title">Inställningar</string>
+    <string name="settings_language_label">Språk</string>
+    <string name="settings_language_description">Välj vilket språk Trails ska visas på.</string>
+    <string name="settings_language_swedish">Svenska</string>
+    <string name="settings_language_english">Engelska</string>
+    <string name="drawer_settings">Inställningar</string>
 </resources>

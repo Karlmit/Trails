@@ -1,8 +1,10 @@
 package com.trails.app.ui.sections
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.R
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.SectionEntity
 import com.trails.app.network.dto.SectionRequest
@@ -21,7 +23,12 @@ data class SectionEditState(
     val emoji: String? = null,
     val color: String? = null,
     val saving: Boolean = false,
+    // Dynamic, server-provided error text (e.g. from a thrown exception) --
+    // takes precedence over [errorRes] when non-null.
     val error: String? = null,
+    // Known, statically-translated error case -- resolved to text by the
+    // Composable via stringResource(), since a ViewModel can't call it.
+    @StringRes val errorRes: Int? = null,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -59,10 +66,10 @@ class SectionEditViewModel @Inject constructor(
     fun save() {
         val current = _state.value
         if (current.name.isBlank() || current.startDate.isBlank() || current.endDate.isBlank()) {
-            _state.value = current.copy(error = "Name, start date, and end date are required.")
+            _state.value = current.copy(error = null, errorRes = R.string.section_error_required)
             return
         }
-        _state.value = current.copy(saving = true, error = null)
+        _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             val request = SectionRequest(
                 tripId = tripId,
@@ -78,18 +85,28 @@ class SectionEditViewModel @Inject constructor(
             }.onSuccess {
                 _state.value = _state.value.copy(saving = false, saved = true)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to save Section.")
+                _state.value = _state.value.copy(
+                    saving = false,
+                    error = e.message,
+                    errorRes = if (e.message == null) R.string.section_error_save_failed else null,
+                )
             }
         }
     }
 
     fun delete() {
         val id = _state.value.sectionId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching { timelineRepository.deleteSection(id) }
                 .onSuccess { _state.value = _state.value.copy(saving = false, deleted = true) }
-                .onFailure { e -> _state.value = _state.value.copy(saving = false, error = e.message ?: "Failed to delete Section.") }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        saving = false,
+                        error = e.message,
+                        errorRes = if (e.message == null) R.string.section_error_delete_failed else null,
+                    )
+                }
         }
     }
 }
