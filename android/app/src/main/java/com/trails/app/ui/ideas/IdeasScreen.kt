@@ -57,40 +57,58 @@ fun IdeasScreen(
     val sections by sectionsViewModel.sections.collectAsState(initial = emptyList())
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            IdeaFilterBar(
-                filters = filters,
-                sections = sections,
-                categoryOptions = categoryOptions,
-                onPriorityChange = viewModel::onPriorityFilterChange,
-                onSectionChange = viewModel::onSectionFilterChange,
-                onCategoryChange = viewModel::onCategoryFilterChange,
-                onWeatherChange = viewModel::onWeatherFilterChange,
-                onClear = viewModel::clearFilters,
-            )
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (groups.isEmpty()) {
+        // User-requested: the filter bar must scroll away with the rest of
+        // the list, not stay pinned over the results -- it's the LazyColumn's
+        // own first item (not a fixed header above it), same as every other
+        // item, so it scrolls out of view once the user scrolls down and is
+        // only visible again after scrolling back to the top.
+        if (groups.isEmpty()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                IdeaFilterBar(
+                    filters = filters,
+                    sections = sections,
+                    categoryOptions = categoryOptions,
+                    onPriorityChange = viewModel::onPriorityFilterChange,
+                    onSectionChange = viewModel::onSectionFilterChange,
+                    onCategoryChange = viewModel::onCategoryFilterChange,
+                    onWeatherChange = viewModel::onWeatherFilterChange,
+                    onClear = viewModel::clearFilters,
+                    modifier = Modifier.padding(16.dp),
+                )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     EmptyState(
                         emoji = "💡",
                         message = if (hasAnyIdeas) stringResource(R.string.idea_empty_state_no_match) else stringResource(R.string.idea_empty_message),
                         modifier = Modifier.align(Alignment.Center),
                     )
-                } else {
-                    val noSectionLabel = stringResource(R.string.idea_no_section_label)
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                        groups.forEach { group ->
-                            item {
-                                Text(
-                                    group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: noSectionLabel,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = TrailsColors.TextSoft,
-                                    modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                                )
-                            }
-                            items(group.ideas, key = { it.idea.id }) { item ->
-                                IdeaCompactCard(item, onClick = { onOpenIdea(item.idea.id) })
-                            }
-                        }
+                }
+            }
+        } else {
+            val noSectionLabel = stringResource(R.string.idea_no_section_label)
+            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+                item {
+                    IdeaFilterBar(
+                        filters = filters,
+                        sections = sections,
+                        categoryOptions = categoryOptions,
+                        onPriorityChange = viewModel::onPriorityFilterChange,
+                        onSectionChange = viewModel::onSectionFilterChange,
+                        onCategoryChange = viewModel::onCategoryFilterChange,
+                        onWeatherChange = viewModel::onWeatherFilterChange,
+                        onClear = viewModel::clearFilters,
+                    )
+                }
+                groups.forEach { group ->
+                    item {
+                        Text(
+                            group.section?.let { buildString { if (it.emoji != null) append("${it.emoji} "); append(it.name) } } ?: noSectionLabel,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = TrailsColors.TextSoft,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                        )
+                    }
+                    items(group.ideas, key = { it.idea.id }) { item ->
+                        IdeaCompactCard(item, onClick = { onOpenIdea(item.idea.id) })
                     }
                 }
             }
@@ -108,12 +126,13 @@ private fun IdeaFilterBar(
     onCategoryChange: (String?) -> Unit,
     onWeatherChange: (String?) -> Unit,
     onClear: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val allLabel = stringResource(R.string.idea_filter_all_option)
     val priorityLabels = IDEA_PRIORITY_LABEL_RES.mapValues { (_, resId) -> stringResource(resId) }
     val weatherLabels = IDEA_WEATHER_LABEL_RES.mapValues { (_, resId) -> stringResource(resId) }
 
-    TrailsCard(modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp)) {
+    TrailsCard(modifier = modifier) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DropdownField(
                 label = stringResource(R.string.idea_edit_label_priority),
