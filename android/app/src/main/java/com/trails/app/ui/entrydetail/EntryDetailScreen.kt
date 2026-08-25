@@ -36,6 +36,7 @@ import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
+import com.trails.app.ui.timeline.graph.formatEntryEndpoint
 import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 import com.trails.app.util.entryMapsUrl
 import com.trails.app.util.openCachedFile
@@ -87,7 +88,11 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         entry.subtype?.let { append(" · ${subtypeLabelResolved(it)}") }
                     },
                 )
-                Field(stringResource(R.string.timeline_field_when), "${entry.startAt}${entry.endAt?.let { " → $it" } ?: ""}")
+                Field(
+                    stringResource(R.string.timeline_field_when),
+                    formatEntryEndpoint(entry.startAt, entry.startTimezone) +
+                        (entry.endAt?.let { " → ${formatEntryEndpoint(it, entry.endTimezone)}" } ?: ""),
+                )
                 if (entry.locationName != null || entry.locationAddress != null) {
                     Column {
                         Text(stringResource(R.string.timeline_field_location).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
@@ -123,7 +128,7 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                     Field(
                         stringResource(R.string.timeline_field_expense),
                         "${entry.expenseAmount} ${entry.expenseCurrency ?: ""}" +
-                            (entry.expensePaymentStatus?.let { " · $it" } ?: "") +
+                            (entry.expensePaymentStatus?.let { " · ${paymentStatusLabelFor(it)}" } ?: "") +
                             (entry.expensePaymentNote?.let { " · $it" } ?: ""),
                     )
                 }

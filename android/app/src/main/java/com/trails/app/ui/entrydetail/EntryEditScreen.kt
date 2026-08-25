@@ -73,7 +73,7 @@ private fun newEntryTitleFor(entryType: String): String = when (entryType) {
 }
 
 @Composable
-private fun paymentStatusLabelFor(value: String): String = when (value) {
+fun paymentStatusLabelFor(value: String): String = when (value) {
     "Paid" -> stringResource(R.string.timeline_payment_status_paid)
     "Unpaid" -> stringResource(R.string.timeline_payment_status_unpaid)
     "" -> stringResource(R.string.timeline_payment_status_not_set)

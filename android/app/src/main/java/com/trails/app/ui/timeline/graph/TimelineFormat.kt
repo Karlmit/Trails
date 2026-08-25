@@ -32,6 +32,33 @@ fun formatHHMM(isoDateTime: String, zone: String?, tripTimezone: String): String
     return "%02d:%02d%s".format(hour, minute, timezoneDisclosure(zone, tripTimezone))
 }
 
+/** True when an Entry's own recorded time is exactly midnight -- the sentinel a "no specific time" Entry (EntryEditScreen's timeRequired=false) is stored with. Mirrors components/EntryDetailPanel.tsx::hasNoSpecificTime. */
+fun hasNoSpecificTime(isoDateTime: String, zone: String?): Boolean {
+    val (hour, minute) = entryClockTime(isoDateTime, zone)
+    return hour == 0 && minute == 0
+}
+
+/** lib/trip-status.ts::formatEntryEndpointDateOnly -- date only, no clock time, locale-aware (Locale.getDefault() follows the in-app language, same as formatDayLabel above). */
+fun formatEntryEndpointDateOnly(isoDateTime: String, zone: String?): String = runCatching {
+    val date = if (zone == null) {
+        java.time.LocalDate.parse(isoDateTime.take(10))
+    } else {
+        Instant.parse(isoDateTime).atZone(ZoneId.of(zone)).toLocalDate()
+    }
+    val month = date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+    "$month ${date.dayOfMonth}, ${date.year}"
+}.getOrDefault(isoDateTime)
+
+/** lib/trip-status.ts::formatEntryEndpointDateTime -- date + clock time, locale-aware, no timezone-disclosure suffix (unlike formatHHMM -- callers with no Trip timezone in scope, e.g. EntryDetailScreen, use this directly). */
+fun formatEntryEndpointDateTime(isoDateTime: String, zone: String?): String {
+    val (hour, minute) = entryClockTime(isoDateTime, zone)
+    return "${formatEntryEndpointDateOnly(isoDateTime, zone)}, %02d:%02d".format(hour, minute)
+}
+
+/** Combines the two above exactly like components/EntryDetailPanel.tsx's own startAt/endAt rendering: date-only when the recorded time is the "no specific time" midnight sentinel, date+time otherwise. */
+fun formatEntryEndpoint(isoDateTime: String, zone: String?): String =
+    if (hasNoSpecificTime(isoDateTime, zone)) formatEntryEndpointDateOnly(isoDateTime, zone) else formatEntryEndpointDateTime(isoDateTime, zone)
+
 data class DayLabel(val monthDay: String, val weekday: String)
 
 fun formatDayLabel(dateKey: String): DayLabel = runCatching {
