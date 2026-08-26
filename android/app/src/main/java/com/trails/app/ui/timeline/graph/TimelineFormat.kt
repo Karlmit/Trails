@@ -169,25 +169,35 @@ fun dayLineLabel(line: TimelineDayLine, tripTimezone: String): DayLineLabel {
         )
     }
     if (line.entryType == "TRANSPORT") {
+        // A same-day Transport (departure and arrival both fall on this day
+        // line) is both isStart and isEnd at once -- show both endpoints
+        // instead of only the departure the two used to early-return on.
+        val parts = mutableListOf<String>()
         if (line.isStart) {
             val (hour, minute) = entryClockTime(line.startAt, line.startTimezone)
-            val title = if (hour != 0 || minute != 0) {
-                "${line.title} · " + stringResource(R.string.timeline_departure_at, formatHHMM(line.startAt, line.startTimezone, tripTimezone))
+            parts += if (hour != 0 || minute != 0) {
+                stringResource(R.string.timeline_departure_at, formatHHMM(line.startAt, line.startTimezone, tripTimezone))
             } else {
-                "${line.title} · " + stringResource(R.string.timeline_departure)
+                stringResource(R.string.timeline_departure)
             }
-            return DayLineLabel(hidden = false, title = title, subtitle = transportItinerarySubtitle(line.typeDetailsJson), showSubtype = false)
         }
         if (line.isEnd && line.endAt != null) {
             val (hour, minute) = entryClockTime(line.endAt, line.endTimezone)
-            val title = if (hour != 0 || minute != 0) {
-                "${line.title} · " + stringResource(R.string.timeline_arrival_at, formatHHMM(line.endAt, line.endTimezone, tripTimezone))
+            parts += if (hour != 0 || minute != 0) {
+                stringResource(R.string.timeline_arrival_at, formatHHMM(line.endAt, line.endTimezone, tripTimezone))
             } else {
-                "${line.title} · " + stringResource(R.string.timeline_arrival)
+                stringResource(R.string.timeline_arrival)
             }
-            return DayLineLabel(hidden = false, title = title, subtitle = null, showSubtype = false)
         }
-        return DayLineLabel(hidden = false, title = line.title, subtitle = null, showSubtype = false)
+        if (parts.isEmpty()) {
+            return DayLineLabel(hidden = false, title = line.title, subtitle = null, showSubtype = false)
+        }
+        return DayLineLabel(
+            hidden = false,
+            title = "${line.title} · " + parts.joinToString(" · "),
+            subtitle = if (line.isStart) transportItinerarySubtitle(line.typeDetailsJson) else null,
+            showSubtype = false,
+        )
     }
     return DayLineLabel(hidden = false, title = line.title, subtitle = null, showSubtype = true)
 }

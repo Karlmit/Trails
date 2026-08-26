@@ -201,23 +201,29 @@ function dayLineLabel(line: TimelineDayLine, tripTimezone: string, t: Translator
     };
   }
   if (line.entryType === 'TRANSPORT') {
+    // A same-day Transport (departure and arrival both fall on this day
+    // line) is both isStart and isEnd at once -- show both endpoints
+    // instead of only the departure the two used to early-return on.
+    const parts: string[] = [];
     if (line.isStart) {
       const { hour, minute } = entryEndpointClockTime(line.startAt, line.startTimezone);
       const hasTime = hour !== 0 || minute !== 0;
-      const title = hasTime
-        ? `${line.title} · ${t('departure')} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}`
-        : `${line.title} · ${t('departure')}`;
-      return { hidden: false, title, subtitle: transportItinerarySubtitle(line.typeDetails, t), showSubtype: false };
+      parts.push(hasTime ? `${t('departure')} ${formatHHMM(line.startAt, line.startTimezone, tripTimezone)}` : t('departure'));
     }
     if (line.isEnd && line.endAt) {
       const { hour, minute } = entryEndpointClockTime(line.endAt, line.endTimezone);
       const hasTime = hour !== 0 || minute !== 0;
-      const title = hasTime
-        ? `${line.title} · ${t('arrival')} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}`
-        : `${line.title} · ${t('arrival')}`;
-      return { hidden: false, title, subtitle: null, showSubtype: false };
+      parts.push(hasTime ? `${t('arrival')} ${formatHHMM(line.endAt, line.endTimezone, tripTimezone)}` : t('arrival'));
     }
-    return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
+    if (parts.length === 0) {
+      return { hidden: false, title: line.title, subtitle: null, showSubtype: false };
+    }
+    return {
+      hidden: false,
+      title: `${line.title} · ${parts.join(' · ')}`,
+      subtitle: line.isStart ? transportItinerarySubtitle(line.typeDetails, t) : null,
+      showSubtype: false,
+    };
   }
   return { hidden: false, title: line.title, subtitle: null, showSubtype: true };
 }
