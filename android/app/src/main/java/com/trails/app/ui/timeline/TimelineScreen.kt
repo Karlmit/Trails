@@ -36,6 +36,7 @@ import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.timeline.graph.TimelineDayWithEntries
 import com.trails.app.ui.timeline.graph.TimelineGraphColumn
 import com.trails.app.ui.timeline.graph.dayLineLabel
+import com.trails.app.ui.timeline.graph.entryIcon
 import com.trails.app.ui.timeline.graph.formatDayLabel
 import com.trails.app.ui.timeline.graph.graphWidthFor
 import com.trails.app.ui.timeline.graph.sectionBandColor
@@ -131,12 +132,13 @@ private fun DayRow(
     // causes). All breathing room lives on the date/content columns only.
     // User-requested: the day a Section ends and the next begins gets a
     // half-and-half band (this Section's color on top, the next Section's
-    // on the bottom) instead of a flat single color -- a hard-stop
-    // gradient (two color-stops at the same 0.5f position), not a smooth
-    // blend, same convention as the web version's CSS gradient.
+    // on the bottom) instead of a flat single color. Each half stays solid
+    // near its own edge of the row -- only the middle third blends, a soft
+    // seam rather than a hard cut or a wash across the whole row, same
+    // convention as the web version's CSS gradient.
     val rowModifier = if (bandColor != null && nextBandColor != null) {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(
-            Brush.verticalGradient(0f to bandColor, 0.5f to bandColor, 0.5f to nextBandColor, 1f to nextBandColor),
+            Brush.verticalGradient(0f to bandColor, 0.35f to bandColor, 0.65f to nextBandColor, 1f to nextBandColor),
         )
     } else if (bandColor != null) {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor)
@@ -195,9 +197,12 @@ private fun DayRow(
                         val isBlog = line.entryType == "BLOG_POST"
                         Column(modifier = Modifier.clickable { onOpenEntry(line.entryType, line.entryId) }) {
                             Row(verticalAlignment = Alignment.Top) {
-                                if (isBlog) {
-                                    Text("📖 ", style = MaterialTheme.typography.bodyMedium)
-                                }
+                                // User-requested: every Entry Type/Subtype
+                                // gets its own glyph so the Timeline reads
+                                // at a glance -- Blog Post's book (the only
+                                // one before) is just entryIcon's BLOG_POST
+                                // fallback now.
+                                Text("${entryIcon(line.entryType, line.subtype)} ", style = MaterialTheme.typography.bodyMedium)
                                 Text(
                                     buildString {
                                         append(label.title)

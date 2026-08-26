@@ -22,6 +22,7 @@ import {
   sectionCustomColorSolid,
 } from '@/lib/section-colors';
 import { entryTypeColor } from '@/lib/entry-types/colors';
+import { entryIcon } from '@/lib/entry-types/icons';
 import { entryDetailHref, timelineVisibleEntryWhere } from '@/lib/entry-types';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
@@ -462,18 +463,15 @@ export default async function TimelinePage({ params }: PageProps) {
                           href={entryDetailHref(tripId, line.entryType, line.entryId)}
                           className={`entry-chip${isBlogPost ? ' entry-chip-blog' : ''}`}
                         >
-                          {/* User-reported: "it should be a fancy link to the
-                              blog post" -- a Blog Post has no subtype badge
-                              of its own (labels.ts), so on the Timeline it
-                              rendered as a plain, undistinguished text link,
-                              identical to a Note. A book icon + brand-color
-                              text + "Read post" affordance sets it apart at
-                              a glance. */}
-                          {isBlogPost && (
-                            <span className="entry-chip-blog-icon" aria-hidden="true">
-                              📖
-                            </span>
-                          )}
+                          {/* User-requested: every Entry Type/Subtype gets
+                              its own glyph so the Timeline reads at a
+                              glance -- a Blog Post's book (previously the
+                              only one) is just entryIcon's BLOG_POST
+                              fallback now, same brand-color text + "Read
+                              post" affordance as before. */}
+                          <span className="entry-chip-icon" aria-hidden="true">
+                            {entryIcon(line.entryType, line.subtype)}
+                          </span>
                           <span>{label.title}</span>
                           {label.subtitle && (
                             <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>

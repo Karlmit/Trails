@@ -67,6 +67,29 @@ fun entryTypeColor(entryType: String): Color = when (entryType) {
     else -> TrailsColors.TextSoft // NOTE
 }
 
+// lib/entry-types/icons.ts -- one glyph per Entry Subtype, keyed flat since
+// subtype strings are unique across all three enums, plus a per-Entry-Type
+// fallback (entryIcon) for the two subtype-less types (Note, Blog Post) and
+// the rare Stay/Transport/Activity row with no subtype set.
+private val SUBTYPE_ICONS: Map<String, String> = mapOf(
+    "HOTEL" to "🏨", "HOSTEL" to "🛏️", "RESORT" to "🏝️", "APARTMENT" to "🏢",
+    "VILLA" to "🏡", "GUESTHOUSE" to "🏠", "STAY_OTHER" to "🏘️",
+    "FLIGHT" to "✈️", "TRAIN" to "🚆", "FERRY" to "⛴️", "BUS" to "🚌", "CAR" to "🚗",
+    "TAXI" to "🚕", "TRANSFER" to "🚐", "TRANSPORT_OTHER" to "🧭",
+    "TOUR" to "🗺️", "RESTAURANT" to "🍽️", "ATTRACTION" to "🎡", "EVENT" to "🎉",
+    "BEACH" to "🏖️", "HIKE" to "🥾", "MUSEUM" to "🏛️", "SHOPPING" to "🛍️",
+    "NIGHTLIFE" to "🍸", "ACTIVITY_OTHER" to "📍",
+)
+
+private val ENTRY_TYPE_ICONS: Map<String, String> = mapOf(
+    "STAY" to "🏨", "TRANSPORT" to "🚗", "ACTIVITY" to "📍", "NOTE" to "📝", "BLOG_POST" to "📖",
+)
+
+fun entryTypeIcon(entryType: String): String = ENTRY_TYPE_ICONS[entryType] ?: "📍"
+
+fun entryIcon(entryType: String, subtype: String?): String =
+    subtype?.let { SUBTYPE_ICONS[it] } ?: entryTypeIcon(entryType)
+
 // lib/entry-types/labels.ts, resolved through string resources so every
 // screen shows the current app language (see subtypeLabelResolved/
 // entryTypeLabelResolved below -- both are @Composable since resolving a

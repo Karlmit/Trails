@@ -660,11 +660,18 @@ p {
 
 /* User-requested: the day a Section ends and the next begins gets a
    half-and-half band (this Section's color on top, the next Section's on
-   the bottom) instead of a flat single color, marking the handoff -- a
-   hard-stop gradient (both color-stops at the same 50% position), not a
-   smooth blend. */
+   the bottom) instead of a flat single color, marking the handoff. Each
+   half stays solid near its own edge of the row so the day still reads
+   clearly as belonging to its Section -- only the middle third blends,
+   a soft seam rather than either a hard cut or a wash across the whole row. */
 .timeline-row-bg.is-section-transition {
-  background: linear-gradient(to bottom, var(--band-color) 50%, var(--band-color-next) 50%);
+  background: linear-gradient(
+    to bottom,
+    var(--band-color) 0%,
+    var(--band-color) 35%,
+    var(--band-color-next) 65%,
+    var(--band-color-next) 100%
+  );
 }
 
 .timeline-row-bg.is-today {
@@ -881,7 +888,12 @@ p {
   font-weight: 600;
 }
 
-.entry-chip-blog-icon {
+/* User-requested: every Entry Type/Subtype on the Timeline gets its own
+   glyph to the left of its title, so the day's list reads at a glance
+   without opening each entry. Plain inline span (not inline-flex/-block)
+   for the same reason .entry-chip itself is `display: inline` above --
+   it has to wrap as part of the same text run as the title next to it. */
+.entry-chip-icon {
   margin-right: 2px;
 }
 
