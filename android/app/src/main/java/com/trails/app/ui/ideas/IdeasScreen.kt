@@ -1,6 +1,5 @@
 package com.trails.app.ui.ideas
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -192,6 +191,9 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // User-requested: no cover photo means no placeholder box --
+                // the empty gray square added nothing, so the text content
+                // just starts at the card's own left edge instead.
                 if (item.coverPhoto?.localPath != null) {
                     AsyncImage(
                         model = File(item.coverPhoto.localPath),
@@ -199,10 +201,8 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
                     )
-                } else {
-                    Box(modifier = Modifier.size(52.dp).background(TrailsColors.SurfaceCool, RoundedCornerShape(8.dp)))
                 }
-                Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                Column(modifier = Modifier.padding(start = if (item.coverPhoto?.localPath != null) 12.dp else 0.dp).weight(1f)) {
                     Text(idea.title, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 2.dp)) {
                         PriorityBadge(idea.priority)
