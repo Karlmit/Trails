@@ -10,6 +10,7 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.IdeaCategoryStore
 import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
+import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.dto.IdeaRequest
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -55,6 +57,9 @@ val IDEA_WEATHER_LABEL_RES = mapOf(
 
 data class IdeaEditState(
     val ideaId: String? = null,
+    // True only for the Entry→Idea convert flow -- IdeaEditScreen swaps its
+    // "New idea" heading/subtitle/button for convert-flavored copy when set.
+    val convertingFromEntry: Boolean = false,
     val sectionId: String? = null,
     val title: String = "",
     val category: String? = null,
@@ -87,11 +92,22 @@ class IdeaEditViewModel @Inject constructor(
     private val linksTagsRepository: LinksTagsRepository,
     private val documentsRepository: DocumentsRepository,
     private val categoryStore: IdeaCategoryStore,
+    private val timelineRepository: TimelineRepository,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val ideaId: String? = savedStateHandle.get<String>("ideaId")?.takeUnless { it == "new" }
 
-    private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId))
+    // Set only when this screen was reached via an Activity Entry's own
+    // "Convert to Idea" action -- TrailsNavHost's dedicated convert route
+    // declares an "entryId" nav arg the plain "ideas/new/edit" route never
+    // supplies (so this is naturally null there), reusing that same key
+    // rather than inventing a second one. Always null together with a
+    // non-null ideaId, since converting only ever happens from a fresh
+    // create. See init{}'s seeding block and save()/ensureIdeaId()'s
+    // routing through repository.convertFromEntry instead of .create.
+    private val fromEntryId: String? = savedStateHandle["entryId"]
+
+    private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId, convertingFromEntry = fromEntryId != null))
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
 
     // Captured right after `loadIfEditing` populates the existing Idea's
@@ -156,6 +172,27 @@ class IdeaEditViewModel @Inject constructor(
             viewModelScope.launch {
                 runCatching { linksTagsRepository.listLinks(OWNER_TYPE, ownerId) }
                     .onSuccess { links -> _state.value = _state.value.copy(links = links.map { LinkFieldItem(it.id, it.url, it.label) }) }
+            }
+        }
+
+        // Entry→Idea convert: seed this create-mode form from the source
+        // Activity's own title/description/location/expense, same pre-fill
+        // role as web's IdeaForm `initialValues` prop for this direction.
+        // Priority/Weather suitability have no Entry-side source at all, so
+        // they're left at their normal create-mode defaults (WOULD_LIKE/
+        // EITHER) below for the user to pick.
+        if (ideaId == null && fromEntryId != null) {
+            viewModelScope.launch {
+                timelineRepository.observeEntry(fromEntryId).first()?.let { entry ->
+                    _state.value = _state.value.copy(
+                        title = entry.title,
+                        description = entry.description.orEmpty(),
+                        locationAddress = entry.locationAddress.orEmpty(),
+                        locationMapLink = entry.locationMapLink.orEmpty(),
+                        estimatedExpenseAmount = entry.expenseAmount?.toString().orEmpty(),
+                        estimatedExpenseCurrency = entry.expenseCurrency ?: DEFAULT_CURRENCY,
+                    )
+                }
             }
         }
     }
@@ -226,7 +263,16 @@ class IdeaEditViewModel @Inject constructor(
         }
     }
 
-    /** Lazily creates the Idea on the very first cover photo -- same convention as BlogEditViewModel's own ensurePostId. */
+    /**
+     * Lazily creates the Idea on the very first cover photo -- same
+     * convention as BlogEditViewModel's own ensurePostId. When seeded from
+     * an Entry ([fromEntryId] non-null), this is also the earliest point a
+     * plain "add a photo before saving" tap could materialize the Idea --
+     * routed through [IdeaRepository.convertFromEntry] rather than
+     * [IdeaRepository.create] so the source Activity is still deleted (and
+     * its own Tag/Link/Photo rows reassigned) exactly once, same as a
+     * Save-first conversion.
+     */
     private suspend fun ensureIdeaId(): String {
         _state.value.ideaId?.let { return it }
         creatingIdeaId?.let { return it.await() }
@@ -236,7 +282,7 @@ class IdeaEditViewModel @Inject constructor(
         try {
             val current = _state.value
             val request = toRequest(current).copy(title = current.title.trim().ifEmpty { "Untitled" })
-            val created = repository.create(request)
+            val created = fromEntryId?.let { repository.convertFromEntry(it, request) } ?: repository.create(request)
             _state.value = _state.value.copy(ideaId = created.id, title = _state.value.title.ifBlank { request.title })
             deferred.complete(created.id)
             return created.id
@@ -332,17 +378,31 @@ class IdeaEditViewModel @Inject constructor(
         _state.value = current.copy(saving = true, error = null, errorRes = null)
         viewModelScope.launch {
             runCatching {
-                if (current.ideaId == null) {
-                    repository.create(toRequest(current))
-                } else {
-                    repository.update(current.ideaId, diffFields(originalFields, fieldsOf(current)))
+                when {
+                    current.ideaId != null -> repository.update(current.ideaId, diffFields(originalFields, fieldsOf(current)))
+                    // Entry→Idea convert: routes through the convert
+                    // endpoint instead of a plain create, so the source
+                    // Activity is deleted (and its Tag/Link/Photo rows
+                    // reassigned) atomically with the Idea's creation --
+                    // same routing ensureIdeaId() applies for an
+                    // add-photo-before-save tap.
+                    fromEntryId != null -> repository.convertFromEntry(fromEntryId, toRequest(current))
+                    else -> repository.create(toRequest(current))
                 }
             }.onSuccess { result ->
-                // Deliberately NOT navigating away here (state.saved isn't
-                // watched by the screen) -- creating an Idea must stay on
-                // this screen so Photos/Links become reachable right away,
-                // same choice ChecklistEditScreen makes for items.
-                _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id)
+                // Deliberately NOT navigating away for a plain create
+                // (state.saved isn't watched by the screen) -- creating an
+                // Idea must stay on this screen so Photos/Links become
+                // reachable right away, same choice ChecklistEditScreen
+                // makes for items. A convert is different: the screen
+                // behind this one on the backstack (the now-deleted
+                // Activity's own detail screen) is stale the moment
+                // fromEntryId's Idea exists, whether that happened via this
+                // very save() call or an earlier ensureIdeaId() photo
+                // upload -- so this reuses `converted`, the same "leave via
+                // onDone" signal convertToEntry() sets for the opposite
+                // direction, rather than introducing a second one.
+                _state.value = _state.value.copy(saving = false, saved = true, ideaId = result.id, converted = fromEntryId != null)
             }.onFailure { e ->
                 _state.value = _state.value.copy(
                     saving = false,

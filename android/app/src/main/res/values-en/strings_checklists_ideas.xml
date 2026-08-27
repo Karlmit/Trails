@@ -49,7 +49,9 @@
     <!-- Idea edit -->
     <string name="idea_edit_title_new">New idea</string>
     <string name="idea_edit_title_edit">Edit idea</string>
+    <string name="idea_edit_title_convert">Convert to Idea</string>
     <string name="idea_edit_subtitle">Something worth doing on this trip -- pin it here before you forget.</string>
+    <string name="idea_edit_subtitle_convert">Title, description, location, and estimated expense are carried over from the Activity -- everything is still editable. Booking details don\'t carry over. Pick a Priority and Weather suitability, then save to create the Idea and remove the Activity.</string>
     <string name="idea_edit_label_title">Title *</string>
     <string name="idea_edit_label_section">Section</string>
     <string name="idea_edit_label_category">Category</string>
@@ -61,6 +63,7 @@
     <string name="idea_edit_label_expense_amount">Est. expense</string>
     <string name="idea_edit_label_expense_currency">Currency</string>
     <string name="idea_edit_button_create">Create idea</string>
+    <string name="idea_edit_button_convert">Convert to Idea</string>
     <string name="idea_edit_button_save">Save changes</string>
     <string name="idea_edit_cover_photo_heading">Cover photo</string>
     <string name="idea_edit_uploading_photo">Uploading…</string>

@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useState } from 'react';
 import { EntryForm, type EntryDTO } from '@/components/EntryForm';
 import { AttachmentList } from '@/components/AttachmentList';
@@ -180,6 +181,16 @@ export function EntryDetailPanel({
           </div>
           {!readOnly && (
             <div className="row" style={{ gap: 'var(--space-2)' }}>
+              {/* Only ever offered for an Activity -- the reverse of Ideas'
+                  own "Convert to Entry" (IdeaCard.tsx), and only sensible
+                  for the one Entry Type Ideas already model (Stay/
+                  Transport carry booking-specific fields an Idea has no
+                  concept of; Note/BlogPost were never Idea candidates). */}
+              {entry.entryType === 'ACTIVITY' && (
+                <Link href={`/trips/${tripId}/entries/${entry.id}/convert-to-idea`} className="btn btn-outline">
+                  {tEntries('convertToIdeaButton')}
+                </Link>
+              )}
               <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
                 {tEntries('editButton')}
               </button>

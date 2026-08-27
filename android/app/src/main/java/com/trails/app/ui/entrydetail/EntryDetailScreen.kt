@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
+import com.trails.app.ui.components.PillButton
+import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.theme.TrailsColors
@@ -53,7 +55,11 @@ private fun entryTypeEmoji(entryType: String) = when (entryType) {
 
 /** Mirrors components/EntryDetailPanel.tsx, plus Photo/Attachment upload (not in the web's read-only panel, but the whole point of an on-device Documents cache). */
 @Composable
-fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = hiltViewModel()) {
+fun EntryDetailScreen(
+    padding: PaddingValues,
+    onConvertToIdea: () -> Unit = {},
+    viewModel: EntryDetailViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
     val context = LocalContext.current
@@ -239,6 +245,20 @@ fun EntryDetailScreen(padding: PaddingValues, viewModel: EntryDetailViewModel = 
                         }
                     }
                 }
+            }
+
+            // Only ever offered for an Activity -- the reverse of Ideas' own
+            // "Convert to Entry" (IdeaDetailScreen), and only sensible for
+            // the one Entry Type Ideas already model (Stay/Transport carry
+            // booking-specific fields an Idea has no concept of; Note/
+            // BlogPost were never Idea candidates).
+            if (entry.entryType == "ACTIVITY") {
+                PillButton(
+                    text = stringResource(R.string.timeline_convert_to_idea_button),
+                    variant = PillButtonVariant.Outline,
+                    onClick = onConvertToIdea,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
     }

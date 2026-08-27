@@ -49,7 +49,9 @@
     <!-- Idea edit -->
     <string name="idea_edit_title_new">Ny idé</string>
     <string name="idea_edit_title_edit">Redigera idé</string>
+    <string name="idea_edit_title_convert">Konvertera till idé</string>
     <string name="idea_edit_subtitle">Något värt att göra på resan -- spara det här innan du glömmer.</string>
+    <string name="idea_edit_subtitle_convert">Titel, beskrivning, plats och uppskattad kostnad är hämtade från aktiviteten -- allt går fortfarande att ändra. Bokningsdetaljer förs inte över. Välj en prioritet och väderlämplighet, spara sedan för att skapa idén och ta bort aktiviteten.</string>
     <string name="idea_edit_label_title">Titel *</string>
     <string name="idea_edit_label_section">Sektion</string>
     <string name="idea_edit_label_category">Kategori</string>
@@ -61,6 +63,7 @@
     <string name="idea_edit_label_expense_amount">Ber. kostnad</string>
     <string name="idea_edit_label_expense_currency">Valuta</string>
     <string name="idea_edit_button_create">Skapa idé</string>
+    <string name="idea_edit_button_convert">Konvertera till idé</string>
     <string name="idea_edit_button_save">Spara ändringar</string>
     <string name="idea_edit_cover_photo_heading">Omslagsbild</string>
     <string name="idea_edit_uploading_photo">Laddar upp…</string>

@@ -84,6 +84,7 @@ private val IDEAS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.IDEAS.rout
 private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/important-info/${infoId ?: NEW_ID}/edit"
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 private fun ideaDetailRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId"
+private fun convertEntryToIdeaRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId/convert-to-idea"
 
 /**
  * Settings isn't Trip-scoped, so it can't use TripDrawerScaffold (which
@@ -502,7 +503,45 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
                     }
                 },
             ) { padding ->
-                EntryDetailScreen(padding)
+                EntryDetailScreen(padding, onConvertToIdea = { navController.navigate(convertEntryToIdeaRoute(tripId, entryId)) })
+            }
+        }
+
+        // The reverse of ideas/{ideaId} view mode's own "Convert to Entry"
+        // (IdeaDetailScreen) -- only ever reached from an ACTIVITY Entry's
+        // own detail screen. Reuses IdeaEditScreen/IdeaEditViewModel exactly
+        // (a create with a `fromEntryId` nav arg the plain "ideas/new/edit"
+        // route never supplies) rather than a second, near-duplicate form --
+        // see IdeaEditViewModel's own fromEntryId comment.
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/entries/{$ARG_ENTRY_ID}/convert-to-idea",
+            arguments = listOf(
+                navArgument(ARG_TRIP_ID) { type = NavType.StringType },
+                navArgument(ARG_ENTRY_ID) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            TripDrawerScaffold(tripId, TripTab.TIMELINE, stringResource(R.string.timeline_convert_to_idea_button), navController, showBackButton = true) { padding ->
+                IdeaEditScreen(
+                    padding,
+                    // Unlike ideas/{ideaId}/edit's own onDone (popBackStack
+                    // to the Ideas list, always safely on the backstack
+                    // there since that's how the user reached it), this
+                    // screen is reached from Timeline → Entry Detail, where
+                    // the Ideas list was never pushed -- popBackStack to a
+                    // route that isn't present would silently no-op and
+                    // strand the user here. Pop up to Timeline instead
+                    // (guaranteed to sit at the bottom of every Trip-scoped
+                    // backstack, per TripDrawerScaffold's own class doc)
+                    // then navigate to Ideas, landing on [Timeline, Ideas]
+                    // -- same destination the web version's convert page
+                    // redirects to.
+                    onDone = {
+                        navController.navigate(tripRoute(tripId, TripTab.IDEAS.route)) {
+                            popUpTo(tripRoute(tripId, TripTab.TIMELINE.route)) { inclusive = false }
+                        }
+                    },
+                )
             }
         }
 

@@ -176,6 +176,13 @@ interface TrailsApiService {
     @POST("api/v1/ideas/{id}/convert")
     suspend fun convertIdea(@Path("id") id: String): TimelineEntryDto
 
+    // The reverse: converts an ACTIVITY Entry into an Idea server-side. body
+    // reuses IdeaRequest (same shape ideaCreateSchema accepts) -- tripId is
+    // ignored server-side (always the Entry's own Trip), sent anyway only
+    // because IdeaRequest requires it.
+    @POST("api/v1/timeline-entries/{id}/convert-to-idea")
+    suspend fun convertEntryToIdea(@Path("id") id: String, @Body body: IdeaRequest): IdeaDto
+
     @GET("api/v1/attachments")
     suspend fun listAttachments(@Query("tripId") tripId: String): List<AttachmentDto>
 

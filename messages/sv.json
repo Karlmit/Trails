@@ -238,7 +238,11 @@
     "seatValue": "Säte {seat}",
     "backToTimelineLink": "Tillbaka till tidslinjen",
     "addEntryHeading": "Lägg till post",
-    "addEntryDescription": "Boende, transport, aktivitet eller anteckning – välj en typ nedan."
+    "addEntryDescription": "Boende, transport, aktivitet eller anteckning – välj en typ nedan.",
+    "convertToIdeaButton": "Konvertera till idé",
+    "convertToIdeaTitle": "Konvertera \"{title}\" till en idé",
+    "convertToIdeaDescription": "Titel, beskrivning, plats och uppskattad kostnad förs över från posten -- allt går fortfarande att ändra. Bokningsdetaljer (datum, referenser, kontakter, ...) förs inte över -- en idé har inget bekräftat datum. Välj en prioritet och väderlämplighet, spara sedan för att skapa idén och ta bort posten.",
+    "backToEntryLink": "Tillbaka till posten"
   },
   "shared": {
     "dateTimeInputHourLabel": "Timme",

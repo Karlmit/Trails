@@ -238,7 +238,11 @@
     "seatValue": "Seat {seat}",
     "backToTimelineLink": "Back to Timeline",
     "addEntryHeading": "Add Entry",
-    "addEntryDescription": "Stay, Transport, Activity, or Note -- pick a type below."
+    "addEntryDescription": "Stay, Transport, Activity, or Note -- pick a type below.",
+    "convertToIdeaButton": "Convert to Idea",
+    "convertToIdeaTitle": "Convert \"{title}\" to an Idea",
+    "convertToIdeaDescription": "Title, Description, Location, and estimated expense are carried over from the Entry -- everything is still editable. Booking details (dates, references, contacts, ...) don't carry over -- an Idea has no confirmed date of its own. Pick a Priority and Weather suitability, then save to create the Idea and remove this Entry.",
+    "backToEntryLink": "Back to Entry"
   },
   "shared": {
     "dateTimeInputHourLabel": "Hour",

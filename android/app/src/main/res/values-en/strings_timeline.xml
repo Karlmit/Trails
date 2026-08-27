@@ -70,6 +70,7 @@
     <string name="timeline_photos_attachments">Photos &amp; attachments</string>
     <string name="timeline_add_photo">+ Add photo</string>
     <string name="timeline_add_attachment">+ Add attachment</string>
+    <string name="timeline_convert_to_idea_button">Convert to Idea</string>
     <string name="timeline_flight_terminal">Terminal %1$s</string>
     <string name="timeline_flight_gate">Gate %1$s</string>
     <string name="timeline_flight_platform">Platform %1$s</string>

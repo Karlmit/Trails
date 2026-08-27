@@ -18,6 +18,18 @@ interface IdeaFormProps {
   categoryOptions: string[];
   mode?: 'create' | 'edit';
   idea?: IdeaDTO;
+  // The Entry→Idea convert page's seed (Activity title/location/expense
+  // carried over, editable) -- same role as EntryForm's own `initialValues`
+  // prop for the opposite direction. `idea` (edit mode) always wins; this
+  // only ever seeds create mode.
+  initialValues?: Partial<IdeaDTO>;
+  // Overrides where create mode POSTs -- the convert page submits to
+  // /api/v1/timeline-entries/[entryId]/convert-to-idea instead of the plain
+  // create endpoint, same as EntryForm's own `apiUrl` override.
+  apiUrl?: string;
+  // The convert page always renders this open, pre-filled -- unlike the
+  // Ideas list's own collapsed-behind-a-button embedding.
+  startOpen?: boolean;
   onSaved?: (idea: IdeaDTO) => void;
   onCancel?: () => void;
 }
@@ -39,30 +51,34 @@ export function IdeaForm({
   categoryOptions,
   mode = 'create',
   idea,
+  initialValues,
+  apiUrl,
+  startOpen = false,
   onSaved,
   onCancel,
 }: IdeaFormProps) {
   const t = useTranslations('errors');
   const ti = useTranslations('tripIdeas');
   const router = useRouter();
-  const [open, setOpen] = useState(mode === 'edit');
-  const [title, setTitle] = useState(idea?.title ?? '');
-  const [sectionId, setSectionId] = useState(idea?.sectionId ?? '');
-  const [category, setCategory] = useState(idea?.category ?? '');
-  const [description, setDescription] = useState(idea?.description ?? '');
+  const seed = idea ?? initialValues;
+  const [open, setOpen] = useState(mode === 'edit' || startOpen);
+  const [title, setTitle] = useState(seed?.title ?? '');
+  const [sectionId, setSectionId] = useState(seed?.sectionId ?? '');
+  const [category, setCategory] = useState(seed?.category ?? '');
+  const [description, setDescription] = useState(seed?.description ?? '');
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>(
-    (idea?.priority as (typeof PRIORITIES)[number]) ?? 'WOULD_LIKE',
+    (seed?.priority as (typeof PRIORITIES)[number]) ?? 'WOULD_LIKE',
   );
   const [weatherSuitability, setWeatherSuitability] = useState<(typeof WEATHER_SUITABILITIES)[number]>(
-    (idea?.weatherSuitability as (typeof WEATHER_SUITABILITIES)[number]) ?? 'EITHER',
+    (seed?.weatherSuitability as (typeof WEATHER_SUITABILITIES)[number]) ?? 'EITHER',
   );
-  const [locationName, setLocationName] = useState(idea?.locationName ?? '');
-  const [locationAddress, setLocationAddress] = useState(idea?.locationAddress ?? '');
-  const [locationMapLink, setLocationMapLink] = useState(idea?.locationMapLink ?? '');
+  const [locationName, setLocationName] = useState(seed?.locationName ?? '');
+  const [locationAddress, setLocationAddress] = useState(seed?.locationAddress ?? '');
+  const [locationMapLink, setLocationMapLink] = useState(seed?.locationMapLink ?? '');
   const [estimatedExpenseAmount, setEstimatedExpenseAmount] = useState(
-    idea?.estimatedExpenseAmount != null ? String(idea.estimatedExpenseAmount) : '',
+    seed?.estimatedExpenseAmount != null ? String(seed.estimatedExpenseAmount) : '',
   );
-  const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState(idea?.estimatedExpenseCurrency ?? '');
+  const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState(seed?.estimatedExpenseCurrency ?? '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -107,7 +123,7 @@ export function IdeaForm({
     try {
       const response =
         mode === 'create'
-          ? await fetch('/api/v1/ideas', {
+          ? await fetch(apiUrl ?? '/api/v1/ideas', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ tripId, ...body }),

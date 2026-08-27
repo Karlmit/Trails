@@ -106,8 +106,17 @@ fun IdeaEditScreen(
         TrailsCard {
             ScreenHeading(
                 emoji = "💡",
-                title = if (isNew) stringResource(R.string.idea_edit_title_new) else stringResource(R.string.idea_edit_title_edit),
-                subtitle = stringResource(R.string.idea_edit_subtitle),
+                // Convert-flavored copy only while still `isNew` -- once the
+                // convert POST succeeds, ideaId is set and this reverts to
+                // plain "Edit idea" like any other existing Idea, matching
+                // that further edits now go through the normal PATCH path
+                // (IdeaEditViewModel.save()'s `current.ideaId != null` branch).
+                title = when {
+                    isNew && state.convertingFromEntry -> stringResource(R.string.idea_edit_title_convert)
+                    isNew -> stringResource(R.string.idea_edit_title_new)
+                    else -> stringResource(R.string.idea_edit_title_edit)
+                },
+                subtitle = if (isNew && state.convertingFromEntry) stringResource(R.string.idea_edit_subtitle_convert) else stringResource(R.string.idea_edit_subtitle),
             )
 
             LabeledField(label = stringResource(R.string.idea_edit_label_title), value = state.title, onValueChange = viewModel::onTitleChange)
@@ -167,7 +176,11 @@ fun IdeaEditScreen(
                 CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
             } else {
                 PillButton(
-                    text = if (isNew) stringResource(R.string.idea_edit_button_create) else stringResource(R.string.idea_edit_button_save),
+                    text = when {
+                        isNew && state.convertingFromEntry -> stringResource(R.string.idea_edit_button_convert)
+                        isNew -> stringResource(R.string.idea_edit_button_create)
+                        else -> stringResource(R.string.idea_edit_button_save)
+                    },
                     onClick = viewModel::save,
                     modifier = Modifier.fillMaxWidth(),
                 )

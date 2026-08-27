@@ -64,4 +64,13 @@ class IdeaRepository @Inject constructor(
         dao.deleteById(ideaId)
         return entity
     }
+
+    /** The reverse: converts an ACTIVITY Entry into an Idea server-side, removing the Entry locally and caching the new Idea. */
+    suspend fun convertFromEntry(entryId: String, request: IdeaRequest): IdeaEntity {
+        val created = api.convertEntryToIdea(entryId, request)
+        val entity = created.toEntity()
+        dao.upsertAll(listOf(entity))
+        timelineEntryDao.deleteById(entryId)
+        return entity
+    }
 }
