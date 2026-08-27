@@ -19,12 +19,16 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.trails.app.R
@@ -52,6 +56,19 @@ fun CreatableDropdownField(
     var expanded by remember { mutableStateOf(false) }
     var addingNew by remember { mutableStateOf(false) }
     var newValue by remember { mutableStateOf("") }
+    val newValueFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // User-reported: the "add a new category" field appearing inside this
+    // dropdown's Popup never got the keyboard on its own -- composing a
+    // TextField doesn't request focus/show the IME by itself, it needs an
+    // explicit ask once the field actually exists to focus.
+    LaunchedEffect(addingNew) {
+        if (addingNew) {
+            newValueFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(text = label.uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
@@ -95,7 +112,7 @@ fun CreatableDropdownField(
                         OutlinedTextField(
                             value = newValue,
                             onValueChange = { newValue = it },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).focusRequester(newValueFocusRequester),
                             singleLine = true,
                             placeholder = { Text(stringResource(R.string.shared_new_category_placeholder)) },
                             shape = TrailsShapes.Input,
