@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -59,15 +60,51 @@ fun CreatableDropdownField(
     val newValueFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    // User-reported: the "add a new category" field appearing inside this
-    // dropdown's Popup never got the keyboard on its own -- composing a
-    // TextField doesn't request focus/show the IME by itself, it needs an
-    // explicit ask once the field actually exists to focus.
+    // The "add a new category" field never got the keyboard when it lived
+    // inline inside this dropdown's own Popup, even with an explicit
+    // requestFocus()/show() -- a DropdownMenu's Popup window doesn't
+    // reliably accept IME focus regardless of Compose-level focus state
+    // (a known Compose/Android platform limitation, not something fixable
+    // from inside that Popup). A real AlertDialog uses its own proper
+    // Dialog window, which does support the keyboard correctly -- so
+    // "Add new" now closes the dropdown and opens one instead of adding a
+    // row inside it.
     LaunchedEffect(addingNew) {
         if (addingNew) {
             newValueFocusRequester.requestFocus()
             keyboardController?.show()
         }
+    }
+
+    if (addingNew) {
+        AlertDialog(
+            onDismissRequest = { addingNew = false; newValue = "" },
+            title = { Text(stringResource(R.string.shared_add_new_option)) },
+            text = {
+                OutlinedTextField(
+                    value = newValue,
+                    onValueChange = { newValue = it },
+                    modifier = Modifier.fillMaxWidth().focusRequester(newValueFocusRequester),
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.shared_new_category_placeholder)) },
+                    shape = TrailsShapes.Input,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val trimmed = newValue.trim()
+                    if (trimmed.isNotEmpty()) {
+                        onAddOption(trimmed)
+                        onSelected(trimmed)
+                    }
+                    newValue = ""
+                    addingNew = false
+                }) { Text(stringResource(R.string.shared_add_button)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { addingNew = false; newValue = "" }) { Text(stringResource(R.string.shared_cancel_button)) }
+            },
+        )
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -92,7 +129,7 @@ fun CreatableDropdownField(
                     unfocusedContainerColor = TrailsColors.Surface,
                 ),
             )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false; addingNew = false }) {
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(text = { Text(noneLabel) }, onClick = { onSelected(null); expanded = false })
                 options.forEach { option ->
                     DropdownMenuItem(
@@ -107,30 +144,7 @@ fun CreatableDropdownField(
                         onClick = { onSelected(option); expanded = false },
                     )
                 }
-                if (addingNew) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = newValue,
-                            onValueChange = { newValue = it },
-                            modifier = Modifier.weight(1f).focusRequester(newValueFocusRequester),
-                            singleLine = true,
-                            placeholder = { Text(stringResource(R.string.shared_new_category_placeholder)) },
-                            shape = TrailsShapes.Input,
-                        )
-                        TextButton(onClick = {
-                            val trimmed = newValue.trim()
-                            if (trimmed.isNotEmpty()) {
-                                onAddOption(trimmed)
-                                onSelected(trimmed)
-                            }
-                            newValue = ""
-                            addingNew = false
-                            expanded = false
-                        }) { Text(stringResource(R.string.shared_add_button)) }
-                    }
-                } else {
-                    DropdownMenuItem(text = { Text(stringResource(R.string.shared_add_new_option)) }, onClick = { addingNew = true })
-                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.shared_add_new_option)) }, onClick = { expanded = false; addingNew = true })
             }
         }
     }
