@@ -353,3 +353,44 @@ export const localeSchema = z
     locale: z.nativeEnum(Locale),
   })
   .strict();
+
+// spec-push-notifications: the body POST /api/v1/push/subscriptions accepts
+// -- deliberately shaped like the browser's own `PushSubscription.toJSON()`
+// (`{ endpoint, keys: { p256dh, auth } }`) so the client can post the
+// subscription object straight through, plus the locale the notification
+// text should be written in. `expirationTime` (also present in toJSON's
+// output, always null in practice) is ignored rather than rejected, so
+// `.strip()` semantics are used here instead of the `.strict()` every other
+// schema in this file uses.
+//
+// The endpoint is validated as an https URL: it is a Push Service URL the
+// browser minted, so anything else is either a broken client or someone
+// hand-posting junk -- and it is a URL our own server will later fetch, so
+// keeping the scheme locked down matters more here than for a stored-only
+// string.
+export const pushSubscriptionCreateSchema = z.object({
+  endpoint: z
+    .string()
+    .trim()
+    .min(1, 'endpoint is required')
+    .max(2048)
+    .refine((value) => {
+      try {
+        return new URL(value).protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }, 'endpoint must be a valid https URL'),
+  keys: z.object({
+    p256dh: z.string().trim().min(1, 'keys.p256dh is required').max(512),
+    auth: z.string().trim().min(1, 'keys.auth is required').max(512),
+  }),
+  locale: z.nativeEnum(Locale).optional(),
+});
+
+/** The body DELETE /api/v1/push/subscriptions accepts -- endpoint only. */
+export const pushSubscriptionDeleteSchema = z
+  .object({
+    endpoint: z.string().trim().min(1, 'endpoint is required').max(2048),
+  })
+  .strict();

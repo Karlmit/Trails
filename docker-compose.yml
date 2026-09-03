@@ -26,6 +26,16 @@ services:
     environment:
       DATABASE_URL: postgresql://trails:trails@db:5432/trails?schema=public
       NODE_ENV: production
+      # spec-push-notifications: the VAPID keypair for Web Push, read from
+      # the repo-root .env (gitignored) so the private key never lands in
+      # this file. Unset = the notification opt-in never appears at all.
+      # Note that notifications additionally need HTTPS in front of this
+      # (secure-context-only APIs), which the default local setup has not
+      # got -- localhost is exempt, so `next dev` can still be used to
+      # exercise the flow.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     ports:
       - '3000:3000'
     healthcheck:

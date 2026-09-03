@@ -54,6 +54,7 @@ model User {
 
   sessions Session[]
   createdChecklists Checklist[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -71,6 +72,50 @@ model Session {
   @@index([userId])
   @@index([token])
   @@map("sessions")
+}
+
+// spec-push-notifications: one row per browser (strictly: per Push Service
+// endpoint) that has approved notifications, which is NOT the same grain as
+// a User -- the same person's phone and laptop are two rows, and a Guest
+// reading a Public Trip's Blog with no account at all is a row with
+// `userId = NULL`.
+//
+// `endpoint` is the Push Service URL the browser itself minted
+// (fcm.googleapis.com/..., web.push.apple.com/..., ...) and is the natural
+// key: a re-subscribe returns it unchanged, so POST
+// /api/v1/push/subscriptions upserts on it rather than accumulating a
+// duplicate row every time a page re-registers its Service Worker.
+//
+// `p256dh`/`auth` are the browser's own public encryption keys, needed by
+// `web-push` to encrypt each payload -- per-subscription public material,
+// not our VAPID private key (that lives only in the VAPID_PRIVATE_KEY env
+// var and never in the database).
+model PushSubscription {
+  id       String @id @default(uuid()) @db.Uuid
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  // NULL = an anonymous Guest subscription. A Guest may only ever be
+  // notified about a Published, non-Private post on a PUBLIC Trip; a
+  // User-linked row is notified about every published post (AD-7: any
+  // authenticated User has full access to every Trip) -- see lib/push.ts's
+  // `selectAudience`, the one place that distinction is evaluated.
+  userId String? @map("user_id") @db.Uuid
+
+  // The locale the notification text itself is written in, captured at
+  // subscribe time from the same resolution the page render used
+  // (lib/locale.ts). A Guest has no User row to read a preference back
+  // from at send time, so it must be stored per subscription here.
+  locale Locale @default(sv)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 enum TripVisibility {
@@ -361,6 +406,16 @@ model TimelineEntry {
   // reserved for the Blog spec, which is why it must already exist as a
   // real column rather than a later migration.
   publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+
+  // spec-push-notifications: the once-ever "subscribers have been told
+  // about this post" stamp, same Blog-Post-only scope as `publishedAt`
+  // above (every other entry_type leaves it NULL forever). Deliberately a
+  // separate column rather than reusing `publishedAt`: unpublishing and
+  // re-publishing a post resets `publishedAt` but must NOT re-notify
+  // everyone, so the publish route only ever fans out while this is still
+  // NULL, and never clears it again (see
+  // app/api/v1/timeline-entries/[entryId]/publish/route.ts).
+  notifiedAt DateTime? @map("notified_at") @db.Timestamptz(6)
 
   // spec-guest-access (FR-28/AD-10): unlike ImportantInfo.isPrivate (still
   // inert -- no Guest surface exists for Important Info), this flag is read

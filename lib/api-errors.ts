@@ -17,4 +17,8 @@ export const Errors = {
   conflict: (message: string) => apiError(409, 'CONFLICT', message),
   gone: (message: string) => apiError(410, 'GONE', message),
   internal: () => apiError(500, 'INTERNAL_ERROR', 'Something went wrong'),
+  // spec-push-notifications: the feature is configured (VAPID keypair) or it
+  // is not -- "the server can't do this at all right now" is a 503, not a
+  // client mistake and not an internal error.
+  serviceUnavailable: (message: string) => apiError(503, 'SERVICE_UNAVAILABLE', message),
 };

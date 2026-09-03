@@ -49,7 +49,15 @@ import { prisma } from '@/lib/prisma';
 //     Idea/ImportantInfo-owned Photos are still denied inside the route
 //     handler itself, which re-derives the same Trip/Entry/Photo visibility
 //     the Guest-eligible pages already apply -- see that route's own
-//     comment). No other /api/v1/** route is added here.
+//     comment).
+//   - A SECOND disclosed exception, added by spec-push-notifications:
+//     `POST`/`DELETE /api/v1/push/subscriptions`. A Guest reading a Public
+//     Trip's Blog is exactly who new-post notifications are for, and their
+//     browser has no session to authenticate the subscription it must hand
+//     us -- same "reachability here, visibility elsewhere" split: what an
+//     anonymous subscription may be told is decided at send time by
+//     lib/push.ts's `selectAudience`. See that constant below.
+//     No other /api/v1/** route is added here.
 //   - Root (`/`), added per direct user feedback (this deployment only ever
 //     plans one Trip at a time): an unauthenticated visitor to `/` lands on
 //     the same "next upcoming or currently Active Trip" decision an
@@ -104,6 +112,21 @@ function isGuestEligibleApiGet(pathname: string, method: string): boolean {
   return method === 'GET' && GUEST_ELIGIBLE_API_GET_PATH.test(pathname);
 }
 
+// spec-push-notifications' one disclosed /api/v1/** exception -- POST/DELETE
+// on this exact path only. A Guest reading a PUBLIC Trip's Blog has no
+// session and no account of any kind, and their browser has nothing but
+// this endpoint to hand its own Push subscription to, so notifications for
+// Blog readers are impossible without it. Deliberately kept as narrow as
+// the Photos exception above: no other push path, no GET (there is no
+// "list subscriptions" surface at all), and what an anonymous subscription
+// may ever be *told* is restricted separately at send time by lib/push.ts's
+// `selectAudience`, never trusted from the fact that the request got here.
+const GUEST_ELIGIBLE_PUSH_PATH = '/api/v1/push/subscriptions';
+
+function isGuestEligiblePushMutation(pathname: string, method: string): boolean {
+  return pathname === GUEST_ELIGIBLE_PUSH_PATH && (method === 'POST' || method === 'DELETE');
+}
+
 function bearerToken(request: NextRequest): string | undefined {
   const header = request.headers.get('authorization');
   if (header?.toLowerCase().startsWith('bearer ')) {
@@ -128,6 +151,12 @@ export async function proxy(request: NextRequest) {
       // API GET (see the comment block above) -- every other /api/** path
       // still 401s unauthenticated exactly as before.
       if (isGuestEligibleApiGet(pathname, request.method)) {
+        return NextResponse.next();
+      }
+      // spec-push-notifications' one disclosed exception (see above) -- an
+      // anonymous Blog reader subscribing to / unsubscribing from new-post
+      // notifications.
+      if (isGuestEligiblePushMutation(pathname, request.method)) {
         return NextResponse.next();
       }
       return NextResponse.json(
@@ -160,5 +189,13 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.png).*)'],
+  // spec-push-notifications adds the Service Worker, the Web App Manifest
+  // and the icons they reference to the existing static-asset exclusions:
+  // every one of them is fetched by the browser itself with no session
+  // (and, for /sw.js, from a Guest's browser), where a redirect to /login
+  // would silently break Service Worker registration and PWA install --
+  // which on iOS is the only way notifications can be granted at all.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|logo.png|sw.js|manifest.webmanifest|icon-192.png|icon-512.png|icon-maskable-512.png|badge-96.png).*)',
+  ],
 };

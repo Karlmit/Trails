@@ -537,6 +537,28 @@
     "english": "English",
     "saved": "Saved"
   },
+  "notifications": {
+    "settingsLabel": "Notifications",
+    "settingsDescription": "Get a notification when a new blog post is published. This applies to this browser only — turn it on separately on every device you want notified.",
+    "statusOn": "On",
+    "statusOff": "Off",
+    "promptTitle": "Get notified about new posts",
+    "promptBody": "Trails can send a notification when a new blog post is published. Tapping it opens the post.",
+    "enable": "Enable",
+    "enabling": "Enabling…",
+    "notNow": "Not now",
+    "enabledTitle": "Notifications are on",
+    "enabledBody": "You'll get a notification here when a new blog post is published.",
+    "turnOff": "Turn off",
+    "turningOff": "Turning off…",
+    "enableFailed": "Could not enable notifications. Please try again.",
+    "disableFailed": "Could not turn notifications off. Please try again.",
+    "denied": "Notifications are blocked for this site. Allow them in your browser's settings for this site, then come back.",
+    "unsupported": "This browser does not support notifications.",
+    "iosHint": "On iPhone and iPad, add Trails to your Home Screen first (Share → Add to Home Screen), then turn notifications on from there.",
+    "insecure": "Notifications need a secure (HTTPS) connection. This site is currently served over plain HTTP.",
+    "unconfigured": "Notifications are not set up on this server."
+  },
   "errors": {
     "Authentication required": "Authentication required",
     "You do not have access to this resource": "You do not have access to this resource",

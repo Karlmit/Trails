@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { appFont } from '@/app/fonts';
@@ -11,7 +11,18 @@ export const metadata: Metadata = {
   description: 'Trails — trip planning and travel journal.',
   icons: {
     icon: '/favicon.ico',
+    apple: '/icon-192.png',
   },
+  // spec-push-notifications: the Web App Manifest is what makes Trails
+  // installable, and on iOS/iPadOS an installed Home Screen app is the
+  // ONLY context in which Web Push can be granted at all -- so this is a
+  // requirement of the notification feature, not decoration. Nothing else
+  // about how the app loads changes (public/sw.js caches nothing).
+  manifest: '/manifest.webmanifest',
+};
+
+export const viewport: Viewport = {
+  themeColor: '#006241',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

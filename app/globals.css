@@ -293,6 +293,82 @@ p {
   font-size: 0.9rem;
 }
 
+/* Notification opt-in card (components/NotificationOptInCard.tsx) --
+   spec-push-notifications. A light brand-mint wash rather than a white
+   `.card`: it is an ask sitting above the Blog list, not another post in
+   it, and mint is already the palette's "light wash / valid state" tint
+   (never gold -- that stays reserved for the Active-trip marker). Solid
+   color block, 12px card radius, no gradient, per DESIGN.md. */
+.notify-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-brand-mint);
+  color: var(--color-brand-deep);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+/* The post-opt-in confirmation. Same block, quieter surface -- it is an
+   acknowledgement, not a call to action. */
+.notify-card-on {
+  background: var(--color-canvas-alt);
+  color: var(--color-text);
+}
+
+.notify-card-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.notify-card-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The card's own copy is tighter than page prose -- `p` carries a
+   1.6rem bottom margin app-wide, which would leave a gap inside a card
+   this short. */
+.notify-card-text p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.notify-card-error {
+  margin-top: var(--space-1) !important;
+  color: var(--color-danger);
+}
+
+.notify-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+/* On a phone the icon + text + two pill buttons cannot share one row
+   without the buttons shrinking below a comfortable tap target -- the
+   actions drop to their own full-width row instead. */
+@media (max-width: 640px) {
+  .notify-card {
+    flex-wrap: wrap;
+  }
+
+  .notify-card-text {
+    flex-basis: calc(100% - 1.5rem - var(--space-3));
+  }
+
+  .notify-card-actions {
+    flex: 1 1 100%;
+  }
+
+  .notify-card-actions .btn {
+    flex: 1 1 0;
+  }
+}
+
 /* Top nav */
 /* User-reported: "Top banner should always dissappear when scrolling
    down... guests should not always see login button when scrolling down

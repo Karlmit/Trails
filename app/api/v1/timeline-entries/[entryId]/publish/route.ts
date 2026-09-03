@@ -6,6 +6,7 @@ import { Errors } from '@/lib/api-errors';
 import { serializeTimelineEntry } from '@/lib/serializers';
 import { isRecordNotFoundError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
+import { sendBlogPostNotification } from '@/lib/push';
 
 interface RouteParams {
   params: Promise<{ entryId: string }>;
@@ -42,6 +43,51 @@ async function loadBlogPost(entryId: string) {
   return entry;
 }
 
+// spec-push-notifications: publishing is the one and only trigger for a
+// new-post notification, so the fan-out hangs off this route rather than
+// off the create/edit path -- a Draft never notifies anyone, and neither
+// does editing an already-published post.
+//
+// Guarded by `notifiedAt` (not `publishedAt`): unpublish + re-publish is a
+// normal editorial action here (DELETE below clears `publishedAt`), and it
+// must not notify everyone a second time about the same post. The stamp is
+// claimed with a conditional UPDATE rather than a read-then-write, so two
+// concurrent publishes of the same post can only ever produce one fan-out
+// -- whichever request loses the race gets `count: 0` and sends nothing.
+//
+// Every failure here is swallowed: the User's publish already succeeded,
+// and a Push Service being slow or down must not turn it into a 500 (see
+// lib/push.ts's header for why this is awaited inline at all). `notifiedAt`
+// is deliberately claimed *before* sending, so a crash mid-fan-out can
+// never re-notify the subscribers who already received it.
+async function notifySubscribersOnce(entryId: string) {
+  try {
+    const claimed = await prisma.timelineEntry.updateMany({
+      where: { id: entryId, notifiedAt: null },
+      data: { notifiedAt: new Date() },
+    });
+    if (claimed.count === 0) return;
+
+    const entry = await prisma.timelineEntry.findUnique({
+      where: { id: entryId },
+      select: {
+        id: true,
+        tripId: true,
+        title: true,
+        entryType: true,
+        isPrivate: true,
+        publishedAt: true,
+        trip: { select: { id: true, name: true, visibility: true } },
+      },
+    });
+    if (!entry) return;
+
+    await sendBlogPostNotification(entry, entry.trip);
+  } catch (err) {
+    console.error('[push] Blog Post notification fan-out failed', err);
+  }
+}
+
 /** PUT — Publish. Sets `publishedAt = now()`, even if already Published. */
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const user = await getUserFromApiRequest(request);
@@ -58,6 +104,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     revalidateBlogPost(existing.tripId, entryId);
+
+    await notifySubscribersOnce(entryId);
 
     return NextResponse.json(serializeTimelineEntry(entry));
   } catch (err) {
@@ -76,6 +124,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!existing) return Errors.notFound('Blog Post not found');
 
   try {
+    // spec-push-notifications: `notifiedAt` is deliberately NOT cleared
+    // here. Unpublishing is a correction, not a reset -- re-publishing
+    // afterwards must not push the same post to everyone a second time.
     await prisma.timelineEntry.update({
       where: { id: entryId },
       data: { publishedAt: null },

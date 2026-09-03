@@ -537,6 +537,28 @@
     "english": "Engelska",
     "saved": "Sparat"
   },
+  "notifications": {
+    "settingsLabel": "Notiser",
+    "settingsDescription": "Få en notis när ett nytt blogginlägg publiceras. Det gäller bara den här webbläsaren — slå på det separat på varje enhet du vill få notiser på.",
+    "statusOn": "På",
+    "statusOff": "Av",
+    "promptTitle": "Få notiser om nya inlägg",
+    "promptBody": "Trails kan skicka en notis när ett nytt blogginlägg publiceras. Tryck på den för att öppna inlägget.",
+    "enable": "Slå på",
+    "enabling": "Slår på…",
+    "notNow": "Inte nu",
+    "enabledTitle": "Notiser är på",
+    "enabledBody": "Du får en notis här när ett nytt blogginlägg publiceras.",
+    "turnOff": "Stäng av",
+    "turningOff": "Stänger av…",
+    "enableFailed": "Kunde inte slå på notiser. Försök igen.",
+    "disableFailed": "Kunde inte stänga av notiser. Försök igen.",
+    "denied": "Notiser är blockerade för den här webbplatsen. Tillåt dem i webbläsarens inställningar för sidan och kom tillbaka.",
+    "unsupported": "Den här webbläsaren stöder inte notiser.",
+    "iosHint": "På iPhone och iPad: lägg först till Trails på hemskärmen (Dela → Lägg till på hemskärmen) och slå sedan på notiser därifrån.",
+    "insecure": "Notiser kräver en säker anslutning (HTTPS). Den här sidan visas just nu över vanlig HTTP.",
+    "unconfigured": "Notiser är inte konfigurerade på den här servern."
+  },
   "errors": {
     "Authentication required": "Inloggning krävs",
     "You do not have access to this resource": "Du har inte åtkomst till den här resursen",

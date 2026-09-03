@@ -11,7 +11,8 @@ own instance — not a multi-tenant SaaS product.
 **Status:** feature-complete for v1. Auth, Trips, Sections, the Timeline,
 itinerary content (Stays, Transport, Activities, Notes, Blog), Ideas,
 Checklists, Budget, Documents, Important Info, Tags/Links/Photos, Travel
-Mode, Guest/public sharing, and Admin-managed accounts are all in place.
+Mode, Guest/public sharing, Blog-post push notifications, and
+Admin-managed accounts are all in place.
 
 ## Running it (Docker Compose)
 
@@ -36,6 +37,11 @@ services:
       # for plain HTTP -- setting "true" without HTTPS in front makes the
       # browser silently drop the login cookie, so you'll never stay logged in.
       COOKIE_SECURE: "false"
+      # Optional -- see "Notifications for new blog posts" below. Leave these
+      # out and the notification opt-in never appears at all.
+      VAPID_PUBLIC_KEY: ""
+      VAPID_PRIVATE_KEY: ""
+      VAPID_SUBJECT: "mailto:you@example.com"
     ports:
       - "3018:3000"
     volumes:
@@ -74,6 +80,48 @@ The first account you create is automatically an Admin, and sign-up closes
 permanently the moment that account exists — there's no public registration
 after that. Every other authenticated User has full access to every Trip;
 Trails is built for one trusted household, not multiple isolated accounts.
+
+### Notifications for new blog posts
+
+Readers can ask to be notified whenever a new blog post is published — the
+notification opens that post directly. It works for signed-in users and for
+guests reading a public trip's blog, and the ask appears as a small card on
+the trip's Blog page (plus a permanent on/off switch in **Settings** for
+signed-in users). Notifications are per browser, so each device opts in
+separately.
+
+Two things are required:
+
+1. **A VAPID keypair.** Generate it once and set it on the container:
+
+   ```sh
+   npx web-push generate-vapid-keys
+   ```
+
+   Put the two values in `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` and set
+   `VAPID_SUBJECT` to a `mailto:` address. Keep the keypair **stable** —
+   every browser's subscription is tied to the public key it was created
+   with, so changing it forces every subscriber to opt in again. With the
+   keys unset, nothing about the app changes: the opt-in is simply never
+   offered.
+
+2. **HTTPS.** The browser APIs this relies on (Service Workers and the Push
+   API) only exist in a secure context, so notifications cannot work on a
+   plain-HTTP deployment — put your reverse proxy's TLS in front of Trails
+   first (`http://localhost` is exempt, which is enough for local
+   development). If HTTPS is missing, the Settings toggle says so rather
+   than offering a switch that could never work.
+
+On iPhone and iPad there is a third requirement, imposed by iOS itself:
+Safari only grants notification permission to a site that has been added to
+the Home Screen (Share → Add to Home Screen). Trails ships a web app
+manifest so that install works; the Settings page shows this hint when it
+applies.
+
+Publishing a post notifies its subscribers exactly once. Unpublishing and
+re-publishing the same post does not notify anyone a second time, and a
+guest is never notified about a draft, a post marked Private, or any post on
+a private trip.
 
 ### Image tags
 

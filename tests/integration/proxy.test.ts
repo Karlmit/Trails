@@ -195,4 +195,40 @@ describe.skipIf(!hasTestDatabase)('proxy (AD-6/AD-7 auth gate)', () => {
       expect(body.error.code).toBe('UNAUTHORIZED');
     });
   });
+
+  // spec-push-notifications: the second disclosed /api/v1/** exception --
+  // POST/DELETE /api/v1/push/subscriptions only, so a Guest reading a
+  // Public Trip's Blog can approve (and revoke) notifications with no
+  // session. Same "reaches the route handler" vs "401" assertions as the
+  // Photos block above -- what an anonymous subscription may ever be told
+  // is a send-time decision (lib/push.ts's selectAudience, covered by
+  // tests/push.test.ts), never inferred from getting through here.
+  describe('Guest-eligible push subscribe exception (spec-push-notifications)', () => {
+    function requestForMethod(pathname: string, method: string) {
+      return new NextRequest(`http://localhost${pathname}`, { method });
+    }
+
+    it.each(['POST', 'DELETE'])(
+      'passes through an unauthenticated %s to the push subscriptions route',
+      async (method) => {
+        const res = await proxy(requestForMethod('/api/v1/push/subscriptions', method));
+        expect(res.headers.get('x-middleware-next')).toBe('1');
+      },
+    );
+
+    it('still 401s a GET on the same path (there is no read surface)', async () => {
+      const res = await proxy(requestForMethod('/api/v1/push/subscriptions', 'GET'));
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['/api/v1/push', '/api/v1/push/subscriptions/extra'])(
+      'still 401s an unauthenticated POST to %s (the exception is that exact path only)',
+      async (pathname) => {
+        const res = await proxy(requestForMethod(pathname, 'POST'));
+        expect(res.status).toBe(401);
+        const body = await res.json();
+        expect(body.error.code).toBe('UNAUTHORIZED');
+      },
+    );
+  });
 });

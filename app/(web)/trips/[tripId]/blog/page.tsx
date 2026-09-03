@@ -7,6 +7,8 @@ import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
 import { BlogPostCard } from '@/components/BlogPostCard';
+import { NotificationOptInCard } from '@/components/NotificationOptInCard';
+import { getPushPublicKey } from '@/lib/push-config';
 
 interface PageProps {
   params: Promise<{ tripId: string }>;
@@ -94,6 +96,17 @@ export default async function BlogPage({ params }: PageProps) {
         )}
       </div>
       <p className="text-soft">{t('description')}</p>
+
+      {/* spec-push-notifications: the "may we notify you?" ask lives here,
+          on the surface a reader (Guest included) is actually on when new
+          posts are what they care about. It renders nothing at all unless
+          the opt-in is available and untaken -- see the component. The
+          VAPID public key is passed down from the server rather than
+          fetched from an endpoint of its own: it is public by definition
+          (the browser sends it to its Push Service), and this way an
+          unconfigured deployment simply passes `null` and the whole
+          surface disappears with no extra request. */}
+      <NotificationOptInCard publicKey={getPushPublicKey()} />
 
       {posts.length === 0 ? (
         <div className="empty-state">{t('emptyState')}</div>
