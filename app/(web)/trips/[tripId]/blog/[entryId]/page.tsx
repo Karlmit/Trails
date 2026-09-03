@@ -6,6 +6,8 @@ import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import { BlogPostDetailPanel } from '@/components/BlogPostDetailPanel';
+import { NotificationOptInCard } from '@/components/NotificationOptInCard';
+import { getPushPublicKey } from '@/lib/push-config';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
 
 interface PageProps {
@@ -56,6 +58,12 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
       <Link href={`/trips/${tripId}/blog`} className="text-soft">
         {t('backToBlog')}
       </Link>
+      {/* spec-push-notifications: the same ask as the Blog list carries, on
+          the page a shared link actually lands on -- a reader sent straight
+          to one post would otherwise never be offered notifications at all.
+          Same component, same localStorage dismissal, so saying "Not now"
+          on either surface silences both. */}
+      <NotificationOptInCard publicKey={getPushPublicKey()} />
       <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
     </main>
   );
