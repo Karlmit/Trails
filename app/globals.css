@@ -367,6 +367,77 @@ p {
   .notify-card-actions .btn {
     flex: 1 1 0;
   }
+
+  /* The bar covers the Timeline it is pinned over, so on a phone it has to
+     earn every pixel: measured at 243px (31% of a 390x780 screen) with the
+     in-flow card's own padding and body size, which is far too much of a
+     view whose whole point is the graph behind it. Tightened to roughly a
+     seventh of the screen -- the copy still fits, the buttons keep their
+     44px+ tap target. */
+  .notify-bar {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .notify-bar .notify-card-icon {
+    font-size: 1.25rem;
+  }
+
+  .notify-bar .notify-card-text strong {
+    font-size: 0.95rem;
+  }
+
+  .notify-bar .notify-card-text p {
+    font-size: 0.85rem;
+    line-height: 1.35;
+  }
+
+  .notify-bar .notify-card-text {
+    flex-basis: calc(100% - 1.25rem - var(--space-2));
+  }
+}
+
+/* The Timeline's variant: the same block pinned to the bottom of the
+   VIEWPORT, not the document. An Active Trip's Timeline auto-scrolls to
+   today on load, so a card at the top of that page would be scrolled past
+   unseen -- and, appearing after mount, would shove the row auto-scroll
+   had just positioned. Fixed positioning sidesteps both: it cannot shift
+   the graph at all, and it is visible wherever the reader has scrolled to.
+   Square-cornered and edge-to-edge, so it reads as page chrome rather than
+   a card that happens to be floating. */
+.notify-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  margin-bottom: 0;
+  border-radius: 0;
+  /* Shadow cast upward -- the content it covers is above it. */
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1), 0 -2px 2px rgba(0, 0, 0, 0.06);
+  /* Long trip names / two-line copy must not let the bar eat a phone
+     screen; its own actions stay reachable. */
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* `--notify-bar-height` is published by the component from the bar's own
+   measured height (it wraps to two rows on a phone), and the class is only
+   present while the bar is actually on screen -- so nothing reserves space
+   for an ask that is never shown. */
+body.has-notify-bar .fab {
+  bottom: calc(var(--space-4) + var(--notify-bar-height, 96px));
+}
+
+/* Without this the tail of the Timeline (or of any page carrying the bar)
+   sits underneath it, unreachable by scrolling. Overrides the plain
+   `.page:has(.fab)` padding above, which only accounts for the FAB. */
+body.has-notify-bar .page {
+  padding-bottom: calc(var(--notify-bar-height, 96px) + var(--space-4));
+}
+
+body.has-notify-bar .page:has(.fab) {
+  padding-bottom: calc(56px + var(--space-6) + var(--notify-bar-height, 96px));
 }
 
 /* Top nav */

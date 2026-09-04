@@ -28,6 +28,8 @@ import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
 import Link from 'next/link';
 import { TimelineAutoScroll } from '@/components/TimelineAutoScroll';
+import { NotificationOptInCard } from '@/components/NotificationOptInCard';
+import { getPushPublicKey } from '@/lib/push-config';
 
 interface PageProps {
   params: Promise<{ tripId: string }>;
@@ -325,6 +327,16 @@ export default async function TimelinePage({ params }: PageProps) {
   return (
     <main className="page">
       {todayKey && <TimelineAutoScroll targetId={`day-${todayKey}`} />}
+
+      {/* spec-push-notifications, user-requested ("can we just make it so
+          that prompt is automatically given when they enter the timeline"):
+          the Timeline is where every visitor lands (app/page.tsx routes
+          here), so the ask is offered here rather than only on the Blog
+          surfaces. `bar` -- not an in-flow card -- because this page
+          auto-scrolls to today; see the component's own comment. It stays
+          silent when unavailable or already answered, and "Not now" is
+          remembered across every surface. */}
+      <NotificationOptInCard publicKey={getPushPublicKey()} variant="bar" />
 
       {trip.sections.length === 0 && (
         <p className="text-soft" style={{ marginBottom: 'var(--space-3)' }}>
