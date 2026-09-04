@@ -85,43 +85,123 @@ Trails is built for one trusted household, not multiple isolated accounts.
 
 Readers can ask to be notified whenever a new blog post is published — the
 notification opens that post directly. It works for signed-in users and for
-guests reading a public trip's blog, and the ask appears as a small card on
-the trip's Blog page (plus a permanent on/off switch in **Settings** for
-signed-in users). Notifications are per browser, so each device opts in
-separately.
+guests reading a public trip's blog: the ask appears as a small card on the
+trip's Blog page and on an individual post's page (so a shared link offers
+it too), plus a permanent on/off switch in **Settings** for signed-in users.
+Notifications are per browser, so each device opts in separately.
 
-Two things are required:
+This is a web feature only — it has nothing to do with the Android app.
 
-1. **A VAPID keypair.** Generate it once and set it on the container:
+Nothing appears anywhere until you set a VAPID keypair, so the setup below
+is not optional if you want notifications.
 
-   ```sh
-   npx web-push generate-vapid-keys
-   ```
+#### What VAPID is, briefly
 
-   Put the two values in `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` and set
-   `VAPID_SUBJECT` to a `mailto:` address. Keep the keypair **stable** —
-   every browser's subscription is tied to the public key it was created
-   with, so changing it forces every subscriber to opt in again. With the
-   keys unset, nothing about the app changes: the opt-in is simply never
-   offered.
+A browser that opts in mints its own private "mailbox" URL at its vendor's
+push service (`fcm.googleapis.com` for Chrome and Android,
+`web.push.apple.com` for Safari). Trails posts a notification to that
+mailbox and the push service delivers it to the device. VAPID (Voluntary
+Application Server Identification) is a keypair you generate yourself so
+those push services can tell a delivery request genuinely came from your
+Trails instance and not from anyone who got hold of a mailbox URL:
 
-2. **HTTPS.** The browser APIs this relies on (Service Workers and the Push
-   API) only exist in a secure context, so notifications cannot work on a
-   plain-HTTP deployment — put your reverse proxy's TLS in front of Trails
-   first (`http://localhost` is exempt, which is enough for local
-   development). If HTTPS is missing, the Settings toggle says so rather
-   than offering a switch that could never work.
+| Variable | What it is |
+| --- | --- |
+| `VAPID_PUBLIC_KEY` | Handed to the browser at subscribe time; each mailbox is permanently bound to it. |
+| `VAPID_PRIVATE_KEY` | Stays on the server and signs every send. A secret — keep it out of version control. |
+| `VAPID_SUBJECT` | A `mailto:` address (or https URL). Only used if a push service needs to contact an operator about a misbehaving sender; never shown to subscribers. |
 
-On iPhone and iPad there is a third requirement, imposed by iOS itself:
+No third-party account and no cost — you generate the pair yourself. The one
+rule is to **keep it stable**: every existing subscription is tied to the
+public key it was created with, so replacing the keypair silently orphans
+every subscriber and they all have to opt in again.
+
+#### 1. Generate the keypair (once)
+
+```sh
+npx web-push generate-vapid-keys
+```
+
+That prints a `Public Key:` and a `Private Key:` line. Keep them somewhere
+safe — you will need the same pair again on every future update.
+
+#### 2. Set the three variables on the container
+
+**Docker Compose** (including Unraid's Compose plugin — Compose → your
+Trails stack → *Edit Stack*). Add them to the `trails` service's existing
+`environment:` block, at the same indentation as `DATABASE_URL`:
+
+```yaml
+    environment:
+      DATABASE_URL: postgresql://trails:trails@db:5432/trails?schema=public
+      NODE_ENV: production
+      COOKIE_SECURE: "true"
+      VAPID_PUBLIC_KEY: "<the public key you generated>"
+      VAPID_PRIVATE_KEY: "<the private key you generated>"
+      VAPID_SUBJECT: "mailto:you@example.com"
+```
+
+Then bring the stack back up (*Compose Up*, or `docker compose up -d` —
+`docker compose pull` first if you are also updating the image).
+
+To keep the private key out of a file you might commit or share, put the
+values in a `.env` next to the compose file instead (plain
+`VAPID_PUBLIC_KEY=...` lines, no indentation and no quotes) and reference
+them from the service:
+
+```yaml
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+```
+
+**Unraid's plain Docker template** (no compose): *Edit* the container →
+**Add another Path, Port, Variable, Label or Device** → Config Type
+**Variable** → Key `VAPID_PUBLIC_KEY`, Value the public key → *Add*. Repeat
+for `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT`, then *Apply* to recreate the
+container.
+
+#### 3. Serve Trails over HTTPS
+
+Service Workers and the Push API only exist in a secure context, so
+notifications cannot work on a plain-HTTP deployment — put your
+TLS-terminating reverse proxy (Nginx Proxy Manager, Traefik, SWAG, …) in
+front of Trails first, and set `COOKIE_SECURE: "true"` while you are there.
+`http://localhost` is the one exemption, which is enough for local
+development.
+
+#### 4. Check that it worked
+
+```sh
+docker exec <trails-container> printenv | grep VAPID
+```
+
+Then open `/settings` in a browser: a **Notifications** row with On/Off
+appears once the keys are live. Turn it on, publish a blog post, and the
+notification should arrive on that device.
+
+| What you see in Settings | What it means |
+| --- | --- |
+| No Notifications row at all | The keys never reached the container — check step 2 and that you recreated it, not just restarted the stack's proxy. |
+| "Notifications are not set up on this server." | Same cause: `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` is empty or only one of the two is set. |
+| "Notifications need a secure (HTTPS) connection." | You are reaching Trails over plain HTTP (e.g. a LAN IP and port) — see step 3. |
+| "Notifications are blocked for this site." | The browser denied permission earlier. Only the visitor can undo that, in the browser's site settings. |
+| An "add Trails to your Home Screen" hint | iPhone/iPad, see below. |
+
+On iPhone and iPad there is one extra requirement, imposed by iOS itself:
 Safari only grants notification permission to a site that has been added to
-the Home Screen (Share → Add to Home Screen). Trails ships a web app
-manifest so that install works; the Settings page shows this hint when it
-applies.
+the Home Screen (Share → Add to Home Screen) and opened from there. Trails
+ships a web app manifest so that install works properly; the Settings page
+shows this hint when it applies. Android Chrome and desktop browsers work
+straight from an ordinary tab.
+
+#### What gets sent, and to whom
 
 Publishing a post notifies its subscribers exactly once. Unpublishing and
 re-publishing the same post does not notify anyone a second time, and a
 guest is never notified about a draft, a post marked Private, or any post on
-a private trip.
+a private trip. Subscriptions whose browser has gone for good are cleaned up
+automatically the next time a post is published.
 
 ### Image tags
 
