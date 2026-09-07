@@ -40,8 +40,11 @@ interface PhotoGalleryProps {
   // component seeds its state from it and skips the initial self-fetch
   // entirely; every mutation still updates local state optimistically (same
   // pattern as AttachmentList), so no later re-fetch is needed either. When
-  // omitted (IdeaCard/ImportantInfoCard, never Guest-reachable), falls back
-  // to AttachmentList's plain self-fetching shape.
+  // omitted (IdeaForm/ImportantInfoForm/ImportantInfoCard, never
+  // Guest-reachable), falls back to AttachmentList's plain self-fetching
+  // shape. (The Ideas *list* no longer mounts this at all -- its redesigned
+  // card shows the Cover Photo itself and leaves Photo management to
+  // IdeaForm's own mount, in edit mode.)
   initialPhotos?: PhotoDTO[];
 }
 

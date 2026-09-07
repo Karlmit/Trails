@@ -1755,3 +1755,423 @@ body.has-notify-bar .page:has(.fab) {
 .bn-block:has(> .react-renderer.node-layoutImage) {
   display: block;
 }
+
+/* ============================================================
+   Ideas shortlist (app/(web)/trips/[tripId]/ideas)
+   ------------------------------------------------------------
+   User-reported redesign: "the design is very much lacking ...
+   the cover image is weirdly placed, the convert button is not
+   matching the other buttons." Rationale in .design/PLAN.md;
+   the two components carry the per-decision comments. Every
+   value below resolves to an existing token -- no new color,
+   radius, or typeface is introduced for this one view.
+   ============================================================ */
+
+/* Page header: title block on the left, the create action on the right
+   where a page-level action belongs. `+ Add Idea` used to be a
+   full-width pill wider than any content on the page.
+
+   IdeaForm's create mode renders that button while closed and a whole
+   `.card` form once opened -- which cannot share a row with the title.
+   `:has()` lets the header flip to a single column for the open state
+   only, the same technique `.page:has(.fab)` already uses in this file. */
+.ideas-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.ideas-header:has(.card) {
+  display: block;
+}
+
+.ideas-header:has(.card) > div:first-child {
+  margin-bottom: var(--space-3);
+}
+
+.ideas-title {
+  margin: 0 0 var(--space-1) 0;
+}
+
+.ideas-subtitle {
+  margin: 0;
+  color: var(--color-text-soft);
+  /* The subtitle is a full sentence of explanation; keep it off the
+     measure the 960px page would otherwise give it. */
+  max-width: 58ch;
+}
+
+/* Filter bar. Was four `.field` blocks, each with a tracked-out ALL-CAPS
+   label stacked above a square-cornered native select. Now one quiet
+   band: sentence-case labels sitting inline before pill selects, so the
+   controls speak the same geometry as every button in the system. */
+.ideas-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  margin-bottom: var(--space-4);
+}
+
+/* Four filters plus the submit share one line at the 960px page width.
+   Label above rather than beside: "Väderlämplighet" beside its own select
+   costs ~250px, which forced the button onto an orphaned second row. */
+.ideas-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.ideas-filter label {
+  font-size: 0.8125rem;
+  color: var(--color-text-soft);
+  /* Sentence case, not the tracked-out uppercase this bar used to carry on
+     all four labels. */
+  text-transform: none;
+  letter-spacing: var(--tracking-tight);
+}
+
+.ideas-filter select {
+  width: 100%;
+  border: 1px solid #d6dbde;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.35rem 0.9rem;
+  min-height: 38px;
+}
+
+.ideas-filter select:focus-visible {
+  outline: 2px solid var(--color-brand-accent);
+  outline-offset: 1px;
+}
+
+.ideas-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+.ideas-filter-clear {
+  font-size: 0.875rem;
+  color: var(--color-text-soft);
+}
+
+.ideas-filter-clear:hover {
+  color: var(--color-text);
+}
+
+/* Section groups. The old view sorted by Section but never said so --
+   every card repeated its own Section name as a metadata word instead.
+   The group heading carries it once, in that Section's own stored color
+   (the same value the Timeline paints its rail with), and the rule runs
+   to the count so the group reads as one band across the grid. */
+.ideas-group {
+  margin-bottom: var(--space-5);
+}
+
+.ideas-group-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3) 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-brand-deep);
+}
+
+/* Only rendered for a Section with no emoji of its own -- the emoji and
+   this dot are two markers doing the same job, and the rule to the right
+   already carries the Section's color either way. */
+.ideas-group-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.ideas-group-emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.ideas-group-name {
+  white-space: nowrap;
+}
+
+.ideas-group-rule {
+  flex: 1 1 auto;
+  height: 2px;
+  min-width: var(--space-2);
+  /* Held back from full strength so the heading text stays the thing you
+     read first, but not so far that two Sections' colors stop being
+     distinguishable from each other across the page. */
+  opacity: 0.55;
+}
+
+.ideas-group-count {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+}
+
+/* The grid. Rows stretch (the default) rather than each card sizing to its
+   own content: with ragged heights the two footer actions landed at a
+   different y in every card, so the eye had to hunt for them. Equal rows
+   put the action pair on one line across the row, and `margin-top: auto`
+   inside the card is what pins it there. */
+.ideas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(276px, 1fr));
+  gap: var(--space-3);
+}
+
+.idea-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* The Cover Photo as the card's own header image, full-bleed to the card
+   edges. It previously rendered twice per card: an 80px `float: right`
+   thumbnail beside the metadata, plus the whole read-only PhotoGallery
+   repeating it below under a `FOTON` label. */
+.idea-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--color-canvas-alt);
+}
+
+.idea-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Only shown when the Idea has Photos beyond its Cover -- the card face
+   deliberately shows one image, so this says what is behind Edit rather
+   than silently dropping them. */
+.idea-card-photo-count {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background: rgba(30, 57, 50, 0.82);
+  color: var(--color-text-on-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Stands in for the image on a photo-less Idea: the Section's color as a
+   thin edge, so the card still reads as part of its group. Not a
+   placeholder graphic -- there is no photo, and inventing one would be
+   decoration. */
+.idea-card-edge {
+  height: 6px;
+  flex: 0 0 auto;
+}
+
+.idea-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  flex: 1 1 auto;
+}
+
+/* The subject of the card. Was `h3` at 1rem/600 -- the same size as the
+   body copy under it, which is why nothing on the old card read as its
+   title. */
+.idea-card-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.idea-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Sentence case, not the tracked-out uppercase of the shared `.badge`
+   (which stays as it is -- Trip status and Blog draft/published both use
+   it, and those are unrelated semantics). Three tiers of visual
+   commitment in brand palette only: the page's weight follows how
+   committed you are to the Idea. Gold stays reserved for the Active-Trip
+   ceremony. */
+.idea-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.idea-chip-must-do {
+  background: var(--color-brand-accent);
+  color: #fff;
+}
+
+.idea-chip-would-like {
+  background: var(--color-brand-mint);
+  color: var(--color-brand-deep);
+}
+
+.idea-chip-maybe {
+  background: transparent;
+  color: var(--color-text-soft);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+}
+
+.idea-chip-category {
+  background: var(--color-surface-cool);
+  color: var(--color-text-soft);
+  font-weight: 400;
+}
+
+/* Clamped so a long note cannot make one card twice its neighbours'
+   height -- the grid only reads as a grid if the cards stay comparable.
+   The full text is one click away in Edit. */
+.idea-card-description {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Where it is, sitting with the chips as context for the title -- it used
+   to appear below the description, between the cost and the actions, which
+   read as a footnote rather than as part of identifying the place. */
+.idea-card-place {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-soft);
+}
+
+/* Footer: the two hard facts (what it costs, where to read more) over the
+   action pair. `margin-top: auto` sits here rather than on the actions
+   alone, so on a card with little to say the slack from the row's equal
+   height opens up *after* the description instead of splitting the facts
+   band away from the buttons it belongs to. */
+.idea-card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.idea-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* Left-aligned, not space-between: an Idea nobody has costed yet would
+     otherwise push its lone link to the far right of an empty row, which
+     read as a layout fault rather than a choice. */
+  gap: var(--space-1) var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  font-size: 0.875rem;
+}
+
+.idea-card-cost {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.idea-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* The two actions as one matched pair: same height, same pill, same
+   label size, differing only in fill. Convert used to be a full-width
+   solid green bar on every card -- the loudest thing on the page for its
+   rarest action -- with Edit as a small outline pill up beside the title.
+   `margin-top: auto` pins the pair to the card's foot so the row lines up
+   across neighbours of unequal text length. */
+.idea-card-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.idea-card-actions > * {
+  flex: 1 1 auto;
+}
+
+/* `.btn`'s own 0.9rem/1.6rem padding is sized for a page-level action and
+   overflows a 276px card foot holding two of them. `nowrap` matters for the
+   matched pair specifically: the moment one label wraps to a second line
+   the two buttons stop being the same height, which is the exact thing the
+   redesign was asked to fix. */
+.btn-compact {
+  padding: 0.5rem 1rem;
+  min-height: 38px;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.idea-card-actions > *:focus-visible,
+.idea-card-links a:focus-visible,
+.ideas-header .btn:focus-visible {
+  outline: 2px solid var(--color-brand-deep);
+  outline-offset: 2px;
+}
+
+/* Editing breaks the Idea out of the grid: IdeaForm is a tall form with
+   Links and Photos below it and cannot live in a 276px track. */
+.idea-card-editing {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .ideas-filters {
+    gap: var(--space-2);
+  }
+
+  .ideas-filter {
+    /* Two filters per row on a phone rather than four cramped ones. */
+    flex: 1 1 calc(50% - var(--space-2));
+  }
+
+  .ideas-filter-actions {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+
+  /* A 4:3 image is 270px tall once the card goes full-width on a phone,
+     which pushes the title of every idea below the fold as you scroll.
+     3:2 keeps the photograph generous but hands ~70px per card back to
+     the text. */
+  .idea-card-media {
+    aspect-ratio: 3 / 2;
+  }
+}
