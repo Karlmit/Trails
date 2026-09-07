@@ -38,7 +38,9 @@
     <string name="info_action_save">Save changes</string>
     <string name="info_documents_photos_heading">Documents &amp; photos</string>
     <string name="info_add_photo">+ Add photo</string>
+    <string name="info_add_photo_url">+ Photo URL</string>
     <string name="info_add_document">+ Add document</string>
+    <string name="info_add_document_url">+ File URL</string>
     <string name="info_action_delete">Delete</string>
     <string name="info_delete_dialog_title">Delete this item?</string>
     <string name="info_delete_dialog_message">This cannot be undone.</string>

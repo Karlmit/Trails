@@ -10,11 +10,13 @@ import { MAX_UPLOAD_BYTES as ATTACHMENT_MAX_UPLOAD_BYTES } from '@/lib/attachmen
 
 // FR-3/FR-15/FR-16/FR-26/FR-28, spec-tags-links-photos: pure helper tests.
 // Spec's "Always" boundary: "Photo uploads reuse lib/attachments.ts's
-// MIME/size-limit conventions ... restricted to image/jpeg/image/png only."
+// MIME/size-limit conventions ... restricted to images only."
 
 describe('ALLOWED_MIME_TYPES (image-only, no PDF)', () => {
-  it('accepts exactly image/jpeg and image/png', () => {
-    expect(ALLOWED_MIME_TYPES).toEqual(['image/jpeg', 'image/png']);
+  // Widened from the original jpeg/png pair when URL import landed -- see
+  // lib/photos.ts's own comment for why (most pasted image URLs serve WebP).
+  it('accepts exactly the four image formats', () => {
+    expect(ALLOWED_MIME_TYPES).toEqual(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
     for (const type of ALLOWED_MIME_TYPES) {
       expect(isAllowedMimeType(type)).toBe(true);
     }

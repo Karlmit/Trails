@@ -22,6 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,10 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
+import com.trails.app.ui.components.ErrorBanner
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
 import com.trails.app.ui.timeline.graph.formatEntryEndpoint
@@ -71,6 +76,10 @@ fun EntryDetailScreen(
         if (uri != null) viewModel.uploadAttachment(uri, queryDisplayName(context, uri))
     }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val importError by viewModel.importError.collectAsState()
+    // User-requested "post an image URL instead of uploading" -- one dialog
+    // reused for both intake targets, told apart by which one opened it.
+    var urlDialog by remember { mutableStateOf<UrlDialogTarget?>(null) }
 
     com.trails.app.ui.components.PullToRefreshScreen(
         isRefreshing = isRefreshing,
@@ -196,7 +205,15 @@ fun EntryDetailScreen(
 
             TrailsCard {
                 ScreenHeading(emoji = "📎", title = stringResource(R.string.timeline_photos_attachments))
-                Row(modifier = Modifier.fillMaxWidth()) {
+                importError?.let { message ->
+                    ErrorBanner(
+                        message = message,
+                        modifier = Modifier.padding(bottom = 8.dp).clickable { viewModel.dismissImportError() },
+                    )
+                }
+                // FlowRow, not Row: four actions (pick/paste x photo/document)
+                // do not fit one line on a phone.
+                androidx.compose.foundation.layout.FlowRow(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.timeline_add_photo),
                         style = MaterialTheme.typography.bodyMedium,
@@ -206,10 +223,22 @@ fun EntryDetailScreen(
                         },
                     )
                     Text(
+                        stringResource(R.string.timeline_add_photo_url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.padding(end = 20.dp).clickable { urlDialog = UrlDialogTarget.Photo },
+                    )
+                    Text(
                         stringResource(R.string.timeline_add_attachment),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
-                        modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },
+                        modifier = Modifier.padding(end = 20.dp).clickable { pickAttachment.launch(arrayOf("*/*")) },
+                    )
+                    Text(
+                        stringResource(R.string.timeline_add_attachment_url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.clickable { urlDialog = UrlDialogTarget.Attachment },
                     )
                 }
 
@@ -262,7 +291,32 @@ fun EntryDetailScreen(
             }
         }
     }
+
+    // Outside the PullToRefreshScreen content lambda on purpose -- that
+    // lambda returns early while the Entry is still loading, and a dialog
+    // must not be torn down by a refresh re-composition mid-typing.
+    urlDialog?.let { target ->
+        UrlImportDialog(
+            title = stringResource(
+                when (target) {
+                    UrlDialogTarget.Photo -> R.string.url_import_photo_title
+                    UrlDialogTarget.Attachment -> R.string.url_import_document_title
+                },
+            ),
+            onDismiss = { urlDialog = null },
+            onConfirm = { url ->
+                urlDialog = null
+                when (target) {
+                    UrlDialogTarget.Photo -> viewModel.importPhotoFromUrl(url)
+                    UrlDialogTarget.Attachment -> viewModel.importAttachmentFromUrl(url)
+                }
+            },
+        )
+    }
 }
+
+/** Which of this screen's two URL-import targets opened the shared dialog. */
+private enum class UrlDialogTarget { Photo, Attachment }
 
 @Composable
 private fun Field(label: String, value: String) {

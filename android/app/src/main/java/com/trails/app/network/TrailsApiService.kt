@@ -2,6 +2,7 @@ package com.trails.app.network
 
 import com.trails.app.network.dto.ActivityEntryRequest
 import com.trails.app.network.dto.AttachmentDto
+import com.trails.app.network.dto.AttachmentUrlRequest
 import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.ChecklistDto
 import com.trails.app.network.dto.ChecklistItemDto
@@ -20,6 +21,7 @@ import com.trails.app.network.dto.LoginResponse
 import com.trails.app.network.dto.MoveDirectionRequest
 import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.PhotoDto
+import com.trails.app.network.dto.PhotoUrlRequest
 import com.trails.app.network.dto.SectionDto
 import com.trails.app.network.dto.SectionRequest
 import com.trails.app.network.dto.StayEntryRequest
@@ -194,6 +196,11 @@ interface TrailsApiService {
         @Part file: MultipartBody.Part,
     ): AttachmentDto
 
+    // URL import -- same path as uploadAttachment above; the server picks the
+    // intake shape from Content-Type (see PhotoUrlRequest's own doc comment).
+    @POST("api/v1/attachments")
+    suspend fun importAttachmentFromUrl(@Body body: AttachmentUrlRequest): AttachmentDto
+
     @DELETE("api/v1/attachments/{id}")
     suspend fun deleteAttachment(@Path("id") id: String): Response<ResponseBody>
 
@@ -212,6 +219,11 @@ interface TrailsApiService {
         @Part file: MultipartBody.Part,
         @Part("isPrivate") isPrivate: okhttp3.RequestBody? = null,
     ): PhotoDto
+
+    // URL import -- same path as uploadPhoto above; the server picks the
+    // intake shape from Content-Type (see PhotoUrlRequest's own doc comment).
+    @POST("api/v1/photos")
+    suspend fun importPhotoFromUrl(@Body body: PhotoUrlRequest): PhotoDto
 
     @DELETE("api/v1/photos/{id}")
     suspend fun deletePhoto(@Path("id") id: String): Response<ResponseBody>

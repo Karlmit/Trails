@@ -47,6 +47,7 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.util.queryDisplayName
@@ -68,6 +69,8 @@ fun IdeaEditScreen(
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showConvertConfirm by remember { mutableStateOf(false) }
+    // User-requested "post an image URL instead of uploading" -- see UrlImportDialog.
+    var showPhotoUrlDialog by remember { mutableStateOf(false) }
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.uploadPhoto(uri, queryDisplayName(context, uri))
@@ -212,8 +215,13 @@ fun IdeaEditScreen(
                             Text(stringResource(R.string.idea_edit_uploading_photo), color = TrailsColors.TextSoft, modifier = Modifier.padding(start = 8.dp))
                         }
                     } else {
-                        TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
-                            Text(stringResource(R.string.idea_edit_add_photo))
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            TextButton(onClick = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                                Text(stringResource(R.string.idea_edit_add_photo))
+                            }
+                            TextButton(onClick = { showPhotoUrlDialog = true }) {
+                                Text(stringResource(R.string.url_import_action))
+                            }
                         }
                     }
                 }
@@ -241,6 +249,17 @@ fun IdeaEditScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+
+    if (showPhotoUrlDialog) {
+        UrlImportDialog(
+            title = stringResource(R.string.url_import_photo_title),
+            onDismiss = { showPhotoUrlDialog = false },
+            onConfirm = { url ->
+                showPhotoUrlDialog = false
+                viewModel.importPhotoFromUrl(url)
+            },
+        )
     }
 
     if (showDeleteConfirm) {

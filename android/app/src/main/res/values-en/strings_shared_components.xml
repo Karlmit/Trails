@@ -19,4 +19,17 @@
     <string name="shared_link_label_placeholder">Label (optional)</string>
 
     <string name="shared_tags_label">TAGS</string>
+
+    <!-- User-requested: "make it so anywhere I can upload a photo it's also
+         possible to just post an image URL, that way the user does not have to actually download the photo first." Shared by every screen with a photo
+         picker (Ideas, Entry detail, Important Info, Blog); see
+         ui/components/UrlImportDialog.kt. -->
+    <string name="url_import_action">🔗 From URL</string>
+    <string name="url_import_photo_title">Add photo from URL</string>
+    <string name="url_import_document_title">Add document from URL</string>
+    <string name="url_import_hint">Paste a link to the image. It is fetched and stored with the trip, so it works offline too.</string>
+    <string name="url_import_placeholder">https://example.com/photo.jpg</string>
+    <string name="url_import_confirm">Add</string>
+    <string name="url_import_cancel">Cancel</string>
+    <string name="url_import_error">Could not add from that URL.</string>
 </resources>

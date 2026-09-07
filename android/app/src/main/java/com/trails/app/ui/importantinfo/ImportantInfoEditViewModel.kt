@@ -12,6 +12,7 @@ import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.ImportantInfoEntity
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.network.apiErrorMessage
 import com.trails.app.network.dto.ImportantInfoRequest
 import com.trails.app.network.dto.diffFields
 import com.trails.app.network.dto.jsonStringOrNull
@@ -150,6 +151,32 @@ class ImportantInfoEditViewModel @Inject constructor(
         }
     }
 
+    /**
+     * User-requested: "make it so anywhere I can upload a photo it's also
+     * possible to just post an image URL, that way the user does not have to
+     * actually download the photo first." Shares `uploadingPhoto`/`error`
+     * with `uploadPhoto` above so this screen shows one spinner and one
+     * banner regardless of how the photo came in. The server's own reason
+     * ("That URL could not be reached", ...) is preferred over the generic
+     * fallback -- that message *is* the useful information for a bad URL.
+     */
+    fun importPhotoFromUrl(sourceUrl: String) {
+        val ownerId = infoId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(uploadingPhoto = true, error = null, errorRes = null)
+            runCatching { documentsRepository.importPhotoFromUrl(OWNER_TYPE, ownerId, sourceUrl) }
+                .onSuccess { _state.value = _state.value.copy(uploadingPhoto = false) }
+                .onFailure { e ->
+                    val message = e.apiErrorMessage()
+                    _state.value = _state.value.copy(
+                        uploadingPhoto = false,
+                        error = message,
+                        errorRes = if (message == null) R.string.url_import_error else null,
+                    )
+                }
+        }
+    }
+
     fun deletePhoto(photoId: String) {
         viewModelScope.launch {
             runCatching { documentsRepository.deletePhoto(photoId) }
@@ -162,6 +189,21 @@ class ImportantInfoEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching { documentsRepository.uploadAttachment(tripId, OWNER_TYPE, ownerId, uri, filename) }
                 .onFailure { e -> _state.value = _state.value.copy(error = e.message, errorRes = if (e.message == null) R.string.info_error_upload_document_failed else null) }
+        }
+    }
+
+    /** Same URL import as `importPhotoFromUrl`, for a document (PDF allowed too). */
+    fun importAttachmentFromUrl(sourceUrl: String) {
+        val ownerId = infoId ?: return
+        viewModelScope.launch {
+            runCatching { documentsRepository.importAttachmentFromUrl(OWNER_TYPE, ownerId, sourceUrl) }
+                .onFailure { e ->
+                    val message = e.apiErrorMessage()
+                    _state.value = _state.value.copy(
+                        error = message,
+                        errorRes = if (message == null) R.string.url_import_error else null,
+                    )
+                }
         }
     }
 

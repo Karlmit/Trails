@@ -47,6 +47,7 @@ import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TagsEditor
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.util.openCachedFile
 import com.trails.app.util.queryDisplayName
@@ -64,6 +65,9 @@ fun ImportantInfoEditScreen(
     val attachments by viewModel.attachments.collectAsState()
     val photos by viewModel.photos.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    // User-requested "post an image URL instead of uploading" -- one dialog
+    // reused for both intake targets, told apart by which one opened it.
+    var urlDialog by remember { mutableStateOf<InfoUrlDialogTarget?>(null) }
     val context = LocalContext.current
 
     val pickPhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -131,7 +135,9 @@ fun ImportantInfoEditScreen(
         if (!isNew) {
             TrailsCard {
                 ScreenHeading(emoji = "📎", title = stringResource(R.string.info_documents_photos_heading))
-                Row(modifier = Modifier.fillMaxWidth()) {
+                // FlowRow, not Row: four actions (pick/paste x photo/document)
+                // do not fit one line on a phone.
+                androidx.compose.foundation.layout.FlowRow(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.info_add_photo),
                         style = MaterialTheme.typography.bodyMedium,
@@ -141,10 +147,22 @@ fun ImportantInfoEditScreen(
                         },
                     )
                     Text(
+                        stringResource(R.string.info_add_photo_url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.padding(end = 20.dp).clickable { urlDialog = InfoUrlDialogTarget.Photo },
+                    )
+                    Text(
                         stringResource(R.string.info_add_document),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TrailsColors.BrandAccent,
-                        modifier = Modifier.clickable { pickAttachment.launch(arrayOf("*/*")) },
+                        modifier = Modifier.padding(end = 20.dp).clickable { pickAttachment.launch(arrayOf("*/*")) },
+                    )
+                    Text(
+                        stringResource(R.string.info_add_document_url),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.clickable { urlDialog = InfoUrlDialogTarget.Attachment },
                     )
                 }
 
@@ -189,6 +207,25 @@ fun ImportantInfoEditScreen(
         }
     }
 
+    urlDialog?.let { target ->
+        UrlImportDialog(
+            title = stringResource(
+                when (target) {
+                    InfoUrlDialogTarget.Photo -> R.string.url_import_photo_title
+                    InfoUrlDialogTarget.Attachment -> R.string.url_import_document_title
+                },
+            ),
+            onDismiss = { urlDialog = null },
+            onConfirm = { url ->
+                urlDialog = null
+                when (target) {
+                    InfoUrlDialogTarget.Photo -> viewModel.importPhotoFromUrl(url)
+                    InfoUrlDialogTarget.Attachment -> viewModel.importAttachmentFromUrl(url)
+                }
+            },
+        )
+    }
+
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -199,3 +236,6 @@ fun ImportantInfoEditScreen(
         )
     }
 }
+
+/** Which of this screen's two URL-import targets opened the shared dialog. */
+private enum class InfoUrlDialogTarget { Photo, Attachment }

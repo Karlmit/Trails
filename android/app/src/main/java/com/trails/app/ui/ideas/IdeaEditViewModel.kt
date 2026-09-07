@@ -13,6 +13,7 @@ import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.network.apiErrorMessage
 import com.trails.app.network.dto.IdeaRequest
 import com.trails.app.network.dto.diffFields
 import com.trails.app.network.dto.jsonStringOrNull
@@ -307,6 +308,36 @@ class IdeaEditViewModel @Inject constructor(
                     uploadingPhoto = false,
                     error = e.message,
                     errorRes = if (e.message == null) R.string.idea_edit_error_upload_photo_failed else null,
+                )
+            }
+        }
+    }
+
+    /**
+     * User-requested: "make it so anywhere I can upload a photo it's also
+     * possible to just post an image URL, that way the user does not have to
+     * actually download the photo first." Shares `uploadingPhoto`/`error`
+     * with `uploadPhoto` above on purpose -- the screen shows one spinner and
+     * one banner no matter which way the photo came in -- and goes through
+     * `ensureIdeaId()` the same way, so pasting a URL also works on a
+     * brand-new, not-yet-saved Idea.
+     */
+    fun importPhotoFromUrl(sourceUrl: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(uploadingPhoto = true, error = null, errorRes = null)
+            runCatching {
+                val ownerId = ensureIdeaId()
+                documentsRepository.importPhotoFromUrl(OWNER_TYPE, ownerId, sourceUrl)
+            }.onSuccess {
+                _state.value = _state.value.copy(uploadingPhoto = false)
+            }.onFailure { e ->
+                // The server's own reason ("That URL could not be reached",
+                // "not a supported file type", ...) is the useful message here.
+                val message = e.apiErrorMessage()
+                _state.value = _state.value.copy(
+                    uploadingPhoto = false,
+                    error = message,
+                    errorRes = if (message == null) R.string.url_import_error else null,
                 )
             }
         }

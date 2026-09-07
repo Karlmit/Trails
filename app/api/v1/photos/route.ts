@@ -14,6 +14,7 @@ import {
   PHOTO_OWNER_TYPES,
   type PhotoOwnerType,
 } from '@/lib/photos';
+import { fetchRemoteFile } from '@/lib/remote-media';
 import { serializePhoto } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
@@ -138,9 +139,120 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(photos.map(serializePhoto));
 }
 
+/**
+ * The shared tail every intake path ends in: resolve the owner's Trip, write
+ * the bytes at AD-5's path shape, insert the row, revalidate. Extracted when
+ * URL import was added (below) so the multipart and the URL paths cannot
+ * drift on the disk layout, the orphan-file cleanup, or which pages get
+ * revalidated -- they differ only in *where the bytes came from*.
+ */
+async function createPhotoFromBytes(input: {
+  ownerType: PhotoOwnerType;
+  ownerId: string;
+  bytes: Buffer;
+  mimeType: string;
+  originalFilename: string;
+  isPrivate: boolean;
+}) {
+  const { ownerType, ownerId, bytes, mimeType, originalFilename, isPrivate } = input;
+
+  const owner = await resolveOwnerTripId(ownerType, ownerId);
+  if (!owner) return Errors.notFound('Owner not found');
+
+  const filePath = buildUploadPath(owner.tripId, ownerType, ownerId, originalFilename);
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, bytes);
+
+  try {
+    const photo = await prisma.photo.create({
+      data: {
+        tripId: owner.tripId,
+        ownerType,
+        ownerId,
+        filePath,
+        mimeType,
+        sizeBytes: bytes.byteLength,
+        originalFilename,
+        isPrivate,
+      },
+    });
+
+    revalidateForOwner(owner.tripId, ownerType, ownerId, owner.entryType);
+
+    return NextResponse.json(serializePhoto(photo), { status: 201 });
+  } catch (err) {
+    // Same orphan-file cleanup as app/api/v1/attachments/route.ts: the owner
+    // row existed at the lookup above but was deleted before this insert
+    // committed.
+    await unlink(filePath).catch(() => {});
+    if (isForeignKeyViolationError(err)) return Errors.notFound('Owner not found');
+    throw err;
+  }
+}
+
+/**
+ * User-requested: "make it so anywhere I can upload a photo it's also
+ * possible to just post an image URL, that way the user does not have to
+ * actually download the photo first."
+ *
+ * A second intake shape on this same endpoint, selected by Content-Type
+ * (`application/json` here, `multipart/form-data` below) rather than a
+ * separate route -- the two produce an identical Photo row, and every caller
+ * (PhotoGallery's URL field, RichTextEditor's blog images, the Android
+ * clients) already knows this URL. The remote bytes are fetched *server*-
+ * side and stored like any upload; see lib/remote-media.ts for why this is
+ * an import rather than a stored third-party reference, and for the SSRF
+ * guard that outbound fetch needs.
+ */
+async function postFromUrl(request: NextRequest) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Errors.validation('Request body must be valid JSON');
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return Errors.validation('Request body must be a JSON object');
+  }
+  const { ownerType, ownerId, sourceUrl, isPrivate } = body as Record<string, unknown>;
+
+  if (typeof ownerType !== 'string' || !isPhotoOwnerType(ownerType)) {
+    return Errors.validation(`ownerType must be one of: ${PHOTO_OWNER_TYPES.join(', ')}`);
+  }
+  if (typeof ownerId !== 'string' || !isUuid(ownerId)) {
+    return Errors.validation('ownerId must be a valid UUID');
+  }
+  if (typeof sourceUrl !== 'string' || sourceUrl.trim().length === 0) {
+    return Errors.validation('sourceUrl is required');
+  }
+
+  const fetched = await fetchRemoteFile(sourceUrl, {
+    allowedMimeTypes: ALLOWED_MIME_TYPES,
+    maxBytes: MAX_UPLOAD_BYTES,
+    fallbackBasename: 'photo',
+  });
+  if (!fetched.ok) return Errors.validation(fetched.message);
+
+  return createPhotoFromBytes({
+    ownerType,
+    ownerId,
+    bytes: fetched.bytes,
+    mimeType: fetched.mimeType,
+    // `filenameFromUrl` already caps its own length well under this limit,
+    // so no MAX_ORIGINAL_FILENAME_LENGTH check is needed on this path.
+    originalFilename: fetched.filename,
+    isPrivate: isPrivate === true,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const user = await getUserFromApiRequest(request);
   if (!user) return Errors.unauthorized();
+
+  if ((request.headers.get('content-type') ?? '').includes('application/json')) {
+    return postFromUrl(request);
+  }
 
   // Same declared-Content-Length pre-check as app/api/v1/attachments/route.ts.
   const declaredLength = Number(request.headers.get('content-length'));
@@ -196,38 +308,12 @@ export async function POST(request: NextRequest) {
     return Errors.validation(`Filename exceeds the maximum length of ${MAX_ORIGINAL_FILENAME_LENGTH} characters`);
   }
 
-  const owner = await resolveOwnerTripId(ownerType, ownerId);
-  if (!owner) return Errors.notFound('Owner not found');
-
-  const filePath = buildUploadPath(owner.tripId, ownerType, ownerId, file.name);
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, bytes);
-
-  try {
-    const photo = await prisma.photo.create({
-      data: {
-        tripId: owner.tripId,
-        ownerType,
-        ownerId,
-        filePath,
-        mimeType: file.type,
-        sizeBytes: file.size,
-        originalFilename: file.name,
-        isPrivate,
-      },
-    });
-
-    revalidateForOwner(owner.tripId, ownerType, ownerId, owner.entryType);
-
-    return NextResponse.json(serializePhoto(photo), { status: 201 });
-  } catch (err) {
-    // Same orphan-file cleanup as app/api/v1/attachments/route.ts: the owner
-    // row existed at the lookup above but was deleted before this insert
-    // committed.
-    await unlink(filePath).catch(() => {});
-    if (isForeignKeyViolationError(err)) return Errors.notFound('Owner not found');
-    throw err;
-  }
+  return createPhotoFromBytes({
+    ownerType,
+    ownerId,
+    bytes: Buffer.from(await file.arrayBuffer()),
+    mimeType: file.type,
+    originalFilename: file.name,
+    isPrivate,
+  });
 }

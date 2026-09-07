@@ -24,4 +24,17 @@
     <string name="shared_link_label_placeholder">Etikett (valfritt)</string>
 
     <string name="shared_tags_label">TAGGAR</string>
+
+    <!-- User-requested: "make it so anywhere I can upload a photo it's also
+         possible to just post an image URL, that way the user does not have to actually download the photo first." Shared by every screen with a photo
+         picker (Ideas, Entry detail, Important Info, Blog); see
+         ui/components/UrlImportDialog.kt. -->
+    <string name="url_import_action">🔗 Från URL</string>
+    <string name="url_import_photo_title">Lägg till foto från URL</string>
+    <string name="url_import_document_title">Lägg till dokument från URL</string>
+    <string name="url_import_hint">Klistra in en länk till bilden. Den hämtas och sparas på resan, så den fungerar även offline.</string>
+    <string name="url_import_placeholder">https://exempel.se/foto.jpg</string>
+    <string name="url_import_confirm">Lägg till</string>
+    <string name="url_import_cancel">Avbryt</string>
+    <string name="url_import_error">Det gick inte att lägga till från den URL:en.</string>
 </resources>

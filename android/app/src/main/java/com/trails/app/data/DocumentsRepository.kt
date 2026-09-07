@@ -6,6 +6,8 @@ import com.trails.app.data.dao.PhotoDao
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.TrailsApiService
+import com.trails.app.network.dto.AttachmentUrlRequest
+import com.trails.app.network.dto.PhotoUrlRequest
 import kotlinx.coroutines.flow.Flow
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -57,6 +59,24 @@ class DocumentsRepository @Inject constructor(
         return entity
     }
 
+    /**
+     * User-requested: "make it so anywhere I can upload a photo it's also
+     * possible to just post an image URL, that way the user does not have to
+     * actually download the photo first."
+     *
+     * Identical to `uploadAttachment` except for where the bytes come from --
+     * the server fetches the URL and stores the result as an ordinary
+     * Attachment row, so the local cache/DAO tail below is the same code.
+     */
+    suspend fun importAttachmentFromUrl(ownerType: String, ownerId: String, sourceUrl: String): AttachmentEntity {
+        val created = api.importAttachmentFromUrl(AttachmentUrlRequest(ownerType, ownerId, sourceUrl))
+        val entity = created.toEntity()
+        attachmentDao.upsertAll(listOf(entity))
+        val localPath = runCatching { fileCacheManager.downloadAttachment(entity) }.getOrNull()
+        if (localPath != null) attachmentDao.setLocalPath(entity.id, localPath)
+        return entity
+    }
+
     suspend fun deleteAttachment(attachmentId: String) {
         api.deleteAttachment(attachmentId)
         attachmentDao.deleteById(attachmentId)
@@ -76,6 +96,21 @@ class DocumentsRepository @Inject constructor(
             part,
             isPrivate.toString().toPlainRequestBody(),
         )
+        val entity = created.toEntity()
+        photoDao.upsertAll(listOf(entity))
+        val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()
+        if (localPath != null) photoDao.setLocalPath(entity.id, localPath)
+        return entity
+    }
+
+    /** URL-import counterpart of `uploadPhoto` -- see `importAttachmentFromUrl`. */
+    suspend fun importPhotoFromUrl(
+        ownerType: String,
+        ownerId: String,
+        sourceUrl: String,
+        isPrivate: Boolean = false,
+    ): PhotoEntity {
+        val created = api.importPhotoFromUrl(PhotoUrlRequest(ownerType, ownerId, sourceUrl, isPrivate))
         val entity = created.toEntity()
         photoDao.upsertAll(listOf(entity))
         val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()

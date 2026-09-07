@@ -10,6 +10,7 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.network.apiErrorMessage
 import com.trails.app.network.dto.BlogPostRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CompletableDeferred
@@ -190,6 +191,40 @@ class BlogEditViewModel @Inject constructor(
                 _state.value = _state.value.copy(uploadingImage = false, blocks = _state.value.blocks + newBlock)
             }.onFailure { e ->
                 val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_upload_failed)
+                _state.value = _state.value.copy(uploadingImage = false, error = error)
+            }
+        }
+    }
+
+    /**
+     * User-requested: "make it so anywhere I can upload a photo it's also
+     * possible to just post an image URL, that way the user does not have to
+     * actually download the photo first."
+     *
+     * Note what this deliberately does *not* do: it does not keep the pasted
+     * URL as the block's image source. It imports the image into the post's
+     * own Photos (the server fetches the bytes) and the block stores the
+     * resulting Photo id, exactly like `insertImage` above -- so a published
+     * post doesn't go blank the day the remote host rotates that file, and
+     * FileCacheManager can still cache it for offline reading. Same
+     * `ensurePostId` call for the same reason: a Photo needs an owner, even a
+     * Draft one.
+     */
+    fun insertImageFromUrl(sourceUrl: String, untitledLabel: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(uploadingImage = true, error = null)
+            runCatching {
+                val postId = ensurePostId(untitledLabel)
+                documentsRepository.importPhotoFromUrl(OWNER_TYPE, postId, sourceUrl)
+            }.onSuccess { photo ->
+                val newBlock = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
+                _state.value = _state.value.copy(uploadingImage = false, blocks = _state.value.blocks + newBlock)
+            }.onFailure { e ->
+                // The server's own reason ("That URL could not be reached",
+                // "not a supported file type") is the whole message for a bad
+                // URL -- Retrofit's own is just "HTTP 400 Bad Request".
+                val error = e.apiErrorMessage()?.let { BlogEditError.Message(it) }
+                    ?: BlogEditError.Resource(R.string.url_import_error)
                 _state.value = _state.value.copy(uploadingImage = false, error = error)
             }
         }

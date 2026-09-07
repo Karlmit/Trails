@@ -9,12 +9,14 @@ import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.network.apiErrorMessage
 import com.trails.app.sync.SyncScheduler
 import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -49,16 +51,60 @@ class EntryDetailViewModel @Inject constructor(
         refresher?.refresh()
     }
 
+    // Added with URL import below: a pasted URL can fail for reasons the User
+    // needs to read back ("That URL could not be reached", "not a supported
+    // file type"), and this screen previously swallowed every upload failure
+    // into a bare `runCatching {}` with nothing shown. Both intake paths now
+    // report through here, so a failed *file* pick is no longer silent either.
+    private val _importError = MutableStateFlow<String?>(null)
+    val importError: StateFlow<String?> = _importError.asStateFlow()
+
+    fun dismissImportError() {
+        _importError.value = null
+    }
+
+    private fun reportFailure(error: Throwable) {
+        _importError.value = error.apiErrorMessage() ?: error.message ?: GENERIC_IMPORT_FAILURE
+    }
+
     fun uploadPhoto(uri: Uri, filename: String) {
         viewModelScope.launch {
+            _importError.value = null
             runCatching { documentsRepository.uploadPhoto("TIMELINE_ENTRY", entryId, uri, filename) }
+                .onFailure(::reportFailure)
         }
     }
 
     fun uploadAttachment(uri: Uri, filename: String) {
         viewModelScope.launch {
             val tripId = uiState.value.entry?.tripId ?: return@launch
+            _importError.value = null
             runCatching { documentsRepository.uploadAttachment(tripId, "TIMELINE_ENTRY", entryId, uri, filename) }
+                .onFailure(::reportFailure)
+        }
+    }
+
+    /**
+     * User-requested: "make it so anywhere I can upload a photo it's also
+     * possible to just post an image URL, that way the user does not have to
+     * actually download the photo first." The server fetches the bytes and
+     * stores an ordinary Photo row, so nothing else on this screen changes --
+     * the new photo simply appears in the same observed list.
+     */
+    fun importPhotoFromUrl(sourceUrl: String) {
+        viewModelScope.launch {
+            _importError.value = null
+            runCatching { documentsRepository.importPhotoFromUrl("TIMELINE_ENTRY", entryId, sourceUrl) }
+                .onFailure(::reportFailure)
+        }
+    }
+
+    /** Same URL import for an Attachment -- PDFs included, same as the file picker. */
+    fun importAttachmentFromUrl(sourceUrl: String) {
+        viewModelScope.launch {
+            _importError.value = null
+            runCatching { documentsRepository.importAttachmentFromUrl("TIMELINE_ENTRY", entryId, sourceUrl) }
+                .onFailure(::reportFailure)
         }
     }
 
@@ -87,3 +133,10 @@ class EntryDetailViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), EntryDetailUiState())
 }
+
+// Last-resort text when a failure carries neither an API error envelope nor
+// an exception message. Not a @StringRes: this ViewModel already reports
+// dynamic strings (the server's own localized-by-the-server message) through
+// `importError`, and adding a parallel @StringRes channel for one unlikely
+// case would mean threading it through the screen for no real gain.
+private const val GENERIC_IMPORT_FAILURE = "Could not add that file."

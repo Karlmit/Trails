@@ -15,6 +15,7 @@ import {
 import { BlockNoteView } from '@blocknote/mantine';
 import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
+import { UrlImportField } from '@/components/UrlImportField';
 
 // User-reported: "look online for an easy way to integrate a ready made
 // WYSIWYG editor for blog posts ... a way to even choose if text is next to
@@ -68,6 +69,22 @@ const layoutImageBlock = createReactBlockSpec(
         }
       }
 
+      // Mirrors handleFileChange above, but returns the error string rather
+      // than storing it -- UrlImportField renders its own inline error next
+      // to the field the User just typed into.
+      async function handleUrlSubmit(sourceUrl: string): Promise<string | null> {
+        const importFromUrl = (editor as unknown as BlogImageUrlImporter).importImageFromUrl;
+        if (!importFromUrl) return t('imageUrlError');
+        setUploadError(null);
+        try {
+          const url = await importFromUrl(sourceUrl);
+          editor.updateBlock(block, { props: { ...block.props, url } });
+          return null;
+        } catch (err) {
+          return err instanceof Error && err.message ? err.message : t('imageUrlError');
+        }
+      }
+
       function setLayout(layout: 'block' | 'float-left' | 'float-right') {
         editor.updateBlock(block, { props: { ...block.props, layout } });
       }
@@ -87,14 +104,25 @@ const layoutImageBlock = createReactBlockSpec(
         // at all any more.
         return (
           <div className="rte-layout-image-placeholder" contentEditable={false}>
-            <button
-              type="button"
-              className="rte-layout-image-upload-btn"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? t('uploading') : t('addImage')}
-            </button>
+            <div className="rte-layout-image-placeholder-actions">
+              <button
+                type="button"
+                className="rte-layout-image-upload-btn"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? t('uploading') : t('addImage')}
+              </button>
+              <UrlImportField
+                toggleLabel={t('addImageFromUrl')}
+                placeholder={t('imageUrlPlaceholder')}
+                submitLabel={t('imageUrlSubmit')}
+                busyLabel={t('imageUrlFetching')}
+                cancelLabel={t('imageUrlCancel')}
+                onSubmit={handleUrlSubmit}
+                disabled={uploading}
+              />
+            </div>
             <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
             {uploadError && <div className="field-error">{uploadError}</div>}
           </div>
@@ -198,6 +226,38 @@ async function uploadBlogImage(
   return `/api/v1/photos/${photo.id}/file`;
 }
 
+// User-requested: "make it so anywhere I can upload a photo it's also
+// possible to just post an image URL, that way the user does not have to
+// actually download the photo first."
+//
+// Note what this deliberately does *not* do: it does not drop the pasted URL
+// straight into the block's `url` prop. It imports the image into the post's
+// own Photos (the server fetches the bytes -- see app/api/v1/photos/route.ts's
+// `postFromUrl`) and stores our own `/api/v1/photos/{id}/file` URL, exactly
+// like `uploadBlogImage` above. A stored third-party URL would hotlink: the
+// image would vanish from a published Blog Post the day that host rotated
+// it, a Guest's browser would leak a request to it, and the Android client's
+// offline cache (which only knows how to fetch Photo rows) would show a
+// blank. Same reason `ensurePostId` is called first -- a Photo needs an
+// owner, even a Draft one.
+async function addBlogImageFromUrl(
+  sourceUrl: string,
+  ensurePostId: () => Promise<string>,
+  t: ReturnType<typeof useTranslations>,
+): Promise<string> {
+  const postId = await ensurePostId();
+  const response = await fetch('/api/v1/photos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerType: 'TIMELINE_ENTRY', ownerId: postId, sourceUrl }),
+  });
+  const photo = await response.json().catch(() => null);
+  if (!response.ok || !photo?.id) {
+    throw new Error(translateApiError(t, photo?.error?.message) ?? 'Could not add this image.');
+  }
+  return `/api/v1/photos/${photo.id}/file`;
+}
+
 function useBlogEditor(initialContent: string | null | undefined, ensurePostId: () => Promise<string>) {
   const t = useTranslations('errors');
   // A ref, not a value closed over directly by `uploadFile` below --
@@ -218,7 +278,19 @@ function useBlogEditor(initialContent: string | null | undefined, ensurePostId: 
     initialContent: useMemo(() => parseBlogContent(initialContent), [initialContent]),
     uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current(), t),
   });
+  // BlockNote has no `uploadFile` equivalent for "import from a URL", and
+  // `layoutImageBlock`'s render function only ever receives the editor --
+  // not this hook's scope -- so the importer is hung off the editor instance
+  // itself, the same channel `uploadFile` travels on. Typed via a local
+  // interface rather than module augmentation: this is our own property, not
+  // part of BlockNote's API.
+  (editor as unknown as BlogImageUrlImporter).importImageFromUrl = (sourceUrl: string) =>
+    addBlogImageFromUrl(sourceUrl, () => ensurePostIdRef.current(), t);
   return editor;
+}
+
+interface BlogImageUrlImporter {
+  importImageFromUrl?: (sourceUrl: string) => Promise<string>;
 }
 
 type BlogEditor = ReturnType<typeof useBlogEditor>;

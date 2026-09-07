@@ -52,6 +52,7 @@ import com.trails.app.ui.components.LabeledField
 import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
+import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.queryDisplayName
@@ -67,6 +68,7 @@ fun BlogEditScreen(
     val photosById by viewModel.photosById.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showImageUrlDialog by remember { mutableStateOf(false) }
     val untitledLabel = stringResource(R.string.blog_untitled_default)
 
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -185,6 +187,13 @@ fun BlogEditScreen(
             TextButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage) {
                 Text(if (state.uploadingImage) stringResource(R.string.blog_uploading) else stringResource(R.string.blog_add_image))
             }
+            // User-requested "post an image URL instead of uploading". The
+            // image is still imported into the post's own Photos -- see
+            // BlogEditViewModel.insertImageFromUrl for why the pasted URL is
+            // not kept as the block's source.
+            TextButton(onClick = { showImageUrlDialog = true }, enabled = !state.uploadingImage) {
+                Text(stringResource(R.string.url_import_action))
+            }
         }
 
         HorizontalDivider()
@@ -202,6 +211,17 @@ fun BlogEditScreen(
                 PillButton(text = stringResource(R.string.blog_delete_post_button), variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth())
             }
         }
+    }
+
+    if (showImageUrlDialog) {
+        UrlImportDialog(
+            title = stringResource(R.string.url_import_photo_title),
+            onDismiss = { showImageUrlDialog = false },
+            onConfirm = { url ->
+                showImageUrlDialog = false
+                viewModel.insertImageFromUrl(url, untitledLabel)
+            },
+        )
     }
 
     if (showDeleteConfirm) {

@@ -1284,6 +1284,67 @@ body.has-notify-bar .page:has(.fab) {
    thumbnails (components/PhotoGallery.tsx). No server-side thumbnailing
    (AD-5) -- these are next/image-optimized renders of the stored original,
    just laid out here. */
+/* The Upload + "Add from URL" pair in PhotoGallery/AttachmentList's section
+   header. Right-aligned beside the section label while collapsed; once the
+   URL field is open it claims the row's leftover width, and on a phone the
+   whole group drops to its own full-width line so a pasted link is readable
+   rather than squeezed into whatever the label left over. */
+.media-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.media-actions .url-import {
+  flex: 1 1 14rem;
+}
+
+@media (max-width: 640px) {
+  .media-actions {
+    flex: 1 1 100%;
+  }
+}
+
+/* UrlImportField -- the "paste an image URL instead of uploading" control
+   shared by PhotoGallery, AttachmentList and RichTextEditor. The input
+   borrows `.field input`'s chrome by hand (it can't just live inside a
+   `.field`, which stacks its children vertically and adds bottom margin --
+   this one sits on one row beside its two buttons, and inside a flex row
+   next to the Upload button). Wraps rather than overflows on a phone. */
+.url-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.url-import-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.url-import-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  border: 1px solid #d6dbde;
+  border-radius: var(--radius-input);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  min-height: 44px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.url-import-input:focus {
+  outline: none;
+  border-color: var(--color-brand-accent);
+}
+
 .photo-gallery {
   display: flex;
   flex-wrap: wrap;
@@ -1571,6 +1632,31 @@ body.has-notify-bar .page:has(.fab) {
   min-height: 44px;
   font-size: 0.95rem;
   cursor: pointer;
+}
+
+/* The empty-image placeholder now offers two ways in -- pick a file, or
+   paste a URL (UrlImportField). Side by side on desktop, stacked on a
+   phone; the URL row takes the leftover width so a long pasted link is
+   readable. */
+.rte-layout-image-placeholder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+}
+
+.rte-layout-image-placeholder-actions .url-import {
+  flex: 1 1 16rem;
+}
+
+/* Re-assert the affirmative button's fill -- the blanket
+   `.rte-layout-image-placeholder button` rule above would otherwise strip
+   UrlImportField's own `.btn-primary` back to a bare outline. */
+.rte-layout-image-placeholder button.btn-primary {
+  background: var(--color-brand-accent);
+  color: #fff;
+  border-color: var(--color-brand-accent);
 }
 
 .rte-layout-image {

@@ -5,6 +5,7 @@ import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { UrlImportField } from '@/components/UrlImportField';
 
 export interface PhotoDTO {
   id: string;
@@ -125,6 +126,34 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
     }
   }
 
+  // User-requested: "anywhere I can upload a photo it's also possible to
+  // just post an image URL, that way the user does not have to actually
+  // download the photo first." Same endpoint as the multipart upload above,
+  // selected by Content-Type -- the server fetches the bytes and stores them
+  // exactly like a picked file (see app/api/v1/photos/route.ts's
+  // `postFromUrl`), so the resulting Photo is indistinguishable here: it can
+  // be made the Cover, marked Private and deleted like any other, and the
+  // Android client caches it offline like any other.
+  async function handleImportUrl(sourceUrl: string): Promise<string | null> {
+    setError(null);
+    try {
+      const response = await fetch('/api/v1/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ownerType, ownerId, sourceUrl }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        return translateApiError(t, body?.error?.message) ?? tShared('photoGalleryUrlError');
+      }
+      setPhotos((current) => [...current, body as PhotoDTO]);
+      router.refresh();
+      return null;
+    } catch {
+      return tShared('photoGalleryNetworkError');
+    }
+  }
+
   async function handleDelete(photo: PhotoDTO) {
     if (!confirm(tShared('photoGalleryDeleteConfirm'))) return;
     setError(null);
@@ -216,16 +245,32 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
           {tShared('photoGalleryLabel')}
         </span>
         {!readOnly && (
-          <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
-            {uploading ? tShared('photoGalleryUploading') : tShared('photoGalleryUploadButton')}
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={handleUpload}
+          <div className="media-actions">
+            <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
+              {uploading ? tShared('photoGalleryUploading') : tShared('photoGalleryUploadButton')}
+              <input
+                type="file"
+                // Kept in sync by hand with lib/photos.ts's
+                // ALLOWED_MIME_TYPES -- that module can't be imported here,
+                // since it re-exports lib/attachments.ts, which pulls in
+                // node:crypto/node:path and would drag Node builtins into
+                // this Client Component's browser bundle.
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleUpload}
+                disabled={uploading}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <UrlImportField
+              toggleLabel={tShared('photoGalleryUrlToggle')}
+              placeholder={tShared('photoGalleryUrlPlaceholder')}
+              submitLabel={tShared('photoGalleryUrlSubmit')}
+              busyLabel={tShared('photoGalleryUrlFetching')}
+              cancelLabel={tShared('photoGalleryUrlCancel')}
+              onSubmit={handleImportUrl}
               disabled={uploading}
-              style={{ display: 'none' }}
             />
-          </label>
+          </div>
         )}
       </div>
 

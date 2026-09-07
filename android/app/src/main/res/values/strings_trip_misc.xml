@@ -38,7 +38,9 @@
     <string name="info_action_save">Spara ändringar</string>
     <string name="info_documents_photos_heading">Dokument och foton</string>
     <string name="info_add_photo">+ Lägg till foto</string>
+    <string name="info_add_photo_url">+ Foto-URL</string>
     <string name="info_add_document">+ Lägg till dokument</string>
+    <string name="info_add_document_url">+ Fil-URL</string>
     <string name="info_action_delete">Ta bort</string>
     <string name="info_delete_dialog_title">Ta bort det här objektet?</string>
     <string name="info_delete_dialog_message">Det här går inte att ångra.</string>

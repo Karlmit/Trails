@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
 import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, buildUploadPath, isAllowedMimeType } from '@/lib/attachments';
+import { fetchRemoteFile } from '@/lib/remote-media';
 import { serializeAttachment } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
 import { isUuid } from '@/lib/uuid';
@@ -125,9 +126,111 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(attachments.map(serializeAttachment));
 }
 
+/**
+ * The shared tail both intake paths end in: resolve the owner's Trip, write
+ * the bytes at AD-5's path shape, insert the row, revalidate. Extracted when
+ * URL import was added (below) so the multipart and the URL paths cannot
+ * drift on the disk layout or the orphan-file cleanup -- they differ only in
+ * *where the bytes came from*. Mirrors
+ * app/api/v1/photos/route.ts's identically-shaped `createPhotoFromBytes`.
+ */
+async function createAttachmentFromBytes(input: {
+  ownerType: PolymorphicOwnerType;
+  ownerId: string;
+  bytes: Buffer;
+  mimeType: string;
+  originalFilename: string;
+}) {
+  const { ownerType, ownerId, bytes, mimeType, originalFilename } = input;
+
+  const owner = await resolveOwnerTripId(ownerType, ownerId);
+  if (!owner) return Errors.notFound('Owner not found');
+
+  const filePath = buildUploadPath(owner.tripId, ownerType, ownerId, originalFilename);
+
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, bytes);
+
+  try {
+    const attachment = await prisma.attachment.create({
+      data: {
+        tripId: owner.tripId,
+        ownerType,
+        ownerId,
+        filePath,
+        mimeType,
+        sizeBytes: bytes.byteLength,
+        originalFilename,
+      },
+    });
+
+    revalidateForOwner(owner.tripId, ownerType, ownerId, owner.entryType);
+
+    return NextResponse.json(serializeAttachment(attachment), { status: 201 });
+  } catch (err) {
+    // The owner row existed at the lookup above but was deleted before this
+    // insert committed -- clean up the file we just wrote rather than
+    // leaving an orphan with no DB row pointing at it.
+    await unlink(filePath).catch(() => {});
+    if (isForeignKeyViolationError(err)) return Errors.notFound('Owner not found');
+    throw err;
+  }
+}
+
+/**
+ * User-requested URL import ("anywhere I can upload a photo it's also
+ * possible to just post an image URL") -- Documents is one of those places,
+ * since an Attachment can be a JPEG/PNG just as well as a PDF, so this
+ * endpoint grew the same `application/json` + `sourceUrl` intake shape as
+ * app/api/v1/photos/route.ts. Same allowlist as a picked file (PDF
+ * included), same 25 MB cap, and the same SSRF-guarded server-side fetch
+ * (lib/remote-media.ts).
+ */
+async function postFromUrl(request: NextRequest) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Errors.validation('Request body must be valid JSON');
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return Errors.validation('Request body must be a JSON object');
+  }
+  const { ownerType, ownerId, sourceUrl } = body as Record<string, unknown>;
+
+  if (typeof ownerType !== 'string' || !isAttachmentOwnerType(ownerType)) {
+    return Errors.validation(`ownerType must be one of: ${ATTACHMENT_OWNER_TYPES.join(', ')}`);
+  }
+  if (typeof ownerId !== 'string' || !isUuid(ownerId)) {
+    return Errors.validation('ownerId must be a valid UUID');
+  }
+  if (typeof sourceUrl !== 'string' || sourceUrl.trim().length === 0) {
+    return Errors.validation('sourceUrl is required');
+  }
+
+  const fetched = await fetchRemoteFile(sourceUrl, {
+    allowedMimeTypes: ALLOWED_MIME_TYPES,
+    maxBytes: MAX_UPLOAD_BYTES,
+    fallbackBasename: 'download',
+  });
+  if (!fetched.ok) return Errors.validation(fetched.message);
+
+  return createAttachmentFromBytes({
+    ownerType,
+    ownerId,
+    bytes: fetched.bytes,
+    mimeType: fetched.mimeType,
+    originalFilename: fetched.filename,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const user = await getUserFromApiRequest(request);
   if (!user) return Errors.unauthorized();
+
+  if ((request.headers.get('content-type') ?? '').includes('application/json')) {
+    return postFromUrl(request);
+  }
 
   // `request.formData()` below buffers the entire multipart body into
   // memory before this handler can inspect `file.size` -- checking a
@@ -192,37 +295,11 @@ export async function POST(request: NextRequest) {
     return Errors.validation(`Filename exceeds the maximum length of ${MAX_ORIGINAL_FILENAME_LENGTH} characters`);
   }
 
-  const owner = await resolveOwnerTripId(ownerType, ownerId);
-  if (!owner) return Errors.notFound('Owner not found');
-
-  const filePath = buildUploadPath(owner.tripId, ownerType, ownerId, file.name);
-  const bytes = Buffer.from(await file.arrayBuffer());
-
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, bytes);
-
-  try {
-    const attachment = await prisma.attachment.create({
-      data: {
-        tripId: owner.tripId,
-        ownerType,
-        ownerId,
-        filePath,
-        mimeType: file.type,
-        sizeBytes: file.size,
-        originalFilename: file.name,
-      },
-    });
-
-    revalidateForOwner(owner.tripId, ownerType, ownerId, owner.entryType);
-
-    return NextResponse.json(serializeAttachment(attachment), { status: 201 });
-  } catch (err) {
-    // The owner row existed at the lookup above but was deleted before this
-    // insert committed -- clean up the file we just wrote rather than
-    // leaving an orphan with no DB row pointing at it.
-    await unlink(filePath).catch(() => {});
-    if (isForeignKeyViolationError(err)) return Errors.notFound('Owner not found');
-    throw err;
-  }
+  return createAttachmentFromBytes({
+    ownerType,
+    ownerId,
+    bytes: Buffer.from(await file.arrayBuffer()),
+    mimeType: file.type,
+    originalFilename: file.name,
+  });
 }

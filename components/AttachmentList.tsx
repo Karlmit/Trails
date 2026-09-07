@@ -5,6 +5,7 @@ import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatAttachmentSize } from '@/lib/attachments';
+import { UrlImportField } from '@/components/UrlImportField';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -109,6 +110,32 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
     }
   }
 
+  // User-requested URL import ("anywhere I can upload a photo it's also
+  // possible to just post an image URL") -- an Attachment can be a JPEG/PNG
+  // just as much as a PDF, so Documents is one of those places. Same
+  // endpoint as the multipart upload above, selected by Content-Type; the
+  // server fetches the bytes and stores them exactly like a picked file, so
+  // the row that comes back is indistinguishable from an uploaded one.
+  async function handleImportUrl(sourceUrl: string): Promise<string | null> {
+    setError(null);
+    try {
+      const response = await fetch('/api/v1/attachments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ownerType, ownerId, sourceUrl }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        return translateApiError(t, body?.error?.message) ?? td('urlError');
+      }
+      setAttachments((current) => [body as AttachmentDTO, ...current]);
+      router.refresh();
+      return null;
+    } catch {
+      return td('networkError');
+    }
+  }
+
   async function handleDelete(attachment: AttachmentDTO) {
     if (!confirm(td('deleteConfirm', { filename: attachment.originalFilename }))) return;
     setError(null);
@@ -148,16 +175,27 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
           {td('label')}
         </span>
         {!readOnly && (
-          <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
-            {uploading ? td('uploading') : td('upload')}
-            <input
-              type="file"
-              accept="application/pdf,image/jpeg,image/png"
-              onChange={handleUpload}
+          <div className="media-actions">
+            <label className="btn btn-outline" style={{ cursor: uploading ? 'default' : 'pointer', margin: 0 }}>
+              {uploading ? td('uploading') : td('upload')}
+              <input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                onChange={handleUpload}
+                disabled={uploading}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <UrlImportField
+              toggleLabel={td('urlToggle')}
+              placeholder={td('urlPlaceholder')}
+              submitLabel={td('urlSubmit')}
+              busyLabel={td('urlFetching')}
+              cancelLabel={td('urlCancel')}
+              onSubmit={handleImportUrl}
               disabled={uploading}
-              style={{ display: 'none' }}
             />
-          </label>
+          </div>
         )}
       </div>
 
