@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { OwnerCreateError, useOwnerIdResolver } from '@/lib/hooks/useOwnerId';
 
 export interface LinkDTO {
   id: string;
@@ -16,29 +17,39 @@ export interface LinkDTO {
 
 interface LinkListProps {
   ownerType: string;
+  // Empty while the owning row doesn't exist yet (a create form) -- see
+  // `ensureOwnerId` below.
   ownerId: string;
   // See TagList.tsx's identical prop -- owner's own view-vs-edit-mode
   // toggle, unrelated to Guest access (still never mounted for a Guest).
   readOnly?: boolean;
+  // Lets a create form mount this before its own row exists: the first
+  // "Add" creates the owner on demand and returns its id. See
+  // lib/hooks/useOwnerId.ts.
+  ensureOwnerId?: () => Promise<string>;
 }
 
 // FR-15/FR-16/FR-26, spec-tags-links-photos: same self-fetching shape as
 // TagList.tsx -- mounted on every owning entity's detail/edit view, never
 // for a Guest.
-export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps) {
+export function LinkList({ ownerType, ownerId, readOnly = false, ensureOwnerId }: LinkListProps) {
   const t = useTranslations('errors');
   const tShared = useTranslations('shared');
   const router = useRouter();
   const [links, setLinks] = useState<LinkDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Nothing to load for an owner that doesn't exist yet -- start settled
+  // rather than flashing "Loading…" once.
+  const [loading, setLoading] = useState(Boolean(ownerId));
   const [url, setUrl] = useState('');
   const [label, setLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const submitInFlight = useRef(false);
+  const resolveOwnerId = useOwnerIdResolver(ownerId, ensureOwnerId);
 
   useEffect(() => {
+    if (!ownerId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -69,10 +80,11 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
     setError(null);
 
     try {
+      const resolvedOwnerId = await resolveOwnerId();
       const response = await fetch('/api/v1/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerType, ownerId, url, label: label.trim() || null }),
+        body: JSON.stringify({ ownerType, ownerId: resolvedOwnerId, url, label: label.trim() || null }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -83,8 +95,8 @@ export function LinkList({ ownerType, ownerId, readOnly = false }: LinkListProps
       setUrl('');
       setLabel('');
       router.refresh();
-    } catch {
-      setError('Could not reach the server. Please try again.');
+    } catch (err) {
+      setError(err instanceof OwnerCreateError ? err.message : 'Could not reach the server. Please try again.');
     } finally {
       setSubmitting(false);
       submitInFlight.current = false;

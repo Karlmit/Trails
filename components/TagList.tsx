@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { OwnerCreateError, useOwnerIdResolver } from '@/lib/hooks/useOwnerId';
 
 export interface TagDTO {
   id: string;
@@ -15,6 +16,8 @@ export interface TagDTO {
 
 interface TagListProps {
   ownerType: string;
+  // Empty while the owning row doesn't exist yet (a create form) -- see
+  // `ensureOwnerId` below.
   ownerId: string;
   // User-requested: Idea/ImportantInfo's own list views show Tags read-only
   // and only when non-empty, never an "Add" affordance -- adding one is
@@ -23,25 +26,33 @@ interface TagListProps {
   // (spec's "Never" boundary, "No Tags/Links Guest-facing surface"), this
   // is purely the signed-in owner's own view-vs-edit-mode toggle.
   readOnly?: boolean;
+  // Lets a create form mount this before its own row exists: the first
+  // "Add" creates the owner on demand and returns its id. See
+  // lib/hooks/useOwnerId.ts.
+  ensureOwnerId?: () => Promise<string>;
 }
 
 // FR-15/FR-16/FR-26, spec-tags-links-photos: reusable, generic over
 // ownerType/ownerId, mounted on every owning entity's detail/edit view
 // (EntryDetailPanel, BlogPostDetailPanel, IdeaCard, ImportantInfoCard) --
 // same self-fetching shape as AttachmentList.tsx.
-export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) {
+export function TagList({ ownerType, ownerId, readOnly = false, ensureOwnerId }: TagListProps) {
   const t = useTranslations('errors');
   const tShared = useTranslations('shared');
   const router = useRouter();
   const [tags, setTags] = useState<TagDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Nothing to load for an owner that doesn't exist yet -- start settled
+  // rather than flashing "Loading…" once.
+  const [loading, setLoading] = useState(Boolean(ownerId));
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const submitInFlight = useRef(false);
+  const resolveOwnerId = useOwnerIdResolver(ownerId, ensureOwnerId);
 
   useEffect(() => {
+    if (!ownerId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -72,10 +83,11 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
     setError(null);
 
     try {
+      const resolvedOwnerId = await resolveOwnerId();
       const response = await fetch('/api/v1/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerType, ownerId, text }),
+        body: JSON.stringify({ ownerType, ownerId: resolvedOwnerId, text }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -85,8 +97,8 @@ export function TagList({ ownerType, ownerId, readOnly = false }: TagListProps) 
       setTags((current) => [...current, body as TagDTO]);
       setText('');
       router.refresh();
-    } catch {
-      setError('Could not reach the server. Please try again.');
+    } catch (err) {
+      setError(err instanceof OwnerCreateError ? err.message : 'Could not reach the server. Please try again.');
     } finally {
       setSubmitting(false);
       submitInFlight.current = false;

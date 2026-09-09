@@ -53,6 +53,23 @@ export function ImportantInfoCard({
   const ti = useTranslations('tripImportantInfo');
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
+  // Every `router.refresh()` hands this component a fresh server copy, and
+  // the server is authoritative -- adopt it instead of keeping the copy this
+  // card happened to mount with. Required since ImportantInfoForm's create
+  // mode can create the item *before* its final field values are saved
+  // (see that component's `ensureItemId`): the card first mounts showing the
+  // "Namnlös"/"Untitled" placeholder, and without this it would keep showing
+  // that placeholder -- and hand it right back to its own edit form --
+  // after the Save that renamed the row. The local copy still exists for
+  // optimistic updates (the isPrivate toggle below) and for the edit form's
+  // own saved result; a refresh simply re-syncs it. React's documented
+  // "adjusting state when a prop changes" shape, deliberately not a
+  // `useEffect` (that would render the stale value once first).
+  const [serverItem, setServerItem] = useState(initialItem);
+  if (initialItem !== serverItem) {
+    setServerItem(initialItem);
+    setItem(initialItem);
+  }
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [togglingPrivate, setTogglingPrivate] = useState(false);

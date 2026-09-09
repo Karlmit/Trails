@@ -3,12 +3,13 @@
 import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import type { ImportantInfoDTO } from '@/components/ImportantInfoCard';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { AttachmentList } from '@/components/AttachmentList';
+import { OwnerCreateError } from '@/lib/hooks/useOwnerId';
 
 interface ImportantInfoFormProps {
   tripId: string;
@@ -43,6 +44,39 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
   const [isPrivate, setIsPrivate] = useState(item?.isPrivate ?? false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  // User-reported: Tags/Links/Photos/Documents used to appear only after the
+  // item had been saved and re-opened for Edit ("all those should be visible
+  // when creating a new"). Each of those rows needs a real ownerId to attach
+  // to, so create mode now creates the item lazily, on the first attach --
+  // same `ensurePostId` shape as BlogPostForm's, which solved the identical
+  // "add an image before the post exists" problem. A ref, not state:
+  // `ensureItemId` has to read/write it synchronously, and a second
+  // concurrent call (a Link added while a photo is still uploading, or two
+  // photos picked back to back) must see the *in-flight* create rather than
+  // firing a second one -- see `creatingRef`. In edit mode this is just the
+  // item's own id from the start, so nothing is ever created here.
+  const existingIdRef = useRef<string | null>(item?.id ?? null);
+  const creatingRef = useRef<Promise<string> | null>(null);
+  // Only drives the "already saved" hint + Cancel's discard path; the id
+  // itself always comes from the ref above.
+  const [draftCreated, setDraftCreated] = useState(false);
+
+  function fieldsBody(): Record<string, unknown> {
+    return {
+      title,
+      content: content || null,
+      emoji: emoji.trim() || null,
+      locationName: locationName || null,
+      locationAddress: locationAddress || null,
+      locationMapLink: locationMapLink || null,
+      contactName: contactName || null,
+      contactPhone: contactPhone || null,
+      contactEmail: contactEmail || null,
+      isPrivate,
+    };
+  }
 
   function reset() {
     setTitle('');
@@ -55,6 +89,50 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
     setContactPhone('');
     setContactEmail('');
     setIsPrivate(false);
+    existingIdRef.current = null;
+    setDraftCreated(false);
+  }
+
+  async function ensureItemId(): Promise<string> {
+    if (existingIdRef.current) return existingIdRef.current;
+    if (creatingRef.current) return creatingRef.current;
+
+    const promise = (async () => {
+      let response: Response;
+      try {
+        response = await fetch('/api/v1/important-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            ...fieldsBody(),
+            // A blank title can't be saved at all (the schema requires one)
+            // -- but blocking the very first photo on "type a title first"
+            // would just trade one annoyance for another. Same "Untitled"
+            // convention as BlogPostForm's own create-on-first-upload: a
+            // placeholder the User renames before Save, which is still
+            // required to enable the Save button at all.
+            title: title.trim() || ti('untitledFallback'),
+          }),
+        });
+      } catch {
+        throw new OwnerCreateError(ti('networkError'));
+      }
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new OwnerCreateError(translateApiError(t, body?.error?.message) ?? ti('saveError'));
+      }
+      existingIdRef.current = (body as ImportantInfoDTO).id;
+      setDraftCreated(true);
+      return existingIdRef.current;
+    })();
+
+    creatingRef.current = promise;
+    try {
+      return await promise;
+    } finally {
+      creatingRef.current = null;
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -62,32 +140,24 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
     setError(null);
     setSubmitting(true);
 
-    const body: Record<string, unknown> = {
-      title,
-      content: content || null,
-      emoji: emoji.trim() || null,
-      locationName: locationName || null,
-      locationAddress: locationAddress || null,
-      locationMapLink: locationMapLink || null,
-      contactName: contactName || null,
-      contactPhone: contactPhone || null,
-      contactEmail: contactEmail || null,
-      isPrivate,
-    };
+    const body = fieldsBody();
+    // In create mode this is null unless an attach already created the item
+    // above -- if it did, Save is a PATCH of that same row, not a second,
+    // duplicate item.
+    const existingId = existingIdRef.current;
 
     try {
-      const response =
-        mode === 'create'
-          ? await fetch('/api/v1/important-info', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tripId, ...body }),
-            })
-          : await fetch(`/api/v1/important-info/${item!.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            });
+      const response = existingId
+        ? await fetch(`/api/v1/important-info/${existingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await fetch('/api/v1/important-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tripId, ...body }),
+          });
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
@@ -106,6 +176,45 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Cancelling a create that already had something attached to it can't just
+  // forget the form -- the item exists on the server by then. Offer to throw
+  // it away (its Tags/Links/Photos/Documents go with it, same polymorphic
+  // cascade the item's own Delete uses); declining keeps the form open so
+  // the User can finish and Save instead.
+  async function discardDraft(): Promise<boolean> {
+    const draftId = existingIdRef.current;
+    if (!draftId) return true;
+    if (!confirm(ti('discardDraftConfirm'))) return false;
+
+    setDiscarding(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/v1/important-info/${draftId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(translateApiError(t, body?.error?.message) ?? ti('deleteError'));
+        return false;
+      }
+      router.refresh();
+      return true;
+    } catch {
+      setError(ti('networkError'));
+      return false;
+    } finally {
+      setDiscarding(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (mode !== 'create') {
+      onCancel?.();
+      return;
+    }
+    if (!(await discardDraft())) return;
+    reset();
+    setOpen(false);
   }
 
   if (mode === 'create' && !open) {
@@ -178,33 +287,44 @@ export function ImportantInfoForm({ tripId, mode, item, onSaved, onCancel }: Imp
         <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
           {submitting ? tc('saving') : mode === 'create' ? ti('addButton') : tc('save')}
         </button>
-        <button
-          type="button"
-          className="btn btn-dark-outline"
-          onClick={() => {
-            if (mode === 'create') {
-              reset();
-              setOpen(false);
-            } else {
-              onCancel?.();
-            }
-          }}
-        >
-          {tc('cancel')}
+        <button type="button" className="btn btn-dark-outline" onClick={handleCancel} disabled={discarding}>
+          {discarding ? ti('deleting') : tc('cancel')}
         </button>
       </div>
       </form>
 
-      {/* User-requested: Tags/Links/Documents/Photos are only addable once
-          this item exists (Tag/Link/Attachment/Photo all need a real
-          ownerId to attach to) -- create mode never offers these. */}
-      {mode === 'edit' && item && (
-        <>
-          <TagList ownerType="IMPORTANT_INFO" ownerId={item.id} />
-          <LinkList ownerType="IMPORTANT_INFO" ownerId={item.id} />
-          <PhotoGallery tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
-          <AttachmentList tripId={item.tripId} ownerType="IMPORTANT_INFO" ownerId={item.id} />
-        </>
+      {/* Tags/Links/Photos/Documents, in both modes. Create mode has no id
+          to attach them to yet, so it hands each list an `ensureItemId`
+          instead: whichever one the User reaches for first creates the item
+          (see that function's comment), and the rest attach to that same
+          row. */}
+      <TagList
+        ownerType="IMPORTANT_INFO"
+        ownerId={item?.id ?? ''}
+        ensureOwnerId={mode === 'create' ? ensureItemId : undefined}
+      />
+      <LinkList
+        ownerType="IMPORTANT_INFO"
+        ownerId={item?.id ?? ''}
+        ensureOwnerId={mode === 'create' ? ensureItemId : undefined}
+      />
+      <PhotoGallery
+        tripId={item?.tripId ?? tripId}
+        ownerType="IMPORTANT_INFO"
+        ownerId={item?.id ?? ''}
+        ensureOwnerId={mode === 'create' ? ensureItemId : undefined}
+      />
+      <AttachmentList
+        tripId={item?.tripId ?? tripId}
+        ownerType="IMPORTANT_INFO"
+        ownerId={item?.id ?? ''}
+        ensureOwnerId={mode === 'create' ? ensureItemId : undefined}
+      />
+
+      {mode === 'create' && draftCreated && (
+        <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>
+          {ti('draftCreatedHint')}
+        </p>
       )}
     </div>
   );

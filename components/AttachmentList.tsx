@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatAttachmentSize } from '@/lib/attachments';
 import { UrlImportField } from '@/components/UrlImportField';
+import { OwnerCreateError, useOwnerIdResolver } from '@/lib/hooks/useOwnerId';
 
 const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
 
@@ -23,6 +24,8 @@ export interface AttachmentDTO {
 interface AttachmentListProps {
   tripId: string;
   ownerType: string;
+  // Empty while the owning row doesn't exist yet (a create form) -- see
+  // `ensureOwnerId` below.
   ownerId: string;
   // spec-guest-access: not in the original spec-documents Code Map, but
   // required by this spec's Boundaries ("no mutation UI ... renders for a
@@ -34,6 +37,10 @@ interface AttachmentListProps {
   // requireAuth-gated regardless, so a Guest's own fetch 401s and the list
   // simply renders empty; this prop only controls the UI, not the API call).
   readOnly?: boolean;
+  // Lets a create form mount this before its own row exists: the first
+  // upload (file or URL) creates the owner on demand and returns its id.
+  // See lib/hooks/useOwnerId.ts.
+  ensureOwnerId?: () => Promise<string>;
 }
 
 // FR-24, spec-documents: reusable upload form + file list + delete, mounted
@@ -44,20 +51,30 @@ interface AttachmentListProps {
 // fetched data as a prop) -- the Code Map's mount call passes only
 // ownerType/ownerId/tripId, no initial list. Same error-banner + in-flight-
 // request-guarding conventions as ChecklistCard.tsx.
-export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }: AttachmentListProps) {
+export function AttachmentList({
+  tripId,
+  ownerType,
+  ownerId,
+  readOnly = false,
+  ensureOwnerId,
+}: AttachmentListProps) {
   const t = useTranslations('errors');
   const tc = useTranslations('common');
   const td = useTranslations('tripDocuments');
   const router = useRouter();
   const [attachments, setAttachments] = useState<AttachmentDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Nothing to load for an owner that doesn't exist yet -- start settled
+  // rather than flashing "Loading…" once.
+  const [loading, setLoading] = useState(Boolean(ownerId));
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   // Guards a fast double-select from firing two overlapping uploads.
   const uploadInFlight = useRef(false);
+  const resolveOwnerId = useOwnerIdResolver(ownerId, ensureOwnerId);
 
   useEffect(() => {
+    if (!ownerId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -91,7 +108,7 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
     try {
       const formData = new FormData();
       formData.append('ownerType', ownerType);
-      formData.append('ownerId', ownerId);
+      formData.append('ownerId', await resolveOwnerId());
       formData.append('file', file);
 
       const response = await fetch('/api/v1/attachments', { method: 'POST', body: formData });
@@ -102,8 +119,8 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
       }
       setAttachments((current) => [body as AttachmentDTO, ...current]);
       router.refresh();
-    } catch {
-      setError(td('networkError'));
+    } catch (err) {
+      setError(err instanceof OwnerCreateError ? err.message : td('networkError'));
     } finally {
       setUploading(false);
       uploadInFlight.current = false;
@@ -119,10 +136,11 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
   async function handleImportUrl(sourceUrl: string): Promise<string | null> {
     setError(null);
     try {
+      const resolvedOwnerId = await resolveOwnerId();
       const response = await fetch('/api/v1/attachments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerType, ownerId, sourceUrl }),
+        body: JSON.stringify({ ownerType, ownerId: resolvedOwnerId, sourceUrl }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -131,8 +149,10 @@ export function AttachmentList({ tripId, ownerType, ownerId, readOnly = false }:
       setAttachments((current) => [body as AttachmentDTO, ...current]);
       router.refresh();
       return null;
-    } catch {
-      return td('networkError');
+    } catch (err) {
+      // UrlImportField shows whatever string comes back inline, so the
+      // owner-create failure travels the same path as any other error here.
+      return err instanceof OwnerCreateError ? err.message : td('networkError');
     }
   }
 

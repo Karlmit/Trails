@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { UrlImportField } from '@/components/UrlImportField';
+import { OwnerCreateError, useOwnerIdResolver } from '@/lib/hooks/useOwnerId';
 
 export interface PhotoDTO {
   id: string;
@@ -23,6 +24,8 @@ export interface PhotoDTO {
 interface PhotoGalleryProps {
   tripId: string;
   ownerType: string;
+  // Empty while the owning row doesn't exist yet (a create form) -- see
+  // `ensureOwnerId` below.
   ownerId: string;
   // spec-guest-access/spec-tags-links-photos: hides upload/delete/mark-
   // primary/mark-private affordances entirely for a Guest -- not merely
@@ -46,6 +49,10 @@ interface PhotoGalleryProps {
   // card shows the Cover Photo itself and leaves Photo management to
   // IdeaForm's own mount, in edit mode.)
   initialPhotos?: PhotoDTO[];
+  // Lets a create form mount this before its own row exists: the first
+  // upload (file or URL) creates the owner on demand and returns its id.
+  // See lib/hooks/useOwnerId.ts.
+  ensureOwnerId?: () => Promise<string>;
 }
 
 const THUMB_SIZE = 140;
@@ -54,19 +61,29 @@ function fileUrl(photoId: string): string {
   return `/api/v1/photos/${photoId}/file`;
 }
 
-export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, initialPhotos }: PhotoGalleryProps) {
+export function PhotoGallery({
+  tripId,
+  ownerType,
+  ownerId,
+  readOnly = false,
+  initialPhotos,
+  ensureOwnerId,
+}: PhotoGalleryProps) {
   const t = useTranslations('errors');
   const tShared = useTranslations('shared');
   const router = useRouter();
   const [photos, setPhotos] = useState<PhotoDTO[]>(initialPhotos ?? []);
-  const [loading, setLoading] = useState(initialPhotos === undefined);
+  // Nothing to load for an owner that doesn't exist yet -- start settled
+  // rather than flashing "Loading…" once.
+  const [loading, setLoading] = useState(initialPhotos === undefined && Boolean(ownerId));
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const uploadInFlight = useRef(false);
+  const resolveOwnerId = useOwnerIdResolver(ownerId, ensureOwnerId);
 
   useEffect(() => {
-    if (initialPhotos !== undefined) return;
+    if (initialPhotos !== undefined || !ownerId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -110,7 +127,7 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
     try {
       const formData = new FormData();
       formData.append('ownerType', ownerType);
-      formData.append('ownerId', ownerId);
+      formData.append('ownerId', await resolveOwnerId());
       formData.append('file', file);
 
       const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
@@ -121,8 +138,8 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       }
       setPhotos((current) => [...current, body as PhotoDTO]);
       router.refresh();
-    } catch {
-      setError('Could not reach the server. Please try again.');
+    } catch (err) {
+      setError(err instanceof OwnerCreateError ? err.message : 'Could not reach the server. Please try again.');
     } finally {
       setUploading(false);
       uploadInFlight.current = false;
@@ -140,10 +157,11 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
   async function handleImportUrl(sourceUrl: string): Promise<string | null> {
     setError(null);
     try {
+      const resolvedOwnerId = await resolveOwnerId();
       const response = await fetch('/api/v1/photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerType, ownerId, sourceUrl }),
+        body: JSON.stringify({ ownerType, ownerId: resolvedOwnerId, sourceUrl }),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -152,8 +170,10 @@ export function PhotoGallery({ tripId, ownerType, ownerId, readOnly = false, ini
       setPhotos((current) => [...current, body as PhotoDTO]);
       router.refresh();
       return null;
-    } catch {
-      return tShared('photoGalleryNetworkError');
+    } catch (err) {
+      // UrlImportField shows whatever string comes back inline, so the
+      // owner-create failure travels the same path as any other error here.
+      return err instanceof OwnerCreateError ? err.message : tShared('photoGalleryNetworkError');
     }
   }
 

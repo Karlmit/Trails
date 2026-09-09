@@ -536,7 +536,10 @@
     "titleLabel": "Title",
     "descriptionLabel": "Description",
     "emojiOptionalLabel": "Emoji (optional)",
-    "saveError": "Could not save this item."
+    "saveError": "Could not save this item.",
+    "untitledFallback": "Untitled",
+    "discardDraftConfirm": "This item has already been created, because you added a Tag, Link, Photo or Document to it. Delete it? Whatever you added goes with it.",
+    "draftCreatedHint": "This item has been created so that what you add can be saved. Fill in the title and save."
   },
   "tripBudget": {
     "pageTitle": "Budget",
