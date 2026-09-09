@@ -465,7 +465,10 @@
       "INDOOR": "Inomhus",
       "OUTDOOR": "Utomhus",
       "EITHER": "Oavsett väder"
-    }
+    },
+    "untitledFallback": "Namnlös",
+    "discardDraftConfirm": "Idén har redan skapats, eftersom du la till en länk eller ett foto. Vill du radera den? Det du la till försvinner också.",
+    "draftCreatedHint": "Idén har skapats så att det du lägger till kan sparas. Fyll i titeln och spara."
   },
   "tripSections": {
     "pageTitle": "Sektioner",

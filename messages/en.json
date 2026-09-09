@@ -465,7 +465,10 @@
       "INDOOR": "Indoor",
       "OUTDOOR": "Outdoor",
       "EITHER": "Either"
-    }
+    },
+    "untitledFallback": "Untitled",
+    "discardDraftConfirm": "This Idea has already been created, because you added a Link or Photo to it. Delete it? Whatever you added goes with it.",
+    "draftCreatedHint": "This Idea has been created so that what you add can be saved. Fill in the title and save."
   },
   "tripSections": {
     "pageTitle": "Sections",

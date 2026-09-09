@@ -3,10 +3,11 @@
 import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import type { IdeaDTO } from '@/components/IdeaCard';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { OwnerCreateError } from '@/lib/hooks/useOwnerId';
 
 const PRIORITIES = ['MUST_DO', 'WOULD_LIKE', 'MAYBE'] as const;
 
@@ -40,11 +41,17 @@ interface IdeaFormProps {
 // (SectionManager's pattern); edit mode is controlled by its parent
 // (IdeaCard), same as ImportantInfoForm mounted from ImportantInfoCard.
 //
-// User-requested: Links/Photos are only addable once the Idea exists, and
-// live inside this same card as the rest of the form (not as separate
-// sibling sections IdeaCard bolts on afterward, which read as disconnected
-// "outside the form") -- same constraint/placement ImportantInfoForm uses,
-// since a Link/Photo needs a real ownerId to attach to.
+// Links/Photos live inside this same card as the rest of the form (not as
+// separate sibling sections IdeaCard bolts on afterward, which read as
+// disconnected "outside the form") -- same placement ImportantInfoForm
+// uses. User-reported, for both forms: they used to appear only once the
+// Idea already existed, so a brand-new Idea offered neither. A Link/Photo
+// does need a real ownerId, so create mode now creates the Idea lazily on
+// the first attach -- see `ensureIdeaId` below. The one exception is the
+// Entry->Idea convert page (`apiUrl`): its create call *consumes* the
+// source Entry, which must never happen as a side effect of attaching a
+// photo, so that path keeps offering neither (Links/Photos stay available
+// on the resulting Idea's own edit form).
 export function IdeaForm({
   tripId,
   sections,
@@ -81,6 +88,21 @@ export function IdeaForm({
   const [estimatedExpenseCurrency, setEstimatedExpenseCurrency] = useState(seed?.estimatedExpenseCurrency ?? '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  // Create-on-first-attach, so Links/Photos work before this Idea exists --
+  // same shape as ImportantInfoForm's own `ensureItemId` (see that file, and
+  // lib/hooks/useOwnerId.ts). Refs, not state: `ensureIdeaId` reads/writes
+  // the id synchronously, and a second concurrent call (a Link added while
+  // a photo is still uploading) must see the *in-flight* create rather than
+  // firing a second one. In edit mode this is just the Idea's own id from
+  // the start, so nothing is ever created here.
+  const existingIdRef = useRef<string | null>(idea?.id ?? null);
+  const creatingRef = useRef<Promise<string> | null>(null);
+  // Only drives the "already saved" hint + Cancel's discard path.
+  const [draftCreated, setDraftCreated] = useState(false);
+  // A convert (`apiUrl`) deliberately opts out -- see the comment above.
+  const canCreateOnAttach = mode === 'create' && !apiUrl;
 
   function reset() {
     setTitle('');
@@ -94,13 +116,11 @@ export function IdeaForm({
     setLocationMapLink('');
     setEstimatedExpenseAmount('');
     setEstimatedExpenseCurrency('');
+    existingIdRef.current = null;
+    setDraftCreated(false);
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    setSubmitting(true);
-
+  function fieldsBody(): Record<string, unknown> {
     const body: Record<string, unknown> = {
       title,
       sectionId: sectionId || null,
@@ -120,19 +140,113 @@ export function IdeaForm({
       body.estimatedExpenseCurrency = currencyEntered ? estimatedExpenseCurrency : null;
     }
 
+    return body;
+  }
+
+  async function ensureIdeaId(): Promise<string> {
+    if (existingIdRef.current) return existingIdRef.current;
+    if (creatingRef.current) return creatingRef.current;
+
+    const promise = (async () => {
+      let response: Response;
+      try {
+        response = await fetch('/api/v1/ideas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            ...fieldsBody(),
+            // A blank title can't be saved at all (the schema requires
+            // one) -- but blocking the very first photo on "type a title
+            // first" would just trade one annoyance for another. Same
+            // "Untitled" convention as ImportantInfoForm/BlogPostForm: a
+            // placeholder the User renames before Save, which is still
+            // required to enable the Save button at all.
+            title: title.trim() || ti('untitledFallback'),
+          }),
+        });
+      } catch {
+        throw new OwnerCreateError(ti('networkError'));
+      }
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new OwnerCreateError(translateApiError(t, body?.error?.message) ?? ti('couldNotSaveIdea'));
+      }
+      existingIdRef.current = (body as IdeaDTO).id;
+      setDraftCreated(true);
+      return existingIdRef.current;
+    })();
+
+    creatingRef.current = promise;
     try {
-      const response =
-        mode === 'create'
-          ? await fetch(apiUrl ?? '/api/v1/ideas', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tripId, ...body }),
-            })
-          : await fetch(`/api/v1/ideas/${idea!.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            });
+      return await promise;
+    } finally {
+      creatingRef.current = null;
+    }
+  }
+
+  // Cancelling a create that already had something attached to it can't just
+  // forget the form -- the Idea exists on the server by then. Offer to throw
+  // it away (its Links/Photos go with it, same cascade the Idea's own Delete
+  // uses); declining keeps the form open so the User can finish and Save
+  // instead.
+  async function discardDraft(): Promise<boolean> {
+    const draftId = existingIdRef.current;
+    if (!draftId) return true;
+    if (!confirm(ti('discardDraftConfirm'))) return false;
+
+    setDiscarding(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/v1/ideas/${draftId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(translateApiError(t, body?.error?.message) ?? ti('couldNotDeleteIdea'));
+        return false;
+      }
+      router.refresh();
+      return true;
+    } catch {
+      setError(ti('networkError'));
+      return false;
+    } finally {
+      setDiscarding(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (mode !== 'create') {
+      onCancel?.();
+      return;
+    }
+    if (!(await discardDraft())) return;
+    reset();
+    setOpen(false);
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    const body = fieldsBody();
+    // Edit mode's own id, or -- in create mode -- the Idea an attach already
+    // created above. Either way Save is a PATCH of that same row, never a
+    // second, duplicate Idea.
+    const existingId = existingIdRef.current;
+
+    try {
+      const response = existingId
+        ? await fetch(`/api/v1/ideas/${existingId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await fetch(apiUrl ?? '/api/v1/ideas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tripId, ...body }),
+          });
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
@@ -314,27 +428,30 @@ export function IdeaForm({
         <button type="submit" className="btn btn-primary" disabled={submitting || !title.trim()}>
           {submitting ? ti('saving') : mode === 'create' ? ti('addIdea') : ti('save')}
         </button>
-        <button
-          type="button"
-          className="btn btn-dark-outline"
-          onClick={() => {
-            if (mode === 'create') {
-              reset();
-              setOpen(false);
-            } else {
-              onCancel?.();
-            }
-          }}
-        >
-          {ti('cancel')}
+        <button type="button" className="btn btn-dark-outline" onClick={handleCancel} disabled={discarding}>
+          {discarding ? ti('deleting') : ti('cancel')}
         </button>
       </div>
       </form>
 
-      {mode === 'edit' && idea && (
+      {(canCreateOnAttach || (mode === 'edit' && idea)) && (
         <>
-          <LinkList ownerType="IDEA" ownerId={idea.id} />
-          <PhotoGallery tripId={idea.tripId} ownerType="IDEA" ownerId={idea.id} />
+          <LinkList
+            ownerType="IDEA"
+            ownerId={idea?.id ?? ''}
+            ensureOwnerId={canCreateOnAttach ? ensureIdeaId : undefined}
+          />
+          <PhotoGallery
+            tripId={idea?.tripId ?? tripId}
+            ownerType="IDEA"
+            ownerId={idea?.id ?? ''}
+            ensureOwnerId={canCreateOnAttach ? ensureIdeaId : undefined}
+          />
+          {draftCreated && (
+            <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>
+              {ti('draftCreatedHint')}
+            </p>
+          )}
         </>
       )}
     </div>
