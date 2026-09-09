@@ -394,18 +394,28 @@ export function EntryDetailPanel({
           </div>
         )}
 
-        {!readOnly && <TagList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />}
-        {!readOnly && <LinkList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />}
+        {/* User-reported: "I still see the edit buttons when not editing."
+            The view face shows these four read-only -- and, being
+            read-only, each renders nothing at all when it's empty, so a
+            bare Entry no longer carries four empty labelled sections.
+            Adding/removing/uploading (and a Photo's own cover/private
+            toggles) lives in the edit form, which mounts the same four
+            editable -- same view-vs-edit split ImportantInfoCard/IdeaCard
+            already use. `readOnly` on this panel itself means "Guest", a
+            separate axis: a Guest still sees no Tags/Links/Documents at
+            all. */}
+        {!readOnly && <TagList ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly />}
+        {!readOnly && <LinkList ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly />}
         <PhotoGallery
           tripId={tripId}
           ownerType="TIMELINE_ENTRY"
           ownerId={entry.id}
-          readOnly={readOnly}
+          readOnly
           initialPhotos={photos}
         />
 
         {!readOnly && (
-          <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly={readOnly} />
+          <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} readOnly />
         )}
       </div>
     </div>
