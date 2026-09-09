@@ -6,6 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { SUBTYPES_BY_ENTRY_TYPE } from '@/lib/entry-types/labels';
 import { commitStagedLinks, LinkStagingList, type StagedLink } from '@/components/LinkStagingList';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
+import { AttachmentList } from '@/components/AttachmentList';
 import { DateTimeInput, combineDateTime, splitDateTime } from '@/components/DateTimeInput';
 import { TimezoneSelect } from '@/components/TimezoneSelect';
 import { useAutoEndDate } from '@/lib/hooks/useAutoEndDate';
@@ -320,10 +324,10 @@ export function EntryForm({
   // Entry, same as the DB column's own default.
   const [isPrivate, setIsPrivate] = useState(seed?.isPrivate ?? false);
   // spec-tags-links-photos: create-mode-only staging (see
-  // LinkStagingList.tsx's own comment) -- edit mode already has Links on
-  // its own separate, already-existing detail view (EntryDetailPanel's
-  // LinkList), so this stays unmounted there rather than offering two
-  // different Links UIs on the same Entry at once.
+  // LinkStagingList.tsx's own comment) -- edit mode has the real LinkList
+  // at the foot of this form (and on EntryDetailPanel), so this stays
+  // unmounted there rather than offering two different Links UIs on the
+  // same Entry at once.
   const [stagedLinks, setStagedLinks] = useState<StagedLink[]>([]);
 
   const typeDetails = seed?.typeDetails ?? {};
@@ -547,7 +551,24 @@ export function EntryForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card stack">
+    // User-reported, while editing a Transport: "I can only add photos,
+    // links and documents when not editing, which is reversed [from] how it
+    // should be." Those four lists live on EntryDetailPanel, and edit mode
+    // *replaces* that whole panel with this form -- so switching to Edit
+    // used to take them off screen. They're mounted here too now (the panel
+    // keeps its own, so nothing was moved away from the view face; the two
+    // are never on screen at once).
+    //
+    // The outer div, not the <form>, carries the `.card` box styling:
+    // TagList/LinkList/PhotoGallery/AttachmentList each mount their own
+    // <form> for their "Add" control, and a <form> nested inside another
+    // <form> is invalid HTML (silent hydration mismatch in production, a
+    // loud React warning in dev). Same split ImportantInfoForm/IdeaForm
+    // already use for exactly this reason. (LinkStagingList, create mode's
+    // own Links UI below, deliberately has no <form> of its own -- which is
+    // why it could live inside this one before.)
+    <div className="card stack">
+      <form onSubmit={handleSubmit} className="stack">
       {error && <div className="form-error-banner">{error}</div>}
 
       {mode === 'create' && (
@@ -1044,6 +1065,25 @@ export function EntryForm({
           </button>
         )}
       </div>
-    </form>
+      </form>
+
+      {/* Create mode keeps LinkStagingList above instead: unlike an
+          Important Info item or an Idea, a TimelineEntry cannot be created
+          from a placeholder title alone (each type has its own required
+          fields -- a Transport needs a complete Flight, a Stay a check-out,
+          the rest a subtype and Location), and its `entryType` -- still
+          selectable at the top of this form -- can't be changed after the
+          row exists. So there is nothing safe to attach to until the real
+          Create, which lands straight on the new Entry's own detail page
+          where all four lists are waiting. */}
+      {mode === 'edit' && entry && (
+        <>
+          <TagList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
+          <LinkList ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
+          <PhotoGallery tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
+          <AttachmentList tripId={tripId} ownerType="TIMELINE_ENTRY" ownerId={entry.id} />
+        </>
+      )}
+    </div>
   );
 }

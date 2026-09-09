@@ -6,6 +6,11 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
+import { OwnerCreateError } from '@/lib/hooks/useOwnerId';
+import { TagList } from '@/components/TagList';
+import { LinkList } from '@/components/LinkList';
+import { PhotoGallery } from '@/components/PhotoGallery';
+import { AttachmentList } from '@/components/AttachmentList';
 
 // BlockNote (RichTextEditor.tsx) touches `window` during its own render,
 // so it can't tolerate this Client Component's own server-render pass --
@@ -115,7 +120,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         // Docs/Notion: silently fills in a placeholder the User can
         // rename any time before Publishing (nothing here is published
         // yet -- this is still always a Draft).
-        title: title.trim() || 'Untitled',
+        title: title.trim() || tBlog('untitledFallback'),
         description: descriptionRef.current || null,
         startAt: startAt || tripStartDate || toDateOnly(new Date().toISOString()),
         isPrivate,
@@ -127,7 +132,13 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       });
       const responseBody = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(translateApiError(t, responseBody?.error?.message) ?? 'Could not create this Blog Post.');
+        // An OwnerCreateError (a plain Error subclass, so RichTextEditor's
+        // own upload path is unaffected) so the Tags/Links/Photos/Documents
+        // lists below show this message itself rather than falling back to
+        // their generic "could not reach the server."
+        throw new OwnerCreateError(
+          translateApiError(t, responseBody?.error?.message) ?? 'Could not create this Blog Post.',
+        );
       }
       existingIdRef.current = responseBody.id;
       return responseBody.id as string;
@@ -196,7 +207,18 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="blog-editor-form">
+    // User-reported, for Entries and Blog Posts alike: Tags/Links/Photos/
+    // Documents live on the detail panel, and this editor is a whole
+    // separate page -- so they were unreachable exactly while writing the
+    // post. Mounted below the editor now, in both modes. Create mode has no
+    // post id yet and hands each list the same `ensurePostId` the inline
+    // image upload already uses (lib/hooks/useOwnerId.ts): the first attach
+    // creates the Draft, the rest attach to that same row, and Save is
+    // still the PATCH handleSubmit already does. A <form> can't nest inside
+    // another <form> (each list mounts its own for its "Add" control), so
+    // they sit outside this one -- same split ImportantInfoForm uses.
+    <div className="blog-editor-form-outer">
+      <form onSubmit={handleSubmit} className="blog-editor-form">
       {error && <div className="form-error-banner">{error}</div>}
 
       <input
@@ -239,6 +261,24 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
           </Link>
         </div>
       </div>
-    </form>
+      </form>
+
+      <div className="blog-editor-attachments stack">
+        <TagList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
+        <LinkList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
+        <PhotoGallery
+          tripId={post?.tripId ?? tripId}
+          ownerType="TIMELINE_ENTRY"
+          ownerId={post?.id ?? ''}
+          ensureOwnerId={ensurePostId}
+        />
+        <AttachmentList
+          tripId={post?.tripId ?? tripId}
+          ownerType="TIMELINE_ENTRY"
+          ownerId={post?.id ?? ''}
+          ensureOwnerId={ensurePostId}
+        />
+      </div>
+    </div>
   );
 }

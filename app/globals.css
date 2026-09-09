@@ -1571,6 +1571,19 @@ body.has-notify-bar .page:has(.fab) {
   gap: var(--space-3);
 }
 
+/* The Tags/Links/Photos/Documents block below the editor (see
+   BlogPostForm.tsx): part of the same writing surface, separated from the
+   footer's own rule by space rather than a second border. */
+.blog-editor-form-outer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.blog-editor-attachments {
+  gap: var(--space-4);
+}
+
 .blog-editor-title-input {
   width: 100%;
   border: none;

@@ -382,7 +382,8 @@
     "slashImageTitle": "Bild",
     "slashImageSubtext": "Ladda upp ett foto eller klistra in en bild-URL -- kan flyta bredvid text, eller ligga ovanför/under den",
     "slashImageGroup": "Media",
-    "open": "Öppna"
+    "open": "Öppna",
+    "untitledFallback": "Namnlös"
   },
   "tripChecklists": {
     "title": "Checklistor",

@@ -382,7 +382,8 @@
     "slashImageTitle": "Image",
     "slashImageSubtext": "Upload a photo or paste an image URL -- can flow beside text, or sit above/below it",
     "slashImageGroup": "Media",
-    "open": "Open"
+    "open": "Open",
+    "untitledFallback": "Untitled"
   },
   "tripChecklists": {
     "title": "Checklists",
