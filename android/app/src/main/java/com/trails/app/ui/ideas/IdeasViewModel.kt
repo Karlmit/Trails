@@ -20,11 +20,38 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** One Ideas-list group -- a Section (in the Trip's own Section order) or the trailing "No Section" bucket. */
 data class IdeaGroup(val section: SectionEntity?, val ideas: List<IdeaWithCoverPhoto>)
 data class IdeaWithCoverPhoto(val idea: IdeaEntity, val coverPhoto: PhotoEntity?)
+
+/** Selects the same primary-first, newest-fallback cover used by the web Ideas list. */
+internal fun ideaCoverPhotos(
+    ideas: List<IdeaEntity>,
+    photos: List<PhotoEntity>,
+): Map<String, PhotoEntity> {
+    val ideaIds = ideas.mapTo(mutableSetOf()) { it.id }
+    return photos
+        .asSequence()
+        .filter { it.ownerType == "IDEA" && it.ownerId in ideaIds }
+        .groupBy { it.ownerId }
+        .mapValues { (_, ownerPhotos) ->
+            ownerPhotos.filter { it.isPrimary }.maxByOrNull { it.createdAt }
+                ?: ownerPhotos.maxBy { it.createdAt }
+        }
+}
+
+internal suspend fun cacheMissingIdeaCovers(
+    ideas: List<IdeaEntity>,
+    photos: List<PhotoEntity>,
+    cachePhoto: suspend (PhotoEntity) -> Unit,
+) {
+    ideaCoverPhotos(ideas, photos).values
+        .filter { it.localPath == null }
+        .forEach { cachePhoto(it) }
+}
 
 /** lib/ideas.ts::IdeaFilters -- null means "no filter on this field," same as an omitted query param there. */
 data class IdeaFilters(
@@ -44,6 +71,7 @@ class IdeasViewModel @Inject constructor(
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
     val ideas: Flow<List<IdeaEntity>> = repository.observeForTrip(tripId)
+    private val photos: Flow<List<PhotoEntity>> = documentsRepository.observePhotosForTrip(tripId)
 
     // See ChecklistsViewModel's identical init block -- this screen had no
     // sync trigger of its own before, only ever refreshed as a side effect
@@ -55,6 +83,28 @@ class IdeasViewModel @Inject constructor(
 
     init {
         refresh()
+
+        // A full sync normally caches every photo, but individual download
+        // failures are deliberately non-fatal. Web-added covers would then
+        // remain metadata-only and the list used to hide them forever. Retry
+        // the small set of selected covers on demand; Room emits again after
+        // ensurePhotoCached stores the path, so the existing File-backed UI
+        // appears automatically and remains available offline.
+        viewModelScope.launch {
+            combine(ideas, photos, isRefreshing) { ideaList, photoList, refreshing ->
+                Triple(ideaList, photoList, refreshing)
+            }.collect { (ideaList, photoList, refreshing) ->
+                // TripSyncCoordinator downloads all missing photos. Waiting
+                // for it prevents two writers from fetching the same cover
+                // into the same cache file; this pass handles only whatever
+                // the completed bulk sync could not cache.
+                if (!refreshing) {
+                    cacheMissingIdeaCovers(ideaList, photoList) { photo ->
+                        documentsRepository.ensurePhotoCached(photo)
+                    }
+                }
+            }
+        }
     }
 
     private val _filters = MutableStateFlow(IdeaFilters())
@@ -87,7 +137,7 @@ class IdeasViewModel @Inject constructor(
     val groups: StateFlow<List<IdeaGroup>> = combine(
         ideas,
         timelineRepository.observeSections(tripId),
-        documentsRepository.observePhotosForTrip(tripId),
+        photos,
         _filters,
     ) { ideaList, sections, photos, filters ->
         val filtered = ideaList.filter { idea ->
@@ -96,10 +146,7 @@ class IdeasViewModel @Inject constructor(
                 (filters.category == null || idea.category == filters.category) &&
                 (filters.weatherSuitability == null || idea.weatherSuitability == filters.weatherSuitability)
         }
-        val coverPhotoByIdeaId = photos
-            .filter { it.ownerType == "IDEA" }
-            .groupBy { it.ownerId }
-            .mapValues { (_, ownerPhotos) -> ownerPhotos.find { it.isPrimary } ?: ownerPhotos.firstOrNull() }
+        val coverPhotoByIdeaId = ideaCoverPhotos(ideaList, photos)
         val sortedSections = sections.sortedBy { it.startDate }
         val bySectionId = filtered.groupBy { it.sectionId }
         val sectioned = sortedSections.mapNotNull { section ->
