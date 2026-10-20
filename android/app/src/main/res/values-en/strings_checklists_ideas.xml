@@ -89,4 +89,8 @@
     <string name="idea_edit_error_save_failed">Failed to save Idea.</string>
     <string name="idea_edit_error_delete_failed">Failed to delete Idea.</string>
     <string name="idea_edit_error_convert_failed">Failed to convert Idea.</string>
+    <string name="idea_sync_error_both">Ideas and cover photos could not be refreshed. Cached content is still shown.</string>
+    <string name="idea_sync_error_ideas">Ideas could not be refreshed. Cached content is still shown.</string>
+    <string name="idea_sync_error_photos">Cover photos could not be refreshed. Cached content is still shown.</string>
+    <string name="idea_sync_retry">Retry</string>
 </resources>

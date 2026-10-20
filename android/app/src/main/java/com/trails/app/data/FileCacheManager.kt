@@ -13,11 +13,34 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import javax.inject.Singleton
+
+internal fun writeVerifiedPhoto(input: InputStream, file: File, expectedSize: Int) {
+    val temporary = File.createTempFile("${file.nameWithoutExtension}-", ".download", file.parentFile)
+    try {
+        input.use { source -> temporary.outputStream().use { output -> source.copyTo(output) } }
+        if (temporary.length() != expectedSize.toLong() || expectedSize <= 0) {
+            throw IOException("Downloaded photo size does not match metadata")
+        }
+        try {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    } finally {
+        temporary.delete()
+    }
+}
 
 /**
  * Downloads Attachment/Photo bytes into this app's private storage --
@@ -47,25 +70,7 @@ class FileCacheManager @Inject constructor(
         val body = response.body() ?: throw IOException("Empty photo body")
         val dir = File(context.filesDir, "photos/${photo.tripId}").apply { mkdirs() }
         val file = File(dir, "${photo.id}-${sanitizeFilename(photo.originalFilename)}")
-        val temporary = File.createTempFile("${photo.id}-", ".download", dir)
-        try {
-            body.byteStream().use { input -> temporary.outputStream().use { output -> input.copyTo(output) } }
-            if (temporary.length() != photo.sizeBytes.toLong() || photo.sizeBytes <= 0) {
-                throw IOException("Downloaded photo size does not match metadata")
-            }
-            try {
-                Files.move(
-                    temporary.toPath(),
-                    file.toPath(),
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING,
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-        } finally {
-            temporary.delete()
-        }
+        writeVerifiedPhoto(body.byteStream(), file, photo.sizeBytes)
         file.absolutePath
     }
 

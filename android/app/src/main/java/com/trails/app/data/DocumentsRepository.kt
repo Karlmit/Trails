@@ -30,6 +30,16 @@ internal fun isUsableAttachmentCache(attachment: AttachmentEntity): Boolean {
     return cached.isFile && cached.length() == attachment.sizeBytes.toLong() && attachment.sizeBytes > 0
 }
 
+internal fun selectIdeaCoverPhotos(photos: List<PhotoEntity>): Collection<PhotoEntity> = photos
+    .asSequence()
+    .filter { it.ownerType == "IDEA" }
+    .groupBy { it.ownerId }
+    .values
+    .map { ownerPhotos ->
+        ownerPhotos.filter { it.isPrimary }.maxByOrNull { it.createdAt }
+            ?: ownerPhotos.maxBy { it.createdAt }
+    }
+
 @Singleton
 class DocumentsRepository @Inject constructor(
     private val api: TrailsApiService,
@@ -174,6 +184,31 @@ class DocumentsRepository @Inject constructor(
         }
         cacheMissingFiles(tripId)
         firstFailure?.let { throw it }
+    }
+
+    /**
+     * Foreground Ideas-screen sync. Photo metadata is committed before any
+     * download is attempted, and only IDEA-owned bytes are fetched here.
+     */
+    suspend fun syncIdeaPhotos(tripId: String) {
+        syncPhotoMetadata(tripId)
+        val failures = mutableListOf<Exception>()
+        selectIdeaCoverPhotos(photoDao.getAllForTrip(tripId))
+            .filterNot(::isUsablePhotoCache)
+            .forEach { photo ->
+                try {
+                    cachePhoto(photo)
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (failure: Exception) {
+                    failures += failure
+                }
+            }
+        if (failures.isNotEmpty()) {
+            val first = failures.first()
+            failures.drop(1).forEach(first::addSuppressed)
+            throw first
+        }
     }
 
     private suspend fun syncAttachmentMetadata(tripId: String) {

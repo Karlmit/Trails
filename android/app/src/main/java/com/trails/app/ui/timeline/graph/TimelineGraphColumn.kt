@@ -30,6 +30,7 @@ private val GapDash = Color.Black.copy(alpha = 0.16f)
 private val TrunkNeutral = Color.Black.copy(alpha = 0.22f)
 
 internal const val TODAY_MARKER_HAS_INNER_RING = true
+internal fun continuousRailEndpoints(height: Float): Pair<Float, Float> = 0f to height
 
 @Composable
 fun TimelineGraphColumn(
@@ -43,12 +44,13 @@ fun TimelineGraphColumn(
         val trunkX = TRUNK_X_UNITS * unitPx
         val h = size.height
         val strokeWidth = 3.dp.toPx()
+        val (railTop, railBottom) = continuousRailEndpoints(h)
 
         if (trunkColor != null) {
             drawLine(
                 trunkColor.copy(alpha = 0.78f),
-                Offset(trunkX, 0f),
-                Offset(trunkX, h),
+                Offset(trunkX, railTop),
+                Offset(trunkX, railBottom),
                 strokeWidth = strokeWidth,
                 cap = StrokeCap.Round,
             )

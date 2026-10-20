@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 
 class DocumentsRepositoryTest {
     private val api = mockk<TrailsApiService>()
@@ -54,6 +55,54 @@ class DocumentsRepositoryTest {
             photos.setLocalPath("photo", stale.absolutePath)
         }
         stale.delete()
+    }
+
+    @Test
+    fun `idea photo sync persists all metadata before cover download failure`() = runTest {
+        val ideaPhoto = photoEntity(localPath = null, sizeBytes = 2)
+        coEvery { api.listPhotos("trip") } returns listOf(photoDto())
+        coEvery { photos.getAllForTrip("trip") } returnsMany listOf(emptyList(), listOf(ideaPhoto))
+        coEvery { files.downloadPhoto(ideaPhoto) } throws IOException("download failed")
+
+        try {
+            repository.syncIdeaPhotos("trip")
+            fail("Expected cover download failure")
+        } catch (_: IOException) {
+            // Metadata remains committed and is available for retry.
+        }
+
+        coVerify(exactly = 1) { photos.upsertAll(match { it.single().id == "photo" }) }
+        coVerify(exactly = 1) { files.downloadPhoto(ideaPhoto) }
+        coVerify(exactly = 0) { api.listAttachments(any()) }
+    }
+
+    @Test
+    fun `idea photo sync downloads authenticated cover and publishes local path`() = runTest {
+        val cached = File.createTempFile("idea-cover", ".jpg").apply { writeBytes(byteArrayOf(1, 2)) }
+        val ideaPhoto = photoEntity(localPath = null, sizeBytes = 2)
+        coEvery { api.listPhotos("trip") } returns listOf(photoDto())
+        coEvery { photos.getAllForTrip("trip") } returnsMany listOf(emptyList(), listOf(ideaPhoto))
+        coEvery { files.downloadPhoto(ideaPhoto) } returns cached.absolutePath
+
+        repository.syncIdeaPhotos("trip")
+
+        coVerify(exactly = 1) { photos.upsertAll(match { it.single().ownerType == "IDEA" }) }
+        coVerify(exactly = 1) { photos.setLocalPath("photo", cached.absolutePath) }
+        cached.delete()
+    }
+
+    @Test
+    fun `idea photo sync downloads only each displayed cover`() = runTest {
+        val primary = photoEntity(localPath = null, sizeBytes = 2)
+        val unused = primary.copy(id = "gallery", isPrimary = false, createdAt = "2026-02-01")
+        coEvery { api.listPhotos("trip") } returns listOf(photoDto(), photoDto().copy(id = "gallery", isPrimary = false))
+        coEvery { photos.getAllForTrip("trip") } returnsMany listOf(emptyList(), listOf(unused, primary))
+        coEvery { files.downloadPhoto(primary) } returns "/cache/cover.jpg"
+
+        repository.syncIdeaPhotos("trip")
+
+        coVerify(exactly = 1) { files.downloadPhoto(primary) }
+        coVerify(exactly = 0) { files.downloadPhoto(unused) }
     }
 
     private fun photoDto() = PhotoDto(

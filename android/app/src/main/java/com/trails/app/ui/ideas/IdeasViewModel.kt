@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.IdeaRepository
 import com.trails.app.data.TimelineRepository
+import com.trails.app.data.isUsablePhotoCache
+import com.trails.app.data.selectIdeaCoverPhotos
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.SectionEntity
-import com.trails.app.sync.SyncScheduler
-import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,12 +20,74 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /** One Ideas-list group -- a Section (in the Trip's own Section order) or the trailing "No Section" bucket. */
 data class IdeaGroup(val section: SectionEntity?, val ideas: List<IdeaWithCoverPhoto>)
 data class IdeaWithCoverPhoto(val idea: IdeaEntity, val coverPhoto: PhotoEntity?)
+
+data class IdeasSyncState(
+    val isRefreshing: Boolean = false,
+    val ideaError: Boolean = false,
+    val photoError: Boolean = false,
+) {
+    val hasError: Boolean get() = ideaError || photoError
+}
+
+internal suspend fun runIndependentIdeasSync(
+    syncIdeas: suspend () -> Unit,
+    syncPhotos: suspend () -> Unit,
+): IdeasSyncState {
+    var ideaError = false
+    var photoError = false
+    try {
+        syncIdeas()
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: Exception) {
+        ideaError = true
+    }
+    try {
+        syncPhotos()
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (_: Exception) {
+        photoError = true
+    }
+    return IdeasSyncState(ideaError = ideaError, photoError = photoError)
+}
+
+internal class IdeasRefreshCoordinator(
+    private val scope: CoroutineScope,
+    private val performSync: suspend () -> IdeasSyncState,
+) {
+    private val admitted = AtomicBoolean(false)
+    private val _state = MutableStateFlow(IdeasSyncState())
+    val state: StateFlow<IdeasSyncState> = _state.asStateFlow()
+
+    fun refresh(): Boolean {
+        if (!admitted.compareAndSet(false, true)) return false
+        _state.value = IdeasSyncState(isRefreshing = true)
+        scope.launch {
+            var completed = IdeasSyncState(ideaError = true, photoError = true)
+            try {
+                completed = performSync()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: Exception) {
+                completed = IdeasSyncState(ideaError = true, photoError = true)
+            } finally {
+                _state.value = completed.copy(isRefreshing = false)
+                admitted.set(false)
+            }
+        }
+        return true
+    }
+}
 
 /** Selects the same primary-first, newest-fallback cover used by the web Ideas list. */
 internal fun ideaCoverPhotos(
@@ -33,15 +95,16 @@ internal fun ideaCoverPhotos(
     photos: List<PhotoEntity>,
 ): Map<String, PhotoEntity> {
     val ideaIds = ideas.mapTo(mutableSetOf()) { it.id }
-    return photos
-        .asSequence()
-        .filter { it.ownerType == "IDEA" && it.ownerId in ideaIds }
-        .groupBy { it.ownerId }
-        .mapValues { (_, ownerPhotos) ->
-            ownerPhotos.filter { it.isPrimary }.maxByOrNull { it.createdAt }
-                ?: ownerPhotos.maxBy { it.createdAt }
-        }
+    return selectIdeaCoverPhotos(photos.filter { it.ownerId in ideaIds })
+        .associateBy { it.ownerId }
 }
+
+internal fun verifiedIdeaCoverPhotos(
+    ideas: List<IdeaEntity>,
+    photos: List<PhotoEntity>,
+): Map<String, PhotoEntity> = ideaCoverPhotos(ideas, photos)
+    .mapNotNull { (ideaId, photo) -> photo.takeIf(::isUsablePhotoCache)?.let { ideaId to it } }
+    .toMap()
 
 internal suspend fun ensureIdeaCoversCached(
     ideas: List<IdeaEntity>,
@@ -71,10 +134,9 @@ data class IdeaFilters(
 @HiltViewModel
 class IdeasViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    repository: IdeaRepository,
+    private val repository: IdeaRepository,
     timelineRepository: TimelineRepository,
-    documentsRepository: DocumentsRepository,
-    syncScheduler: SyncScheduler,
+    private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
     val ideas: Flow<List<IdeaEntity>> = repository.observeForTrip(tripId)
@@ -84,34 +146,24 @@ class IdeasViewModel @Inject constructor(
     // sync trigger of its own before, only ever refreshed as a side effect
     // of the Timeline tab having synced first. Now also drives the
     // pull-to-refresh gesture (user-requested).
-    private val refresher = TripRefresher(viewModelScope, tripId, syncScheduler)
-    val isRefreshing: StateFlow<Boolean> = refresher.isRefreshing
-    fun refresh() = refresher.refresh()
+    private val refreshCoordinator = IdeasRefreshCoordinator(viewModelScope) {
+        runIndependentIdeasSync(
+            syncIdeas = { repository.syncTrip(tripId) },
+            syncPhotos = { documentsRepository.syncIdeaPhotos(tripId) },
+        )
+    }
+    val syncState: StateFlow<IdeasSyncState> = refreshCoordinator.state
+    val isRefreshing: StateFlow<Boolean> = syncState
+        .map { it.isRefreshing }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun refresh() {
+        refreshCoordinator.refresh()
+    }
 
     init {
         refresh()
 
-        // A full sync normally caches every photo, but individual download
-        // failures are deliberately non-fatal. Web-added covers would then
-        // remain metadata-only and the list used to hide them forever. Retry
-        // the small set of selected covers on demand; Room emits again after
-        // ensurePhotoCached stores the path, so the existing File-backed UI
-        // appears automatically and remains available offline.
-        viewModelScope.launch {
-            combine(ideas, photos, isRefreshing) { ideaList, photoList, refreshing ->
-                Triple(ideaList, photoList, refreshing)
-            }.collect { (ideaList, photoList, refreshing) ->
-                // TripSyncCoordinator downloads all missing photos. Waiting
-                // for it prevents two writers from fetching the same cover
-                // into the same cache file; this pass handles only whatever
-                // the completed bulk sync could not cache.
-                if (!refreshing) {
-                    ensureIdeaCoversCached(ideaList, photoList) { photo ->
-                        documentsRepository.ensurePhotoCached(photo)
-                    }
-                }
-            }
-        }
     }
 
     private val _filters = MutableStateFlow(IdeaFilters())
@@ -153,7 +205,7 @@ class IdeasViewModel @Inject constructor(
                 (filters.category == null || idea.category == filters.category) &&
                 (filters.weatherSuitability == null || idea.weatherSuitability == filters.weatherSuitability)
         }
-        val coverPhotoByIdeaId = ideaCoverPhotos(ideaList, photos)
+        val coverPhotoByIdeaId = verifiedIdeaCoverPhotos(ideaList, photos)
         val sortedSections = sections.sortedBy { it.startDate }
         val bySectionId = filtered.groupBy { it.sectionId }
         val sectioned = sortedSections.mapNotNull { section ->

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,6 +46,17 @@ import com.trails.app.ui.timeline.graph.graphWidthFor
 import com.trails.app.ui.timeline.graph.sectionBandColor
 import com.trails.app.ui.timeline.graph.sectionSolidColor
 import com.trails.app.ui.timeline.graph.subtypeLabelResolved
+
+internal data class SectionRunBoundary(val roundsTop: Boolean, val roundsBottom: Boolean)
+
+internal fun sectionRunBoundary(
+    previousSectionIndex: Int?,
+    sectionIndex: Int?,
+    nextSectionIndex: Int?,
+): SectionRunBoundary = SectionRunBoundary(
+    roundsTop = sectionIndex != null && previousSectionIndex != sectionIndex,
+    roundsBottom = sectionIndex != null && nextSectionIndex != sectionIndex,
+)
 
 /**
  * The GitKraken-style branch/merge graph -- ported 1:1 from
@@ -88,6 +100,7 @@ fun TimelineScreen(
                         // next begins gets a half-and-half band instead of
                         // a flat color -- see DayRow's own comment.
                         val nextSectionIndex = if (index < layout.days.size - 1) layout.days[index + 1].day.sectionIndex else null
+                        val runBoundary = sectionRunBoundary(previousSectionIndex, day.day.sectionIndex, nextSectionIndex)
                         val isSectionTransition =
                             day.day.sectionIndex != null && nextSectionIndex != null && nextSectionIndex != day.day.sectionIndex
                         val nextBandColor = if (isSectionTransition) {
@@ -104,6 +117,7 @@ fun TimelineScreen(
                             bandColor = section?.let { sectionBandColor(day.day.sectionIndex!!, it.color) },
                             nextBandColor = nextBandColor,
                             showSectionLabel = showSectionLabel,
+                            runBoundary = runBoundary,
                             tripTimezone = trip.timezone,
                             onOpenEntry = onOpenEntry,
                         )
@@ -124,6 +138,7 @@ private fun DayRow(
     bandColor: androidx.compose.ui.graphics.Color?,
     nextBandColor: androidx.compose.ui.graphics.Color?,
     showSectionLabel: Boolean,
+    runBoundary: SectionRunBoundary,
     tripTimezone: String,
     onOpenEntry: (String, String) -> Unit,
 ) {
@@ -139,12 +154,19 @@ private fun DayRow(
     // near its own edge of the row -- only the middle third blends, a soft
     // seam rather than a hard cut or a wash across the whole row, same
     // convention as the web version's CSS gradient.
+    val bandShape = RoundedCornerShape(
+        topStart = if (runBoundary.roundsTop) 24.dp else 0.dp,
+        topEnd = if (runBoundary.roundsTop) 24.dp else 0.dp,
+        bottomStart = if (runBoundary.roundsBottom) 24.dp else 0.dp,
+        bottomEnd = if (runBoundary.roundsBottom) 24.dp else 0.dp,
+    )
     val rowModifier = if (bandColor != null && nextBandColor != null) {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(
             Brush.verticalGradient(0f to bandColor, 0.35f to bandColor, 0.65f to nextBandColor, 1f to nextBandColor),
+            bandShape,
         )
     } else if (bandColor != null) {
-        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor)
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(bandColor, bandShape)
     } else {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min)
     }
@@ -205,13 +227,17 @@ private fun DayRow(
                         // match TimelineGraphColumn's own line filtering).
                         if (label.hidden) return@forEach
                         val isBlog = line.entryType == "BLOG_POST"
-                        Column(
+                        Surface(
+                            color = TrailsColors.Surface.copy(alpha = 0.94f),
+                            contentColor = TrailsColors.Text,
+                            shape = RoundedCornerShape(16.dp),
+                            shadowElevation = 1.dp,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .defaultMinSize(minHeight = ClayMetrics.MinimumTouchTarget)
-                                .clickable { onOpenEntry(line.entryType, line.entryId) }
-                                .padding(vertical = 6.dp),
+                                .clickable { onOpenEntry(line.entryType, line.entryId) },
                         ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                             Row(verticalAlignment = Alignment.Top) {
                                 // User-requested: every Entry Type/Subtype
                                 // gets its own glyph so the Timeline reads
@@ -240,6 +266,7 @@ private fun DayRow(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = TrailsColors.TextSoft,
                                 )
+                            }
                             }
                         }
                     }

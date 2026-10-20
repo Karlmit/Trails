@@ -89,4 +89,8 @@
     <string name="idea_edit_error_save_failed">Det gick inte att spara idén.</string>
     <string name="idea_edit_error_delete_failed">Det gick inte att ta bort idén.</string>
     <string name="idea_edit_error_convert_failed">Det gick inte att göra om idén.</string>
+    <string name="idea_sync_error_both">Idéer och omslagsbilder kunde inte uppdateras. Cachad information visas fortfarande.</string>
+    <string name="idea_sync_error_ideas">Idéer kunde inte uppdateras. Cachad information visas fortfarande.</string>
+    <string name="idea_sync_error_photos">Omslagsbilder kunde inte uppdateras. Cachad information visas fortfarande.</string>
+    <string name="idea_sync_retry">Försök igen</string>
 </resources>

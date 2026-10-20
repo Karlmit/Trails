@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +50,7 @@ fun IdeasScreen(
 ) {
     val groups by viewModel.groups.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
     val filters by viewModel.filters.collectAsState()
     val categoryOptions by viewModel.categoryOptions.collectAsState()
     val hasAnyIdeas by viewModel.hasAnyIdeas.collectAsState()
@@ -62,6 +64,7 @@ fun IdeasScreen(
         // only visible again after scrolling back to the top.
         if (groups.isEmpty()) {
             Column(modifier = Modifier.fillMaxSize()) {
+                if (syncState.hasError) IdeasSyncError(syncState, viewModel::refresh, Modifier.padding(16.dp))
                 IdeaFilterBar(
                     filters = filters,
                     sections = sections,
@@ -84,6 +87,9 @@ fun IdeasScreen(
         } else {
             val noSectionLabel = stringResource(R.string.idea_no_section_label)
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+                if (syncState.hasError) {
+                    item { IdeasSyncError(syncState, viewModel::refresh) }
+                }
                 item {
                     IdeaFilterBar(
                         filters = filters,
@@ -110,6 +116,32 @@ fun IdeasScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun IdeasSyncError(state: IdeasSyncState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = TrailsShapes.Card,
+        modifier = modifier.fillMaxWidth().padding(bottom = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                when {
+                    state.ideaError && state.photoError -> stringResource(R.string.idea_sync_error_both)
+                    state.ideaError -> stringResource(R.string.idea_sync_error_ideas)
+                    else -> stringResource(R.string.idea_sync_error_photos)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+            )
+            TextButton(onClick = onRetry) { Text(stringResource(R.string.idea_sync_retry)) }
         }
     }
 }

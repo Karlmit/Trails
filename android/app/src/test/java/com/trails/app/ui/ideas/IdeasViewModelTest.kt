@@ -9,8 +9,67 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.CancellationException
+import java.io.IOException
 
 class IdeasViewModelTest {
+    @Test
+    fun `refresh coordinator atomically rejects duplicates and clears state on cancellation`() = runTest {
+        val coordinator = IdeasRefreshCoordinator(backgroundScope) {
+            throw CancellationException("screen closed")
+        }
+
+        assertTrue(coordinator.refresh())
+        assertFalse(coordinator.refresh())
+        assertTrue(coordinator.state.value.isRefreshing)
+        runCurrent()
+
+        assertFalse(coordinator.state.value.isRefreshing)
+        assertTrue(coordinator.refresh())
+    }
+
+    @Test
+    fun `refresh coordinator completes unexpected failure as visible error`() = runTest {
+        val coordinator = IdeasRefreshCoordinator(backgroundScope) {
+            throw IllegalStateException("unexpected")
+        }
+
+        assertTrue(coordinator.refresh())
+        runCurrent()
+
+        assertFalse(coordinator.state.value.isRefreshing)
+        assertTrue(coordinator.state.value.ideaError)
+        assertTrue(coordinator.state.value.photoError)
+    }
+
+    @Test
+    fun `idea and photo sync commit independently and expose partial failure`() = runTest {
+        var ideasCommitted = false
+        val result = runIndependentIdeasSync(
+            syncIdeas = { ideasCommitted = true },
+            syncPhotos = { throw IOException("photos unavailable") },
+        )
+
+        assertTrue(ideasCommitted)
+        assertFalse(result.ideaError)
+        assertTrue(result.photoError)
+        assertTrue(result.hasError)
+    }
+
+    @Test
+    fun `photo sync is still attempted when idea endpoint fails`() = runTest {
+        var photosCommitted = false
+        val result = runIndependentIdeasSync(
+            syncIdeas = { throw IOException("ideas unavailable") },
+            syncPhotos = { photosCommitted = true },
+        )
+
+        assertTrue(photosCommitted)
+        assertTrue(result.ideaError)
+        assertFalse(result.photoError)
+    }
+
     @Test
     fun `primary photo wins over newer fallback`() {
         val idea = idea("idea-1")
@@ -79,6 +138,19 @@ class IdeasViewModelTest {
         assertFalse(isUsablePhotoCache(photo))
         cached.delete()
         assertFalse(isUsablePhotoCache(photo))
+    }
+
+    @Test
+    fun `only a verified local file is exposed as an idea cover`() {
+        val idea = idea("idea-1")
+        val cached = kotlin.io.path.createTempFile(suffix = ".jpg").toFile().apply {
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+        val valid = photo("valid", idea.id, isPrimary = true, localPath = cached.absolutePath, sizeBytes = 3)
+
+        assertEquals(valid, verifiedIdeaCoverPhotos(listOf(idea), listOf(valid))[idea.id])
+        cached.delete()
+        assertTrue(verifiedIdeaCoverPhotos(listOf(idea), listOf(valid)).isEmpty())
     }
 
     private fun idea(id: String, sectionId: String? = null) = IdeaEntity(
