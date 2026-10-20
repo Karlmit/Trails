@@ -1,6 +1,10 @@
 package com.trails.app.ui.triplist
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CardDefaults
@@ -23,6 +28,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,8 +36,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil3.compose.AsyncImage
 import com.trails.app.R
 import com.trails.app.data.entity.TripEntity
 import com.trails.app.ui.components.ErrorBanner
@@ -115,7 +124,12 @@ fun TripListContent(
             )
         },
         floatingActionButton = {
-            androidx.compose.material3.FloatingActionButton(onClick = onAddTrip) {
+            androidx.compose.material3.FloatingActionButton(
+                onClick = onAddTrip,
+                containerColor = TrailsColors.BrandAccent,
+                contentColor = TrailsColors.TextOnDark,
+                shape = TrailsShapes.Floating,
+            ) {
                 androidx.compose.material3.Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_new_trip))
             }
         },
@@ -149,7 +163,7 @@ fun TripListContent(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     items(state.trips, key = { it.id }) { trip: TripEntity ->
                         TripCard(
@@ -179,17 +193,49 @@ private fun TripCard(
     onDismissError: () -> Unit,
 ) {
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = TrailsShapes.Card,
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                BorderStroke(
+                    width = if (trip.status == "ACTIVE") 2.dp else 1.dp,
+                    color = if (trip.status == "ACTIVE") TrailsColors.Gold else TrailsColors.ClayRim,
+                ),
+                TrailsShapes.Hero,
+            )
+            .clickable(onClick = onClick),
+        shape = TrailsShapes.Hero,
         colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 7.dp, pressedElevation = 2.dp),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        trip.coverImage?.takeIf { it.isNotBlank() }?.let { coverImage ->
+            Box(
+                modifier = Modifier.fillMaxWidth().height(168.dp).background(TrailsColors.BrandMint),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.trails_logo),
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                )
+                AsyncImage(
+                    model = coverImage,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(trip.name, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)
+                Text(
+                    trip.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = TrailsColors.BrandDeep,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
                 TripStatusBadge(trip.status)
             }
             trip.destination?.let {
@@ -255,12 +301,9 @@ private fun TripCard(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             )
                         }
-                        Text(
-                            stringResource(R.string.shell_refresh),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TrailsColors.BrandAccent,
-                            modifier = Modifier.padding(start = 12.dp).clickable(onClick = onSaveOffline),
-                        )
+                        TextButton(onClick = onSaveOffline, modifier = Modifier.padding(start = 4.dp)) {
+                            Text(stringResource(R.string.shell_refresh), color = TrailsColors.BrandAccent)
+                        }
                     }
                     else -> {
                         PillButton(text = stringResource(R.string.shell_save_offline), variant = PillButtonVariant.Outline, onClick = onSaveOffline)

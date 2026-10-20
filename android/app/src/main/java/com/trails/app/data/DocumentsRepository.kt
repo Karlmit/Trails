@@ -24,6 +24,12 @@ internal fun isUsablePhotoCache(photo: PhotoEntity): Boolean {
     return cached.isFile && cached.length() == photo.sizeBytes.toLong() && photo.sizeBytes > 0
 }
 
+internal fun isUsableAttachmentCache(attachment: AttachmentEntity): Boolean {
+    val path = attachment.localPath ?: return false
+    val cached = File(path)
+    return cached.isFile && cached.length() == attachment.sizeBytes.toLong() && attachment.sizeBytes > 0
+}
+
 @Singleton
 class DocumentsRepository @Inject constructor(
     private val api: TrailsApiService,
@@ -43,16 +49,20 @@ class DocumentsRepository @Inject constructor(
 
     /** Retries caching one file on demand (e.g. the bulk sync pass failed for it) -- returns the local path on success. */
     suspend fun ensureAttachmentCached(attachment: AttachmentEntity): String? {
-        if (attachment.localPath != null) return attachment.localPath
-        return runCatching { fileCacheManager.downloadAttachment(attachment) }
-            .onSuccess { attachmentDao.setLocalPath(attachment.id, it) }
-            .getOrNull()
+        if (isUsableAttachmentCache(attachment)) return attachment.localPath
+        return try {
+            cacheAttachment(attachment)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            null
+        }
     }
 
     suspend fun ensurePhotoCached(photo: PhotoEntity): String? {
         if (isUsablePhotoCache(photo)) return photo.localPath
         return try {
-            fileCacheManager.downloadPhoto(photo).also { photoDao.setLocalPath(photo.id, it) }
+            cachePhoto(photo)
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Exception) {
@@ -189,18 +199,41 @@ class DocumentsRepository @Inject constructor(
     }
 
     private suspend fun cacheMissingFiles(tripId: String) {
-        attachmentDao.getAllForTrip(tripId).filter { it.localPath == null }.forEach { attachment ->
+        val failures = mutableListOf<Exception>()
+        suspend fun attempt(cache: suspend () -> Unit) {
             try {
-                val path = fileCacheManager.downloadAttachment(attachment)
-                attachmentDao.setLocalPath(attachment.id, path)
+                cache()
             } catch (failure: CancellationException) {
                 throw failure
-            } catch (_: Exception) {
-                // One unavailable file must not prevent other offline files.
+            } catch (failure: Exception) {
+                failures += failure
             }
         }
+
+        attachmentDao.getAllForTrip(tripId)
+            .filterNot(::isUsableAttachmentCache)
+            .forEach { attachment -> attempt { cacheAttachment(attachment) } }
         photoDao.getAllForTrip(tripId).forEach { photo ->
-            ensurePhotoCached(photo)
+            if (!isUsablePhotoCache(photo)) attempt { cachePhoto(photo) }
         }
+        if (failures.isNotEmpty()) {
+            val first = failures.first()
+            failures.drop(1).forEach(first::addSuppressed)
+            throw first
+        }
+    }
+
+    private suspend fun cacheAttachment(attachment: AttachmentEntity): String {
+        // Publish null before a repair even when the eventual path is the
+        // same, so Room/Coil observers discard a stale broken model.
+        if (attachment.localPath != null) attachmentDao.setLocalPath(attachment.id, null)
+        return fileCacheManager.downloadAttachment(attachment)
+            .also { attachmentDao.setLocalPath(attachment.id, it) }
+    }
+
+    private suspend fun cachePhoto(photo: PhotoEntity): String {
+        if (photo.localPath != null) photoDao.setLocalPath(photo.id, null)
+        return fileCacheManager.downloadPhoto(photo)
+            .also { photoDao.setLocalPath(photo.id, it) }
     }
 }

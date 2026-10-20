@@ -40,6 +40,7 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
@@ -94,7 +95,7 @@ fun EntryDetailScreen(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            TrailsCard {
+            TrailsCard(variant = TrailsCardVariant.Standard) {
                 ScreenHeading(
                     emoji = entryTypeEmoji(entry.entryType),
                     title = entry.title,
@@ -203,7 +204,7 @@ fun EntryDetailScreen(
                 entry.postTripNotes?.let { Field(stringResource(R.string.timeline_field_post_trip_notes), it) }
             }
 
-            TrailsCard {
+            TrailsCard(variant = TrailsCardVariant.Tonal) {
                 ScreenHeading(emoji = "📎", title = stringResource(R.string.timeline_photos_attachments))
                 importError?.let { message ->
                     ErrorBanner(

@@ -112,7 +112,11 @@ private fun SettingsRoute(onBack: () -> Unit) {
 
 @Composable
 private fun AddFab(onClick: () -> Unit) {
-    FloatingActionButton(onClick = onClick) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
+    FloatingActionButton(
+        onClick = onClick,
+        containerColor = TrailsColors.BrandAccent,
+        contentColor = TrailsColors.TextOnDark,
+    ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
 }
 
 /** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet (so it doesn't belong as a Timeline Entry until converted), and a Blog Post goes through its own editor, not the generic Entry one. */
@@ -120,7 +124,11 @@ private fun AddFab(onClick: () -> Unit) {
 private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onAddBlogPost: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     androidx.compose.foundation.layout.Box {
-        FloatingActionButton(onClick = { expanded = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
+        FloatingActionButton(
+            onClick = { expanded = true },
+            containerColor = TrailsColors.BrandAccent,
+            contentColor = TrailsColors.TextOnDark,
+        ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.shell_entry)) }, onClick = { expanded = false; onAddEntry() })
             DropdownMenuItem(text = { Text(stringResource(R.string.shell_idea)) }, onClick = { expanded = false; onAddIdea() })

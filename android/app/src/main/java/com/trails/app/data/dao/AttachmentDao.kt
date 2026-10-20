@@ -22,7 +22,7 @@ interface AttachmentDao {
     suspend fun upsertAll(attachments: List<AttachmentEntity>)
 
     @Query("UPDATE attachments SET localPath = :localPath WHERE id = :id")
-    suspend fun setLocalPath(id: String, localPath: String)
+    suspend fun setLocalPath(id: String, localPath: String?)
 
     @Query("DELETE FROM attachments WHERE tripId = :tripId AND id NOT IN (:keepIds)")
     suspend fun deleteMissing(tripId: String, keepIds: List<String>)
@@ -49,7 +49,7 @@ interface PhotoDao {
     suspend fun upsertAll(photos: List<PhotoEntity>)
 
     @Query("UPDATE photos SET localPath = :localPath WHERE id = :id")
-    suspend fun setLocalPath(id: String, localPath: String)
+    suspend fun setLocalPath(id: String, localPath: String?)
 
     @Query("DELETE FROM photos WHERE tripId = :tripId AND id NOT IN (:keepIds)")
     suspend fun deleteMissing(tripId: String, keepIds: List<String>)

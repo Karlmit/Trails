@@ -33,6 +33,7 @@ import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.components.TripStatusBadge
 import com.trails.app.ui.theme.TrailsColors
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -73,7 +74,7 @@ fun OverviewScreen(padding: PaddingValues, onEdit: () -> Unit = {}, viewModel: O
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                TrailsCard {
+                TrailsCard(variant = TrailsCardVariant.Hero) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         ScreenHeading(emoji = "🗺️", title = t.name, modifier = Modifier.weight(1f))
                         TripStatusBadge(t.status)

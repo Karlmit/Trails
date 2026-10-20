@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +29,8 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.timeline.graph.sectionSolidColor
 
 /** Mirrors app/(web)/trips/[tripId]/sections/page.tsx, plus create/edit via [onOpenSection]'s FAB/tap wiring in the nav host. */
@@ -59,11 +59,10 @@ fun SectionsScreen(padding: PaddingValues, onOpenSection: (String?) -> Unit = {}
 
 @Composable
 private fun SectionRow(section: SectionEntity, index: Int, onClick: () -> Unit) {
-    ElevatedCard(
+    TrailsCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick),
-        shape = TrailsShapes.Card,
-        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        variant = TrailsCardVariant.Compact,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

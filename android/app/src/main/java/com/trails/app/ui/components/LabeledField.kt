@@ -43,8 +43,8 @@ fun LabeledField(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = TrailsColors.BrandAccent,
                 unfocusedBorderColor = TrailsColors.InputBorder,
-                focusedContainerColor = TrailsColors.Surface,
-                unfocusedContainerColor = TrailsColors.Surface,
+                focusedContainerColor = TrailsColors.SurfaceCool,
+                unfocusedContainerColor = TrailsColors.SurfaceCool,
             ),
         )
     }

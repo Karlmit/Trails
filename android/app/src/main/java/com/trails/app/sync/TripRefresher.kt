@@ -1,12 +1,14 @@
 package com.trails.app.sync
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.work.WorkInfo
 
 /**
  * Shared "pull to refresh" building block for every trip-content screen --
@@ -25,16 +27,25 @@ class TripRefresher(
 ) {
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _refreshError = MutableStateFlow<Throwable?>(null)
+    val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
 
     fun refresh() {
-        if (_isRefreshing.value) return
-        _isRefreshing.value = true
+        if (!_isRefreshing.compareAndSet(expect = false, update = true)) return
+        _refreshError.value = null
         scope.launch {
             try {
                 val workId = syncScheduler.syncTripNow(tripId)
                 // WorkManager may emit null before the newly-enqueued request
                 // is persisted. That is "not visible yet", not "finished".
-                syncScheduler.observeWork(workId).filterNotNull().first { it.state.isFinished }
+                val finished = syncScheduler.observeWork(workId).filterNotNull().first { it.state.isFinished }
+                if (finished.state != WorkInfo.State.SUCCEEDED) {
+                    _refreshError.value = IllegalStateException("Trip refresh ended in ${finished.state}")
+                }
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Throwable) {
+                _refreshError.value = failure
             } finally {
                 _isRefreshing.value = false
             }

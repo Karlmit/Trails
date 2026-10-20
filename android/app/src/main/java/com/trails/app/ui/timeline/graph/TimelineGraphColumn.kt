@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.trails.app.ui.theme.TrailsColors
 
 // Ported from app/(web)/trips/[tripId]/timeline/page.tsx's LANE_UNIT/
 // TRUNK_X/laneX/branchPath -- same GitKraken-style branch/merge shape,
@@ -28,6 +29,8 @@ fun graphWidthFor(laneCount: Int): Dp = LANE_UNIT * (laneCount + 1)
 private val GapDash = Color.Black.copy(alpha = 0.16f)
 private val TrunkNeutral = Color.Black.copy(alpha = 0.22f)
 
+internal const val TODAY_MARKER_HAS_INNER_RING = true
+
 @Composable
 fun TimelineGraphColumn(
     day: TimelineDayWithEntries,
@@ -42,7 +45,13 @@ fun TimelineGraphColumn(
         val strokeWidth = 3.dp.toPx()
 
         if (trunkColor != null) {
-            drawLine(trunkColor, Offset(trunkX, 0f), Offset(trunkX, h), strokeWidth = strokeWidth, cap = StrokeCap.Round)
+            drawLine(
+                trunkColor.copy(alpha = 0.78f),
+                Offset(trunkX, 0f),
+                Offset(trunkX, h),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
         } else {
             drawLine(
                 GapDash,
@@ -72,6 +81,16 @@ fun TimelineGraphColumn(
                 }
             }
             drawPath(path, color = entryTypeColor(branch.entryType), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+        }
+
+        // Draw the current-day halo before entry nodes so it can never cover
+        // a same-position itinerary marker.
+        if (day.day.isToday) {
+            val center = Offset(trunkX, h / 2f)
+            drawCircle(TrailsColors.GoldLight.copy(alpha = 0.38f), radius = 12.dp.toPx(), center = center)
+            drawCircle(canvasBackground, radius = 8.dp.toPx(), center = center)
+            drawCircle(TrailsColors.Gold, radius = 7.dp.toPx(), center = center)
+            drawCircle(canvasBackground, radius = 3.dp.toPx(), center = center)
         }
 
         // A Stay's own through-day renders no text at all in the content

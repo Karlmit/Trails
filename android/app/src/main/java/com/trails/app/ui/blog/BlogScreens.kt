@@ -12,8 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +35,8 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import java.io.File
 
 private fun runsToAnnotatedString(runs: List<InlineRun>) = buildAnnotatedString {
@@ -70,11 +70,10 @@ fun BlogListScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 items(posts, key = { it.entry.id }) { item ->
-                    ElevatedCard(
+                    TrailsCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
-                        shape = TrailsShapes.Card,
-                        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                        variant = TrailsCardVariant.Standard,
+                        contentPadding = PaddingValues(0.dp),
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text("📖 ${item.entry.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.BrandDeep)

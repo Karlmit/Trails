@@ -13,12 +13,14 @@ import androidx.compose.ui.unit.dp
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 
+internal fun tripStatusUsesCeremonialGold(status: String): Boolean = status == "ACTIVE"
+
 /** Mirrors globals.css's `.badge`/`.badge-upcoming`/`.badge-active`/`.badge-completed`. */
 @Composable
 fun TripStatusBadge(status: String) {
     val (background, contentColor, borderColor) = when (status) {
         "UPCOMING" -> Triple(TrailsColors.BrandMint, TrailsColors.BrandDeep, null)
-        "ACTIVE" -> Triple(TrailsColors.GoldLightest, TrailsColors.Gold, TrailsColors.Gold)
+        "ACTIVE" -> Triple(TrailsColors.GoldLightest, TrailsColors.BrandDeep, TrailsColors.Gold)
         "COMPLETED" -> Triple(TrailsColors.SurfaceCool, TrailsColors.TextSoft, null)
         else -> Triple(TrailsColors.SurfaceCool, TrailsColors.TextSoft, null)
     }

@@ -1,6 +1,7 @@
 package com.trails.app.ui.timeline
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.theme.ClayMetrics
 import com.trails.app.ui.timeline.graph.TimelineDayWithEntries
 import com.trails.app.ui.timeline.graph.TimelineGraphColumn
 import com.trails.app.ui.timeline.graph.dayLineLabel
@@ -173,12 +176,19 @@ private fun DayRow(
                 }
             }
             if (day.day.isToday) {
-                Text(
-                    stringResource(R.string.timeline_today_badge),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TrailsColors.Gold,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+                Surface(
+                    color = TrailsColors.GoldLightest,
+                    contentColor = TrailsColors.BrandDeep,
+                    shape = TrailsShapes.Pill,
+                    border = BorderStroke(1.dp, TrailsColors.Gold),
+                    modifier = Modifier.padding(bottom = 6.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.timeline_today_badge),
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                    )
+                }
             }
             if (day.lines.isEmpty()) {
                 Text(
@@ -195,7 +205,13 @@ private fun DayRow(
                         // match TimelineGraphColumn's own line filtering).
                         if (label.hidden) return@forEach
                         val isBlog = line.entryType == "BLOG_POST"
-                        Column(modifier = Modifier.clickable { onOpenEntry(line.entryType, line.entryId) }) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = ClayMetrics.MinimumTouchTarget)
+                                .clickable { onOpenEntry(line.entryType, line.entryId) }
+                                .padding(vertical = 6.dp),
+                        ) {
                             Row(verticalAlignment = Alignment.Top) {
                                 // User-requested: every Entry Type/Subtype
                                 // gets its own glyph so the Timeline reads

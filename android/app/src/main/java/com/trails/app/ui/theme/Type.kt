@@ -31,6 +31,20 @@ private val TightTracking = (-0.01).em
 // 400/text) -- color is applied at the call site, not baked in here, same
 // split as the CSS.
 val TrailsTypography = Typography(
+    displaySmall = TextStyle(
+        fontFamily = InterFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 32.sp,
+        lineHeight = 1.15.em,
+        letterSpacing = TightTracking,
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = InterFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 26.sp,
+        lineHeight = 1.2.em,
+        letterSpacing = TightTracking,
+    ),
     // h1 (weight 600) / h2 (weight 400, override at call site) share this.
     titleLarge = TextStyle(
         fontFamily = InterFamily,
@@ -86,5 +100,12 @@ val TrailsTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 13.sp,
         letterSpacing = 0.05.em,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = InterFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 1.25.em,
+        letterSpacing = TightTracking,
     ),
 )

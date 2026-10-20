@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +36,7 @@ import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCardVariant
 import java.io.File
 
 /** Mirrors app/(web)/trips/[tripId]/ideas/page.tsx's default Section grouping + Priority/Section/Category/Weather filters, plus create/edit via [onOpenIdea]. */
@@ -183,11 +182,10 @@ private fun IdeaFilterBar(
 private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
     val idea = item.idea
 
-    ElevatedCard(
+    TrailsCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clickable(onClick = onClick),
-        shape = TrailsShapes.Card,
-        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        variant = TrailsCardVariant.Compact,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

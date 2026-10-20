@@ -33,6 +33,7 @@ import androidx.navigation.NavHostController
 import com.trails.app.R
 import com.trails.app.ui.components.TripStatusBadge
 import com.trails.app.ui.theme.TrailsColors
+import com.trails.app.ui.theme.TrailsShapes
 import kotlinx.coroutines.launch
 
 private const val ROUTE_TRIPS = "trips"
@@ -87,7 +88,10 @@ fun TripDrawerScaffold(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                drawerContainerColor = TrailsColors.Canvas,
+                drawerShape = TrailsShapes.Sheet,
+            ) {
                 trip?.let { t ->
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -125,6 +129,11 @@ fun TripDrawerScaffold(
                         selected = tab == currentTab,
                         onClick = { navigateTo(tab.route) },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                        colors = androidx.compose.material3.NavigationDrawerItemDefaults.colors(
+                            selectedContainerColor = TrailsColors.BrandMint,
+                            selectedTextColor = TrailsColors.BrandDeep,
+                            selectedIconColor = TrailsColors.BrandDeep,
+                        ),
                     )
                 }
                 if (trip?.status == "ACTIVE") {
@@ -169,7 +178,7 @@ fun TripDrawerScaffold(
                         }
                     },
                     actions = actions,
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Surface),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = TrailsColors.Canvas),
                 )
             },
             floatingActionButton = floatingActionButton,

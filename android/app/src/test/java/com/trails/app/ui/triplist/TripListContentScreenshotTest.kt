@@ -37,6 +37,23 @@ class TripListContentScreenshotTest {
 
     private val sampleTrips = listOf(
         TripEntity(
+            id = "00000000-0000-4000-8000-000000000000",
+            name = "A long summer across the Swedish archipelago",
+            destination = "Stockholm, Vaxholm, Sandhamn and the outer islands",
+            startDate = "2026-07-14",
+            endDate = "2026-07-28",
+            timezone = "Europe/Stockholm",
+            description = "A long-title fixture for wrapping and active-state styling.",
+            coverImage = null,
+            visibility = "PRIVATE",
+            pinnedActive = true,
+            status = "ACTIVE",
+            durationDays = 15,
+            createdAt = "2026-06-01T00:00:00.000Z",
+            updatedAt = "2026-07-14T00:00:00.000Z",
+            cachedOffline = true,
+        ),
+        TripEntity(
             id = "11111111-1111-4111-8111-111111111111",
             name = "Thailand",
             destination = "Bangkok, Chiang Mai",

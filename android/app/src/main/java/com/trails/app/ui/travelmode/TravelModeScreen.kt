@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +26,8 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
 import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 
@@ -89,11 +89,10 @@ fun TravelModeScreen(
 
 @Composable
 private fun InfoCard(title: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    ElevatedCard(
+    TrailsCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        shape = TrailsShapes.Card,
-        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        variant = TrailsCardVariant.Standard,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = TrailsColors.Text)

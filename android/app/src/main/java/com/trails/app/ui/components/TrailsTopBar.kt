@@ -44,7 +44,7 @@ fun TrailsTopBar(title: String? = null, actions: @Composable RowScope.() -> Unit
         },
         actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = TrailsColors.Surface,
+            containerColor = TrailsColors.Canvas,
             titleContentColor = TrailsColors.Brand,
         ),
     )

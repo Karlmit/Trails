@@ -2,11 +2,7 @@ package com.trails.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/**
- * Ported 1:1 from /workspace/trails/app/globals.css's `:root` custom
- * properties -- the web app's actual design tokens, not generic Material3
- * defaults. Keep this in sync if globals.css's palette ever changes.
- */
+/** Android-only Material Clay tokens. The web palette intentionally remains unchanged. */
 object TrailsColors {
     // Canvas & surfaces
     val Canvas = Color(0xFFF2F0EB)
@@ -27,8 +23,8 @@ object TrailsColors {
     val GoldLightest = Color(0xFFFAF6EE)
 
     // Text
-    val Text = Color(0xDE000000) // rgba(0,0,0,0.87)
-    val TextSoft = Color(0x94000000) // rgba(0,0,0,0.58)
+    val Text = Color(0xFF332F36)
+    val TextSoft = Color(0xFF625E63)
     val TextOnDark = Color(0xFFFFFFFF)
     val TextOnDarkSoft = Color(0xB3FFFFFF) // rgba(255,255,255,0.7)
 
@@ -39,4 +35,6 @@ object TrailsColors {
     // Shared low-alpha lines/borders used throughout globals.css
     val InputBorder = Color(0xFFD6DBDE)
     val HairlineOnLight = Color(0x1F000000) // rgba(0,0,0,0.12)-ish dividers
+    val ClayShadow = Color(0x2B1E3932)
+    val ClayRim = Color(0xCCFFFFFF)
 }

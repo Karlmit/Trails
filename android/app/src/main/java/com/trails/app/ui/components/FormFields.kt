@@ -72,8 +72,8 @@ fun MultilineLabeledField(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = TrailsColors.BrandAccent,
                 unfocusedBorderColor = TrailsColors.InputBorder,
-                focusedContainerColor = TrailsColors.Surface,
-                unfocusedContainerColor = TrailsColors.Surface,
+                focusedContainerColor = TrailsColors.SurfaceCool,
+                unfocusedContainerColor = TrailsColors.SurfaceCool,
             ),
         )
     }
@@ -111,8 +111,8 @@ fun <T> DropdownField(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
                     unfocusedBorderColor = TrailsColors.InputBorder,
-                    focusedContainerColor = TrailsColors.Surface,
-                    unfocusedContainerColor = TrailsColors.Surface,
+                    focusedContainerColor = TrailsColors.SurfaceCool,
+                    unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -220,8 +220,8 @@ fun ChipInputField(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
                     unfocusedBorderColor = TrailsColors.InputBorder,
-                    focusedContainerColor = TrailsColors.Surface,
-                    unfocusedContainerColor = TrailsColors.Surface,
+                    focusedContainerColor = TrailsColors.SurfaceCool,
+                    unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
             TextButton(
@@ -265,8 +265,8 @@ fun DatePickerField(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = TrailsColors.BrandAccent,
                 unfocusedBorderColor = TrailsColors.InputBorder,
-                focusedContainerColor = TrailsColors.Surface,
-                unfocusedContainerColor = TrailsColors.Surface,
+                focusedContainerColor = TrailsColors.SurfaceCool,
+                unfocusedContainerColor = TrailsColors.SurfaceCool,
             ),
         )
     }
@@ -322,8 +322,8 @@ fun DateTimePickerField(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
                     unfocusedBorderColor = TrailsColors.InputBorder,
-                    focusedContainerColor = TrailsColors.Surface,
-                    unfocusedContainerColor = TrailsColors.Surface,
+                    focusedContainerColor = TrailsColors.SurfaceCool,
+                    unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
             OutlinedTextField(
@@ -340,8 +340,8 @@ fun DateTimePickerField(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
                     unfocusedBorderColor = TrailsColors.InputBorder,
-                    focusedContainerColor = TrailsColors.Surface,
-                    unfocusedContainerColor = TrailsColors.Surface,
+                    focusedContainerColor = TrailsColors.SurfaceCool,
+                    unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
         }

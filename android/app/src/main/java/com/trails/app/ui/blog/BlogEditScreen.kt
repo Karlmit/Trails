@@ -105,7 +105,7 @@ fun BlogEditScreen(
             ErrorBanner(message)
         }
         if (state.lostFormattingWarning) {
-            Surface(color = TrailsColors.GoldLightest, shape = TrailsShapes.Input) {
+            Surface(color = TrailsColors.BrandMint, shape = TrailsShapes.Input) {
                 Text(
                     stringResource(R.string.blog_lost_formatting_warning),
                     color = TrailsColors.BrandDeep,
@@ -363,8 +363,8 @@ private fun TextBlockEditor(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = TrailsColors.BrandAccent,
                     unfocusedBorderColor = TrailsColors.InputBorder,
-                    focusedContainerColor = TrailsColors.Surface,
-                    unfocusedContainerColor = TrailsColors.Surface,
+                    focusedContainerColor = TrailsColors.SurfaceCool,
+                    unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
             IconButton(onClick = onRemove) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.theme.ClayMetrics
 
 enum class PillButtonVariant { Primary, Outline, DarkOutline, Danger }
 
@@ -36,8 +38,10 @@ fun PillButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.95f else 1f, label = "pillButtonPress")
-    val shapeModifier = modifier.scale(scale).defaultMinSize(minHeight = 44.dp)
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "pillButtonPress")
+    val shapeModifier = modifier.scale(scale)
+        .defaultMinSize(minWidth = ClayMetrics.MinimumTouchTarget, minHeight = ClayMetrics.MinimumTouchTarget)
+        .heightIn(min = ClayMetrics.MinimumTouchTarget)
 
     when (variant) {
         PillButtonVariant.Primary -> Button(
@@ -49,7 +53,8 @@ fun PillButton(
                 containerColor = TrailsColors.BrandAccent,
                 contentColor = TrailsColors.TextOnDark,
             ),
-            contentPadding = PaddingValues(horizontal = 26.dp, vertical = 14.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 5.dp, pressedElevation = 1.dp),
+            contentPadding = PaddingValues(horizontal = 26.dp, vertical = 13.dp),
             interactionSource = interactionSource,
         ) { Text(text) }
 
@@ -85,7 +90,7 @@ private fun outlinedPillButton(
         shape = TrailsShapes.Pill,
         colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor),
         border = BorderStroke(1.dp, borderColor),
-        contentPadding = PaddingValues(horizontal = 26.dp, vertical = 14.dp),
+        contentPadding = PaddingValues(horizontal = 26.dp, vertical = 13.dp),
         interactionSource = interactionSource,
     ) { Text(text) }
 }

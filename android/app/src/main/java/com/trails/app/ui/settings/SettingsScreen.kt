@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +20,8 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 
 /** Mirrors app/(web)/settings/page.tsx + components/LanguageSettingsForm.tsx. */
 @Composable
@@ -32,10 +32,9 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp)) {
-        ElevatedCard(
-            shape = TrailsShapes.Card,
-            colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        TrailsCard(
+            variant = TrailsCardVariant.Standard,
+            contentPadding = PaddingValues(0.dp),
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(

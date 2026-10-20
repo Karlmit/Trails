@@ -27,6 +27,7 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.util.openCachedFile
 
@@ -49,7 +50,10 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
                 groups.forEach { group ->
                     item {
-                        TrailsCard(modifier = Modifier.padding(bottom = 12.dp)) {
+                        TrailsCard(
+                            modifier = Modifier.padding(bottom = 12.dp),
+                            variant = TrailsCardVariant.Compact,
+                        ) {
                             ScreenHeading(emoji = group.emoji, title = group.label)
                             group.rows.forEachIndexed { index, attachment ->
                                 if (index > 0) {

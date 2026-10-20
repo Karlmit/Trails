@@ -14,8 +14,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +32,8 @@ import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
+import com.trails.app.ui.components.TrailsCard
+import com.trails.app.ui.components.TrailsCardVariant
 
 /** Mirrors app/(web)/trips/[tripId]/important-info/page.tsx, plus create/edit via [onOpenItem]. */
 @Composable
@@ -75,11 +75,10 @@ private fun ImportantInfoCard(
     onClick: () -> Unit,
     onMove: (String) -> Unit,
 ) {
-    ElevatedCard(
+    TrailsCard(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        shape = TrailsShapes.Card,
-        colors = CardDefaults.elevatedCardColors(containerColor = TrailsColors.Surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+        variant = TrailsCardVariant.Compact,
+        contentPadding = PaddingValues(0.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
