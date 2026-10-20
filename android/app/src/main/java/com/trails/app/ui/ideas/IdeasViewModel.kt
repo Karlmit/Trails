@@ -43,14 +43,21 @@ internal fun ideaCoverPhotos(
         }
 }
 
-internal suspend fun cacheMissingIdeaCovers(
+internal suspend fun ensureIdeaCoversCached(
     ideas: List<IdeaEntity>,
     photos: List<PhotoEntity>,
     cachePhoto: suspend (PhotoEntity) -> Unit,
 ) {
     ideaCoverPhotos(ideas, photos).values
-        .filter { it.localPath == null }
         .forEach { cachePhoto(it) }
+}
+
+internal fun ideasWithoutKnownSection(
+    ideas: List<IdeaEntity>,
+    sections: List<SectionEntity>,
+): List<IdeaEntity> {
+    val knownSectionIds = sections.mapTo(mutableSetOf()) { it.id }
+    return ideas.filter { it.sectionId == null || it.sectionId !in knownSectionIds }
 }
 
 /** lib/ideas.ts::IdeaFilters -- null means "no filter on this field," same as an omitted query param there. */
@@ -99,7 +106,7 @@ class IdeasViewModel @Inject constructor(
                 // into the same cache file; this pass handles only whatever
                 // the completed bulk sync could not cache.
                 if (!refreshing) {
-                    cacheMissingIdeaCovers(ideaList, photoList) { photo ->
+                    ensureIdeaCoversCached(ideaList, photoList) { photo ->
                         documentsRepository.ensurePhotoCached(photo)
                     }
                 }
@@ -154,7 +161,9 @@ class IdeasViewModel @Inject constructor(
             if (sectionIdeas.isEmpty()) null
             else IdeaGroup(section, sectionIdeas.map { IdeaWithCoverPhoto(it, coverPhotoByIdeaId[it.id]) })
         }
-        val unsectioned = bySectionId[null].orEmpty()
+        // Match the web list: an Idea whose Section has not synced yet must
+        // remain visible in the trailing bucket instead of being dropped.
+        val unsectioned = ideasWithoutKnownSection(filtered, sortedSections)
         val trailing = if (unsectioned.isEmpty()) emptyList() else listOf(IdeaGroup(null, unsectioned.map { IdeaWithCoverPhoto(it, coverPhotoByIdeaId[it.id]) }))
         sectioned + trailing
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

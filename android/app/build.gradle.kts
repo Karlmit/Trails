@@ -37,8 +37,8 @@ android {
         applicationId = "com.trails.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "0.36.0"
+        versionCode = 37
+        versionName = "0.37.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -149,6 +149,7 @@ dependencies {
     implementation(libs.work.runtime.ktx)
 
     implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)

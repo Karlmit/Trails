@@ -13,6 +13,9 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -44,7 +47,25 @@ class FileCacheManager @Inject constructor(
         val body = response.body() ?: throw IOException("Empty photo body")
         val dir = File(context.filesDir, "photos/${photo.tripId}").apply { mkdirs() }
         val file = File(dir, "${photo.id}-${sanitizeFilename(photo.originalFilename)}")
-        body.byteStream().use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+        val temporary = File.createTempFile("${photo.id}-", ".download", dir)
+        try {
+            body.byteStream().use { input -> temporary.outputStream().use { output -> input.copyTo(output) } }
+            if (temporary.length() != photo.sizeBytes.toLong() || photo.sizeBytes <= 0) {
+                throw IOException("Downloaded photo size does not match metadata")
+            }
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            temporary.delete()
+        }
         file.absolutePath
     }
 

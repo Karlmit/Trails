@@ -1,5 +1,6 @@
 package com.trails.app.data
 
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,11 +25,30 @@ class TripSyncCoordinator @Inject constructor(
     private val documentsRepository: DocumentsRepository,
 ) {
     suspend fun syncTrip(tripId: String) {
-        timelineRepository.syncTrip(tripId)
-        checklistRepository.syncTrip(tripId)
-        importantInfoRepository.syncTrip(tripId)
-        ideaRepository.syncTrip(tripId)
-        documentsRepository.syncTrip(tripId)
+        // Each domain is an independent server/cache projection. One bad
+        // response must not prevent every later domain from refreshing.
+        val failures = mutableListOf<Exception>()
+        suspend fun attempt(sync: suspend () -> Unit) {
+            try {
+                sync()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                failures += failure
+            }
+        }
+
+        attempt { timelineRepository.syncTrip(tripId) }
+        attempt { checklistRepository.syncTrip(tripId) }
+        attempt { importantInfoRepository.syncTrip(tripId) }
+        attempt { ideaRepository.syncTrip(tripId) }
+        attempt { documentsRepository.syncTrip(tripId) }
+
+        if (failures.isNotEmpty()) {
+            val first = failures.first()
+            failures.drop(1).forEach(first::addSuppressed)
+            throw first
+        }
         tripRepository.setCachedOffline(tripId, true)
     }
 }

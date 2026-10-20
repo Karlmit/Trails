@@ -8,13 +8,21 @@ import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.AttachmentUrlRequest
 import com.trails.app.network.dto.PhotoUrlRequest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private fun String.toPlainRequestBody() = toRequestBody("text/plain".toMediaTypeOrNull())
+
+internal fun isUsablePhotoCache(photo: PhotoEntity): Boolean {
+    val path = photo.localPath ?: return false
+    val cached = File(path)
+    return cached.isFile && cached.length() == photo.sizeBytes.toLong() && photo.sizeBytes > 0
+}
 
 @Singleton
 class DocumentsRepository @Inject constructor(
@@ -42,10 +50,14 @@ class DocumentsRepository @Inject constructor(
     }
 
     suspend fun ensurePhotoCached(photo: PhotoEntity): String? {
-        if (photo.localPath != null) return photo.localPath
-        return runCatching { fileCacheManager.downloadPhoto(photo) }
-            .onSuccess { photoDao.setLocalPath(photo.id, it) }
-            .getOrNull()
+        if (isUsablePhotoCache(photo)) return photo.localPath
+        return try {
+            fileCacheManager.downloadPhoto(photo).also { photoDao.setLocalPath(photo.id, it) }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /** Uploads a picked file as an Attachment, then caches its metadata (and the just-uploaded bytes) locally. */
@@ -133,9 +145,25 @@ class DocumentsRepository @Inject constructor(
 
     /** Syncs Attachment/Photo metadata for a trip, then downloads any bytes not already cached. */
     suspend fun syncTrip(tripId: String) {
-        syncAttachmentMetadata(tripId)
-        syncPhotoMetadata(tripId)
+        // Attachment and Photo metadata are independent. Always attempt both
+        // so an attachment endpoint failure cannot hide every cover photo.
+        var firstFailure: Exception? = null
+        try {
+            syncAttachmentMetadata(tripId)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            firstFailure = failure
+        }
+        try {
+            syncPhotoMetadata(tripId)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            firstFailure?.addSuppressed(failure) ?: run { firstFailure = failure }
+        }
         cacheMissingFiles(tripId)
+        firstFailure?.let { throw it }
     }
 
     private suspend fun syncAttachmentMetadata(tripId: String) {
@@ -162,12 +190,17 @@ class DocumentsRepository @Inject constructor(
 
     private suspend fun cacheMissingFiles(tripId: String) {
         attachmentDao.getAllForTrip(tripId).filter { it.localPath == null }.forEach { attachment ->
-            runCatching { fileCacheManager.downloadAttachment(attachment) }
-                .onSuccess { path -> attachmentDao.setLocalPath(attachment.id, path) }
+            try {
+                val path = fileCacheManager.downloadAttachment(attachment)
+                attachmentDao.setLocalPath(attachment.id, path)
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: Exception) {
+                // One unavailable file must not prevent other offline files.
+            }
         }
-        photoDao.getAllForTrip(tripId).filter { it.localPath == null }.forEach { photo ->
-            runCatching { fileCacheManager.downloadPhoto(photo) }
-                .onSuccess { path -> photoDao.setLocalPath(photo.id, path) }
+        photoDao.getAllForTrip(tripId).forEach { photo ->
+            ensurePhotoCached(photo)
         }
     }
 }

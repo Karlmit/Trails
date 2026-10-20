@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -27,11 +28,16 @@ class TripRefresher(
 
     fun refresh() {
         if (_isRefreshing.value) return
+        _isRefreshing.value = true
         scope.launch {
-            _isRefreshing.value = true
-            val workId = syncScheduler.syncTripNow(tripId)
-            syncScheduler.observeWork(workId).first { it == null || it.state.isFinished }
-            _isRefreshing.value = false
+            try {
+                val workId = syncScheduler.syncTripNow(tripId)
+                // WorkManager may emit null before the newly-enqueued request
+                // is persisted. That is "not visible yet", not "finished".
+                syncScheduler.observeWork(workId).filterNotNull().first { it.state.isFinished }
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 }

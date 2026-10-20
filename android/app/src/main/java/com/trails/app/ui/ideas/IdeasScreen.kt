@@ -199,7 +199,7 @@ private fun IdeaCompactCard(item: IdeaWithCoverPhoto, onClick: () -> Unit) {
                         model = File(item.coverPhoto.localPath),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)),
+                        modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)),
                     )
                 }
                 Column(modifier = Modifier.padding(start = if (item.coverPhoto?.localPath != null) 12.dp else 0.dp).weight(1f)) {

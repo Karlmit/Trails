@@ -1,8 +1,11 @@
 package com.trails.app.ui.ideas
 
+import com.trails.app.data.isUsablePhotoCache
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.data.entity.SectionEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlinx.coroutines.test.runTest
@@ -36,7 +39,7 @@ class IdeasViewModelTest {
     }
 
     @Test
-    fun `only selected covers missing a local file are cached`() = runTest {
+    fun `all selected covers are checked so stale paths can be repaired`() = runTest {
         val firstIdea = idea("idea-1")
         val secondIdea = idea("idea-2")
         val firstCover = photo(id = "first-cover", ownerId = firstIdea.id, isPrimary = true)
@@ -44,19 +47,44 @@ class IdeasViewModelTest {
         val cachedCover = photo(id = "cached-cover", ownerId = secondIdea.id, localPath = "/photos/cached.jpg")
         val cached = mutableListOf<PhotoEntity>()
 
-        cacheMissingIdeaCovers(
+        ensureIdeaCoversCached(
             ideas = listOf(firstIdea, secondIdea),
             photos = listOf(firstExtra, firstCover, cachedCover),
             cachePhoto = cached::add,
         )
 
-        assertEquals(listOf(firstCover), cached)
+        assertEquals(listOf(firstCover, cachedCover), cached)
     }
 
-    private fun idea(id: String) = IdeaEntity(
+    @Test
+    fun `idea with unknown section remains in unsectioned group`() {
+        val unassigned = idea("idea-1")
+        val temporarilyUnknown = idea("idea-2", sectionId = "section-missing")
+        val assigned = idea("idea-3", sectionId = "section-known")
+
+        assertEquals(
+            listOf(unassigned, temporarilyUnknown),
+            ideasWithoutKnownSection(listOf(unassigned, temporarilyUnknown, assigned), listOf(section("section-known"))),
+        )
+    }
+
+    @Test
+    fun `photo cache is usable only when file exists at expected size`() {
+        val cached = kotlin.io.path.createTempFile(suffix = ".jpg").toFile()
+        cached.writeBytes(byteArrayOf(1, 2, 3))
+        val photo = photo(id = "cover", ownerId = "idea-1", localPath = cached.absolutePath, sizeBytes = 3)
+
+        assertTrue(isUsablePhotoCache(photo))
+        cached.writeBytes(byteArrayOf(1, 2))
+        assertFalse(isUsablePhotoCache(photo))
+        cached.delete()
+        assertFalse(isUsablePhotoCache(photo))
+    }
+
+    private fun idea(id: String, sectionId: String? = null) = IdeaEntity(
         id = id,
         tripId = "trip-1",
-        sectionId = null,
+        sectionId = sectionId,
         title = "Idea",
         priority = "MAYBE",
         weatherSuitability = "EITHER",
@@ -73,6 +101,18 @@ class IdeasViewModelTest {
         updatedAt = "2026-10-19T09:00:00Z",
     )
 
+    private fun section(id: String) = SectionEntity(
+        id = id,
+        tripId = "trip-1",
+        name = "Section",
+        startDate = "2026-10-20",
+        endDate = "2026-10-21",
+        color = null,
+        emoji = null,
+        createdAt = "2026-10-19T09:00:00Z",
+        updatedAt = "2026-10-19T09:00:00Z",
+    )
+
     private fun photo(
         id: String,
         ownerId: String,
@@ -80,13 +120,14 @@ class IdeasViewModelTest {
         isPrimary: Boolean = false,
         createdAt: String = "2026-10-20T10:00:00Z",
         localPath: String? = null,
+        sizeBytes: Int = 100,
     ) = PhotoEntity(
         id = id,
         tripId = "trip-1",
         ownerType = ownerType,
         ownerId = ownerId,
         mimeType = "image/jpeg",
-        sizeBytes = 100,
+        sizeBytes = sizeBytes,
         originalFilename = "$id.jpg",
         isPrimary = isPrimary,
         isPrivate = false,
