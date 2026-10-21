@@ -4,13 +4,13 @@ import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,6 +28,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,12 +38,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.semantics
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 import com.trails.app.R
@@ -66,6 +77,51 @@ internal fun documentPreviewType(mimeType: String, filename: String): DocumentPr
 }
 
 internal data class RenderedPdfPage(val bitmap: Bitmap, val pageCount: Int)
+
+internal const val MinDocumentScale = 1f
+internal const val MaxDocumentScale = 5f
+
+internal data class DocumentTransform(val scale: Float = MinDocumentScale, val translation: Offset = Offset.Zero)
+
+internal val DocumentScaleKey = SemanticsPropertyKey<Float>("DocumentScale")
+internal var SemanticsPropertyReceiver.documentScale by DocumentScaleKey
+internal val DocumentTranslationKey = SemanticsPropertyKey<Offset>("DocumentTranslation")
+internal var SemanticsPropertyReceiver.documentTranslation by DocumentTranslationKey
+
+internal fun fittedDocumentSize(contentWidth: Float, contentHeight: Float, viewportWidth: Float, viewportHeight: Float): Size {
+    if (contentWidth <= 0f || contentHeight <= 0f || viewportWidth <= 0f || viewportHeight <= 0f) return Size.Zero
+    val fitScale = minOf(viewportWidth / contentWidth, viewportHeight / contentHeight)
+    return Size(contentWidth * fitScale, contentHeight * fitScale)
+}
+
+internal fun updateDocumentTransform(
+    current: DocumentTransform,
+    zoomChange: Float,
+    panChange: Offset,
+    centroid: Offset,
+    contentWidth: Float,
+    contentHeight: Float,
+    viewportWidth: Float,
+    viewportHeight: Float,
+): DocumentTransform {
+    val scale = (current.scale * zoomChange).coerceIn(MinDocumentScale, MaxDocumentScale)
+    if (scale == MinDocumentScale || viewportWidth <= 0f || viewportHeight <= 0f) {
+        return DocumentTransform()
+    }
+    val fitted = fittedDocumentSize(contentWidth, contentHeight, viewportWidth, viewportHeight)
+    val maxX = ((fitted.width * scale - viewportWidth) / 2f).coerceAtLeast(0f)
+    val maxY = ((fitted.height * scale - viewportHeight) / 2f).coerceAtLeast(0f)
+    val scaleChange = scale / current.scale
+    val centroidFromCenter = centroid - Offset(viewportWidth / 2f, viewportHeight / 2f)
+    val translation = centroidFromCenter - (centroidFromCenter - current.translation) * scaleChange + panChange
+    return DocumentTransform(
+        scale = scale,
+        translation = Offset(
+            x = translation.x.coerceIn(-maxX, maxX),
+            y = translation.y.coerceIn(-maxY, maxY),
+        ),
+    )
+}
 private sealed interface PdfLoadState {
     data object Loading : PdfLoadState
     data object Error : PdfLoadState
@@ -119,20 +175,115 @@ internal fun DocumentViewerScreen(
         },
     ) { padding ->
         when (documentPreviewType(mimeType, filename)) {
-            DocumentPreviewType.IMAGE -> SubcomposeAsyncImage(
-                model = File(localPath),
-                contentDescription = filename,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.padding(padding).fillMaxSize().testTag("document-image-preview"),
-                loading = { CircularProgressIndicator(color = Color.White) },
-                error = { Text(stringResource(R.string.document_viewer_error), color = Color.White) },
-                success = { SubcomposeAsyncImageContent() },
-            )
+            DocumentPreviewType.IMAGE -> ImageViewer(localPath, filename, Modifier.padding(padding))
             DocumentPreviewType.PDF -> PdfViewer(File(localPath), pdfRenderer, Modifier.padding(padding))
             DocumentPreviewType.UNSUPPORTED -> UnsupportedViewer(
                 onOpenExternal = onOpenExternal,
                 modifier = Modifier.padding(padding),
             )
+        }
+    }
+}
+
+@Composable
+private fun ImageViewer(localPath: String, filename: String, modifier: Modifier = Modifier) {
+    var imageSize by remember(localPath) { mutableStateOf(Size.Zero) }
+    var zoomEnabled by remember(localPath) { mutableStateOf(false) }
+    ZoomableDocumentViewport(
+        contentIdentity = localPath,
+        contentSize = imageSize,
+        enabled = zoomEnabled,
+        modifier = modifier.fillMaxSize().testTag("document-image-preview"),
+    ) {
+        SubcomposeAsyncImage(
+            model = File(localPath),
+            contentDescription = filename,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+            loading = {
+                SideEffect { zoomEnabled = false; imageSize = Size.Zero }
+                CircularProgressIndicator(color = Color.White)
+            },
+            error = {
+                SideEffect { zoomEnabled = false; imageSize = Size.Zero }
+                Text(stringResource(R.string.document_viewer_error), color = Color.White)
+            },
+            success = {
+                val intrinsicSize = painter.intrinsicSize
+                SideEffect {
+                    imageSize = intrinsicSize
+                    zoomEnabled = intrinsicSize.width > 0f && intrinsicSize.height > 0f
+                }
+                SubcomposeAsyncImageContent()
+            },
+        )
+    }
+}
+
+@Composable
+private fun ZoomableDocumentViewport(
+    contentIdentity: Any,
+    contentSize: Size,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var transform by remember(contentIdentity) { mutableStateOf(DocumentTransform()) }
+    var viewportWidth by remember(contentIdentity) { mutableIntStateOf(0) }
+    var viewportHeight by remember(contentIdentity) { mutableIntStateOf(0) }
+    LaunchedEffect(contentIdentity, enabled) {
+        if (!enabled) transform = DocumentTransform()
+    }
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .background(Color(0xFF171A19))
+                .clipToBounds()
+                .onSizeChanged {
+                    viewportWidth = it.width
+                    viewportHeight = it.height
+                    transform = updateDocumentTransform(
+                        current = transform,
+                        zoomChange = 1f,
+                        panChange = Offset.Zero,
+                        centroid = Offset(it.width / 2f, it.height / 2f),
+                        contentWidth = contentSize.width,
+                        contentHeight = contentSize.height,
+                        viewportWidth = it.width.toFloat(),
+                        viewportHeight = it.height.toFloat(),
+                    )
+                }
+                .pointerInput(contentIdentity, contentSize, enabled, viewportWidth, viewportHeight) {
+                    if (!enabled) return@pointerInput
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        transform = updateDocumentTransform(
+                            current = transform,
+                            zoomChange = zoom,
+                            panChange = pan,
+                            centroid = centroid,
+                            contentWidth = contentSize.width,
+                            contentHeight = contentSize.height,
+                            viewportWidth = viewportWidth.toFloat(),
+                            viewportHeight = viewportHeight.toFloat(),
+                        )
+                    }
+                }
+                .semantics {
+                    documentScale = transform.scale
+                    documentTranslation = transform.translation
+                }
+                .testTag("document-zoomable-viewport"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = transform.scale
+                    scaleY = transform.scale
+                    translationX = transform.translation.x
+                    translationY = transform.translation.y
+                },
+                contentAlignment = Alignment.Center,
+            ) { content() }
         }
     }
 }
@@ -173,12 +324,18 @@ private fun PdfViewer(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                androidx.compose.foundation.Image(
-                    bitmap = rendered.bitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.document_page_count, pageIndex + 1, rendered.pageCount),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.weight(1f).sizeIn(maxWidth = 1200.dp),
-                )
+                ZoomableDocumentViewport(
+                    contentIdentity = "${file.absolutePath}:$pageIndex",
+                    contentSize = Size(rendered.bitmap.width.toFloat(), rendered.bitmap.height.toFloat()),
+                    modifier = Modifier.weight(1f).fillMaxSize(),
+                ) {
+                    androidx.compose.foundation.Image(
+                        bitmap = rendered.bitmap.asImageBitmap(),
+                        contentDescription = stringResource(R.string.document_page_count, pageIndex + 1, rendered.pageCount),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(onClick = { pageIndex-- }, enabled = pageIndex > 0) {
                         Text(stringResource(R.string.document_previous_page))
