@@ -84,6 +84,7 @@ data class IdeaEditState(
     val saved: Boolean = false,
     val deleted: Boolean = false,
     val converted: Boolean = false,
+    val initialized: Boolean = false,
 )
 
 @HiltViewModel
@@ -108,7 +109,13 @@ class IdeaEditViewModel @Inject constructor(
     // routing through repository.convertFromEntry instead of .create.
     private val fromEntryId: String? = savedStateHandle["entryId"]
 
-    private val _state = MutableStateFlow(IdeaEditState(ideaId = ideaId, convertingFromEntry = fromEntryId != null))
+    private val _state = MutableStateFlow(
+        IdeaEditState(
+            ideaId = ideaId,
+            convertingFromEntry = fromEntryId != null,
+            initialized = ideaId == null && fromEntryId == null,
+        ),
+    )
     val state: StateFlow<IdeaEditState> = _state.asStateFlow()
 
     // Captured right after `loadIfEditing` populates the existing Idea's
@@ -184,15 +191,19 @@ class IdeaEditViewModel @Inject constructor(
         // EITHER) below for the user to pick.
         if (ideaId == null && fromEntryId != null) {
             viewModelScope.launch {
-                timelineRepository.observeEntry(fromEntryId).first()?.let { entry ->
-                    _state.value = _state.value.copy(
-                        title = entry.title,
-                        description = entry.description.orEmpty(),
-                        locationAddress = entry.locationAddress.orEmpty(),
-                        locationMapLink = entry.locationMapLink.orEmpty(),
-                        estimatedExpenseAmount = entry.expenseAmount?.toString().orEmpty(),
-                        estimatedExpenseCurrency = entry.expenseCurrency ?: DEFAULT_CURRENCY,
-                    )
+                try {
+                    timelineRepository.observeEntry(fromEntryId).first()?.let { entry ->
+                        _state.value = _state.value.copy(
+                            title = entry.title,
+                            description = entry.description.orEmpty(),
+                            locationAddress = entry.locationAddress.orEmpty(),
+                            locationMapLink = entry.locationMapLink.orEmpty(),
+                            estimatedExpenseAmount = entry.expenseAmount?.toString().orEmpty(),
+                            estimatedExpenseCurrency = entry.expenseCurrency ?: DEFAULT_CURRENCY,
+                        )
+                    }
+                } finally {
+                    _state.value = _state.value.copy(initialized = true)
                 }
             }
         }
@@ -200,7 +211,7 @@ class IdeaEditViewModel @Inject constructor(
 
     fun loadIfEditing(ideas: List<IdeaEntity>) {
         val existing = ideas.find { it.id == ideaId } ?: return
-        if (_state.value.title.isNotEmpty()) return
+        if (_state.value.initialized) return
         _state.value = _state.value.copy(
             sectionId = existing.sectionId,
             title = existing.title,
@@ -212,6 +223,7 @@ class IdeaEditViewModel @Inject constructor(
             locationMapLink = existing.locationMapLink.orEmpty(),
             estimatedExpenseAmount = existing.estimatedExpenseAmount?.toString().orEmpty(),
             estimatedExpenseCurrency = existing.estimatedExpenseCurrency.orEmpty(),
+            initialized = true,
         )
         originalFields = fieldsOf(_state.value)
     }
@@ -392,6 +404,7 @@ class IdeaEditViewModel @Inject constructor(
 
     fun save() {
         val current = _state.value
+        if (!current.initialized || current.saving) return
         if (current.title.isBlank()) {
             _state.value = current.copy(error = null, errorRes = R.string.idea_edit_error_title_required)
             return

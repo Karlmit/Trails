@@ -10,6 +10,7 @@ import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.IdeaEntity
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.data.isUsablePhotoCache
 import com.trails.app.network.dto.LinkDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +36,7 @@ class IdeaDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: IdeaRepository,
     private val linksTagsRepository: LinksTagsRepository,
-    documentsRepository: DocumentsRepository,
+    private val documentsRepository: DocumentsRepository,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     val ideaId: String = checkNotNull(savedStateHandle["ideaId"])
@@ -61,6 +62,11 @@ class IdeaDetailViewModel @Inject constructor(
     val errorRes: StateFlow<Int?> = _errorRes
 
     init {
+        viewModelScope.launch {
+            photos.collect { ownerPhotos ->
+                ownerPhotos.filterNot(::isUsablePhotoCache).forEach { documentsRepository.ensurePhotoCached(it) }
+            }
+        }
         // Links only ever exist for a real (non-"new") Idea -- always true
         // here, this screen only ever shows an existing one.
         viewModelScope.launch {

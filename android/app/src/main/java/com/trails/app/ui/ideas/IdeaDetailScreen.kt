@@ -1,51 +1,45 @@
 package com.trails.app.ui.ideas
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
-import com.trails.app.ui.components.ErrorBanner
-import com.trails.app.ui.components.PillButton
-import com.trails.app.ui.components.PillButtonVariant
-import com.trails.app.ui.components.ScreenHeading
-import com.trails.app.ui.components.TrailsCard
+import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.data.isUsablePhotoCache
+import com.trails.app.data.selectIdeaCoverPhotos
+import com.trails.app.ui.components.*
 import com.trails.app.ui.sections.SectionsViewModel
 import com.trails.app.ui.theme.TrailsColors
+import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.openExternalUrl
 import java.io.File
 
-/** Read-only view of one Idea -- mirrors components/IdeaCard.tsx's own view mode. Editing is IdeaEditScreen's job, reached via this screen's Edit action (TrailsNavHost's TopAppBar action). */
+internal data class IdeaDetailPhotos(val cover: PhotoEntity?, val additional: List<PhotoEntity>)
+
+/** Uses the repository's primary/newest precedence after removing invalid caches. */
+internal fun selectIdeaDetailPhotos(photos: List<PhotoEntity>): IdeaDetailPhotos {
+    val usable = photos.filter(::isUsablePhotoCache)
+    val cover = selectIdeaCoverPhotos(usable).singleOrNull()
+    return IdeaDetailPhotos(cover, usable.filterNot { it.id == cover?.id })
+}
+
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun IdeaDetailScreen(
     padding: PaddingValues,
     onConverted: () -> Unit,
@@ -64,108 +58,101 @@ fun IdeaDetailScreen(
     var showConvertConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(converted) { if (converted) onConverted() }
-
-    if (idea == null) {
+    val currentIdea = idea
+    if (currentIdea == null) {
         Text(stringResource(R.string.timeline_loading), modifier = Modifier.padding(padding), color = TrailsColors.TextSoft)
         return
     }
-    val currentIdea = idea!!
+    val displayPhotos = remember(photos) { selectIdeaDetailPhotos(photos) }
+    val sectionName = currentIdea.sectionId?.let { id -> sections.find { it.id == id }?.name }
 
-    Column(
-        modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        val errorText = error ?: errorRes?.let { stringResource(it) }
-        errorText?.let { ErrorBanner(it) }
+    Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            val errorText = error ?: errorRes?.let { stringResource(it) }
+            errorText?.let { ErrorBanner(it) }
 
-        TrailsCard {
-            ScreenHeading(
-                emoji = "💡",
-                title = currentIdea.title,
-                subtitle = buildString {
-                    append(IDEA_PRIORITY_LABEL_RES[currentIdea.priority]?.let { stringResource(it) } ?: currentIdea.priority)
-                    append(" · ")
-                    append(IDEA_WEATHER_LABEL_RES[currentIdea.weatherSuitability]?.let { stringResource(it) } ?: currentIdea.weatherSuitability)
-                    currentIdea.sectionId?.let { id -> sections.find { it.id == id }?.let { append(" · ${it.name}") } }
-                },
-            )
-            currentIdea.category?.let { Field(stringResource(R.string.idea_edit_label_category), it) }
-            currentIdea.description?.let { Field(stringResource(R.string.idea_edit_label_description), it) }
-            if (currentIdea.locationAddress != null || currentIdea.locationMapLink != null) {
-                Column {
-                    Text(stringResource(R.string.idea_edit_label_location_address).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
-                    currentIdea.locationAddress?.let {
-                        Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text)
-                    }
-                    currentIdea.locationMapLink?.let { link ->
-                        Text(
-                            stringResource(R.string.idea_open_in_maps),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TrailsColors.BrandAccent,
-                            modifier = Modifier.padding(top = 2.dp).clickable { openExternalUrl(context, link) },
-                        )
+            IdeaHero(displayPhotos.cover)
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                IdeaTitle(currentIdea.title)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(IDEA_PRIORITY_LABEL_RES[currentIdea.priority]?.let { stringResource(it) } ?: currentIdea.priority, style = MaterialTheme.typography.labelLarge, color = TrailsColors.Brand)
+                    Text(IDEA_WEATHER_LABEL_RES[currentIdea.weatherSuitability]?.let { stringResource(it) } ?: currentIdea.weatherSuitability, style = MaterialTheme.typography.labelLarge, color = TrailsColors.Brand)
+                    sectionName?.let {
+                        Text(it, style = MaterialTheme.typography.labelLarge, color = TrailsColors.Brand)
                     }
                 }
-            }
-            if (currentIdea.estimatedExpenseAmount != null && currentIdea.estimatedExpenseCurrency != null) {
-                Field(stringResource(R.string.idea_edit_label_expense_amount), "${currentIdea.estimatedExpenseAmount} ${currentIdea.estimatedExpenseCurrency}")
-            }
-
-            if (converting) {
-                CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
-            } else {
-                PillButton(
-                    text = stringResource(R.string.idea_edit_convert_button),
-                    variant = PillButtonVariant.Outline,
-                    onClick = { showConvertConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
-        if (links.isNotEmpty()) {
-            TrailsCard {
-                ScreenHeading(emoji = "🔗", title = stringResource(R.string.idea_edit_links_heading))
-                Column {
-                    links.forEach { link ->
-                        Text(
-                            link.label?.takeIf { it.isNotBlank() } ?: link.url,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TrailsColors.BrandAccent,
-                            modifier = Modifier.padding(vertical = 4.dp).clickable { openExternalUrl(context, link.url) },
-                        )
-                    }
-                }
-            }
-        }
-
-        if (photos.isNotEmpty()) {
-            TrailsCard {
-                ScreenHeading(emoji = "📷", title = stringResource(R.string.idea_detail_photos_heading))
-                LazyRow {
-                    items(photos, key = { it.id }) { photo ->
-                        if (photo.localPath != null) {
-                            AsyncImage(
-                                model = File(photo.localPath),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(88.dp).padding(end = 8.dp).clip(RoundedCornerShape(8.dp)),
-                            )
+                currentIdea.category?.let { Field(stringResource(R.string.idea_edit_label_category), it) }
+                currentIdea.description?.let { Field(stringResource(R.string.idea_edit_label_description), it) }
+                if (currentIdea.locationAddress != null || currentIdea.locationMapLink != null) {
+                    Column {
+                        Text(stringResource(R.string.idea_edit_label_location_address).uppercase(), style = MaterialTheme.typography.labelMedium, color = TrailsColors.TextSoft)
+                        currentIdea.locationAddress?.let { Text(it, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.Text) }
+                        currentIdea.locationMapLink?.let { link ->
+                            Text(stringResource(R.string.idea_open_in_maps), style = MaterialTheme.typography.bodyMedium, color = TrailsColors.BrandAccent, modifier = Modifier.padding(top = 2.dp).clickable { openExternalUrl(context, link) })
                         }
                     }
                 }
+                if (currentIdea.estimatedExpenseAmount != null && currentIdea.estimatedExpenseCurrency != null) {
+                    Field(stringResource(R.string.idea_edit_label_expense_amount), "${currentIdea.estimatedExpenseAmount} ${currentIdea.estimatedExpenseCurrency}")
+                }
             }
+
+            if (links.isNotEmpty()) {
+                TrailsCard {
+                    ScreenHeading(emoji = "🔗", title = stringResource(R.string.idea_edit_links_heading))
+                    links.forEach { link ->
+                        Text(link.label?.takeIf { it.isNotBlank() } ?: link.url, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent, modifier = Modifier.padding(vertical = 4.dp).clickable { openExternalUrl(context, link.url) })
+                    }
+                }
+            }
+
+            IdeaGallery(displayPhotos.additional)
+
+            if (converting) CircularProgressIndicator() else PillButton(
+                text = stringResource(R.string.idea_edit_convert_button), variant = PillButtonVariant.Outline,
+                onClick = { showConvertConfirm = true }, modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 
-    if (showConvertConfirm) {
-        AlertDialog(
-            onDismissRequest = { showConvertConfirm = false },
-            title = { Text(stringResource(R.string.idea_edit_convert_dialog_title)) },
-            text = { Text(stringResource(R.string.idea_edit_convert_dialog_text)) },
-            confirmButton = { TextButton(onClick = { showConvertConfirm = false; viewModel.convertToEntry() }) { Text(stringResource(R.string.idea_edit_convert_confirm_button)) } },
-            dismissButton = { TextButton(onClick = { showConvertConfirm = false }) { Text(stringResource(R.string.idea_edit_convert_cancel_button)) } },
+    if (showConvertConfirm) AlertDialog(
+        onDismissRequest = { showConvertConfirm = false },
+        title = { Text(stringResource(R.string.idea_edit_convert_dialog_title)) },
+        text = { Text(stringResource(R.string.idea_edit_convert_dialog_text)) },
+        confirmButton = { TextButton(onClick = { showConvertConfirm = false; viewModel.convertToEntry() }) { Text(stringResource(R.string.idea_edit_convert_confirm_button)) } },
+        dismissButton = { TextButton(onClick = { showConvertConfirm = false }) { Text(stringResource(R.string.idea_edit_convert_cancel_button)) } },
+    )
+}
+
+@Composable
+internal fun IdeaTitle(title: String) {
+    Text(title, style = MaterialTheme.typography.headlineMedium, color = TrailsColors.Text, maxLines = Int.MAX_VALUE)
+}
+
+@Composable
+internal fun IdeaHero(cover: PhotoEntity?) {
+    cover?.let {
+        AsyncImage(
+            model = File(checkNotNull(it.localPath)), contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f).clip(TrailsShapes.Hero).testTag("idea-hero"),
         )
+    }
+}
+
+@Composable
+internal fun IdeaGallery(additional: List<PhotoEntity>) {
+    if (additional.isNotEmpty()) TrailsCard(modifier = Modifier.testTag("idea-gallery")) {
+        ScreenHeading(emoji = "📷", title = stringResource(R.string.idea_detail_photos_heading))
+        LazyRow {
+            items(additional, key = { it.id }) { photo ->
+                AsyncImage(model = File(checkNotNull(photo.localPath)), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).padding(end = 8.dp).clip(TrailsShapes.Compact))
+            }
+        }
     }
 }
 

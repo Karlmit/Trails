@@ -4,10 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -23,8 +25,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -53,6 +60,7 @@ import com.trails.app.ui.entrydetail.EntryEditScreen
 import com.trails.app.ui.ideas.IdeaDetailScreen
 import com.trails.app.ui.ideas.IdeaDetailViewModel
 import com.trails.app.ui.ideas.IdeaEditScreen
+import com.trails.app.ui.ideas.IdeaEditViewModel
 import com.trails.app.ui.ideas.IdeasScreen
 import com.trails.app.ui.importantinfo.ImportantInfoEditScreen
 import com.trails.app.ui.importantinfo.ImportantInfoScreen
@@ -140,6 +148,28 @@ private fun AddFab(onClick: () -> Unit) {
         contentColor = TrailsColors.TextOnDark,
     ) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.shell_cd_add)) }
 }
+
+@Composable
+internal fun IdeaSaveAction(ready: Boolean, saving: Boolean, onSave: () -> Unit) {
+    val saveLabel = stringResource(R.string.shell_save)
+    TextButton(
+        onClick = onSave,
+        enabled = ready && !saving,
+        modifier = Modifier.semantics { contentDescription = saveLabel },
+    ) {
+        if (saving) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = TrailsColors.Brand,
+            )
+        }
+        Text(saveLabel, color = TrailsColors.Brand)
+    }
+}
+
+@StringRes
+internal fun ideaDetailAppBarTitleRes(): Int = R.string.shell_idea
 
 /** Timeline's own FAB offers a choice -- an Idea isn't scheduled yet (so it doesn't belong as a Timeline Entry until converted), and a Blog Post goes through its own editor, not the generic Entry one. */
 @Composable
@@ -312,10 +342,9 @@ fun TrailsNavHost(
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             val ideaId = backStackEntry.arguments?.getString(ARG_IDEA_ID).orEmpty()
             val detailViewModel: IdeaDetailViewModel = hiltViewModel()
-            val ideaEntity by detailViewModel.idea.collectAsState()
             TripDrawerScaffold(
                 tripId, TripTab.IDEAS,
-                ideaEntity?.title ?: stringResource(R.string.shell_idea),
+                stringResource(ideaDetailAppBarTitleRes()),
                 navController, showBackButton = true,
                 actions = {
                     IconButton(onClick = { navController.navigate(ideaEditRoute(tripId, ideaId)) }) {
@@ -339,13 +368,23 @@ fun TrailsNavHost(
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.IDEAS, stringResource(R.string.shell_title_edit_idea), navController, showBackButton = true) { padding ->
+            val editViewModel: IdeaEditViewModel = hiltViewModel()
+            val editState by editViewModel.state.collectAsState()
+            TripDrawerScaffold(
+                tripId, TripTab.IDEAS, stringResource(R.string.shell_title_edit_idea), navController,
+                showBackButton = true,
+                actions = { IdeaSaveAction(editState.initialized, editState.saving, editViewModel::save) },
+            ) { padding ->
                 // onDone only ever fires for an existing Idea's delete/convert
                 // (a fresh create deliberately stays on this screen, see
                 // IdeaEditScreen's own comment) -- reached via the Detail
                 // screen's Edit action, so popping just one entry would land
                 // back on that now-stale Detail screen instead of the list.
-                IdeaEditScreen(padding, onDone = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) })
+                IdeaEditScreen(
+                    padding,
+                    onDone = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
+                    viewModel = editViewModel,
+                )
             }
         }
 
@@ -585,7 +624,13 @@ fun TrailsNavHost(
             ),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.TIMELINE, stringResource(R.string.timeline_convert_to_idea_button), navController, showBackButton = true) { padding ->
+            val editViewModel: IdeaEditViewModel = hiltViewModel()
+            val editState by editViewModel.state.collectAsState()
+            TripDrawerScaffold(
+                tripId, TripTab.TIMELINE, stringResource(R.string.timeline_convert_to_idea_button), navController,
+                showBackButton = true,
+                actions = { IdeaSaveAction(editState.initialized, editState.saving, editViewModel::save) },
+            ) { padding ->
                 IdeaEditScreen(
                     padding,
                     // Unlike ideas/{ideaId}/edit's own onDone (popBackStack
@@ -605,6 +650,7 @@ fun TrailsNavHost(
                             popUpTo(tripRoute(tripId, TripTab.TIMELINE.route)) { inclusive = false }
                         }
                     },
+                    viewModel = editViewModel,
                 )
             }
         }

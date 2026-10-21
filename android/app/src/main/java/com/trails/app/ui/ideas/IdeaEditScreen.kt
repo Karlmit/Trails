@@ -175,19 +175,6 @@ fun IdeaEditScreen(
                 )
             }
 
-            if (state.saving) {
-                CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
-            } else {
-                PillButton(
-                    text = when {
-                        isNew && state.convertingFromEntry -> stringResource(R.string.idea_edit_button_convert)
-                        isNew -> stringResource(R.string.idea_edit_button_create)
-                        else -> stringResource(R.string.idea_edit_button_save)
-                    },
-                    onClick = viewModel::save,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
 
         TrailsCard {
