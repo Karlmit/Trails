@@ -62,6 +62,15 @@
     <string name="document_size_bytes">%1$d B</string>
     <string name="document_size_kb">%1$d KB</string>
     <string name="document_size_mb">%1$.1f MB</string>
+    <string name="document_open_failed">Could not download this file. Tap to retry.</string>
+    <string name="document_viewer_error">This file could not be displayed.</string>
+    <string name="document_unsupported">This file type cannot be previewed in Trails.</string>
+    <string name="document_share">Share</string>
+    <string name="document_open_external">Open externally</string>
+    <string name="document_previous_page">Previous page</string>
+    <string name="document_next_page">Next page</string>
+    <string name="document_page_count">Page %1$d of %2$d</string>
+    <string name="document_more_actions">More document actions</string>
 
     <!-- Budget -->
     <string name="budget_empty_state">No expenses recorded yet.\nAdd one to an Entry and it\'ll show up here.</string>

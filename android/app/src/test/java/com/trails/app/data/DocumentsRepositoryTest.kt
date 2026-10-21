@@ -3,6 +3,7 @@ package com.trails.app.data
 import com.trails.app.data.dao.AttachmentDao
 import com.trails.app.data.dao.PhotoDao
 import com.trails.app.data.entity.PhotoEntity
+import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.PhotoDto
 import io.mockk.coEvery
@@ -53,6 +54,28 @@ class DocumentsRepositoryTest {
         coVerify(ordering = io.mockk.Ordering.ORDERED) {
             photos.setLocalPath("photo", null)
             photos.setLocalPath("photo", stale.absolutePath)
+        }
+        stale.delete()
+    }
+
+    @Test
+    fun `stale attachment cache is repaired before document opens`() = runTest {
+        val stale = File.createTempFile("stale-attachment", ".pdf").apply { writeBytes(byteArrayOf(1)) }
+        val attachment = AttachmentEntity(
+            id = "attachment", tripId = "trip", ownerType = "TIMELINE_ENTRY", ownerId = "entry",
+            mimeType = "application/pdf", sizeBytes = 2, originalFilename = "ticket.pdf",
+            createdAt = "2026-10-20", localPath = stale.absolutePath,
+        )
+        coEvery { files.downloadAttachment(attachment) } answers {
+            stale.writeBytes(byteArrayOf(1, 2))
+            stale.absolutePath
+        }
+
+        repository.ensureAttachmentCached(attachment)
+
+        coVerify(ordering = io.mockk.Ordering.ORDERED) {
+            attachments.setLocalPath("attachment", null)
+            attachments.setLocalPath("attachment", stale.absolutePath)
         }
         stale.delete()
     }

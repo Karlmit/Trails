@@ -30,13 +30,16 @@ private val GapDash = Color.Black.copy(alpha = 0.16f)
 private val TrunkNeutral = Color.Black.copy(alpha = 0.22f)
 
 internal const val TODAY_MARKER_HAS_INNER_RING = true
-internal fun continuousRailEndpoints(height: Float): Pair<Float, Float> = 0f to height
+internal fun continuousRailEndpoints(height: Float, insetTop: Boolean, insetBottom: Boolean, inset: Float): Pair<Float, Float> =
+    (if (insetTop) inset else 0f) to (if (insetBottom) height - inset else height)
 
 @Composable
 fun TimelineGraphColumn(
     day: TimelineDayWithEntries,
     trunkColor: Color?,
     canvasBackground: Color,
+    insetTop: Boolean = false,
+    insetBottom: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
@@ -44,7 +47,8 @@ fun TimelineGraphColumn(
         val trunkX = TRUNK_X_UNITS * unitPx
         val h = size.height
         val strokeWidth = 3.dp.toPx()
-        val (railTop, railBottom) = continuousRailEndpoints(h)
+        val outerInset = 18.dp.toPx()
+        val (railTop, railBottom) = continuousRailEndpoints(h, insetTop, insetBottom, outerInset)
 
         if (trunkColor != null) {
             drawLine(
@@ -57,8 +61,8 @@ fun TimelineGraphColumn(
         } else {
             drawLine(
                 GapDash,
-                Offset(trunkX, 0f),
-                Offset(trunkX, h),
+                Offset(trunkX, railTop),
+                Offset(trunkX, railBottom),
                 strokeWidth = strokeWidth,
                 cap = StrokeCap.Round,
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 8f)),
@@ -70,16 +74,16 @@ fun TimelineGraphColumn(
             val path = Path()
             when (branch.position) {
                 BranchPosition.START -> {
-                    path.moveTo(trunkX, 0f)
-                    path.cubicTo(trunkX, h / 2, x, h / 2, x, h)
+                    path.moveTo(trunkX, railTop)
+                    path.cubicTo(trunkX, h / 2, x, h / 2, x, railBottom)
                 }
                 BranchPosition.END -> {
-                    path.moveTo(x, 0f)
-                    path.cubicTo(x, h / 2, trunkX, h / 2, trunkX, h)
+                    path.moveTo(x, railTop)
+                    path.cubicTo(x, h / 2, trunkX, h / 2, trunkX, railBottom)
                 }
                 BranchPosition.THROUGH -> {
-                    path.moveTo(x, 0f)
-                    path.lineTo(x, h)
+                    path.moveTo(x, railTop)
+                    path.lineTo(x, railBottom)
                 }
             }
             drawPath(path, color = entryTypeColor(branch.entryType), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))

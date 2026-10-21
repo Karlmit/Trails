@@ -34,7 +34,7 @@ class LoginViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            if (authRepository.hasStoredToken()) {
+            if (authRepository.hasValidStoredSession()) {
                 _uiState.value = _uiState.value.copy(alreadyLoggedIn = true)
             }
         }

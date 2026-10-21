@@ -18,6 +18,9 @@ interface AttachmentDao {
     @Query("SELECT * FROM attachments WHERE tripId = :tripId")
     suspend fun getAllForTrip(tripId: String): List<AttachmentEntity>
 
+    @Query("SELECT * FROM attachments WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): AttachmentEntity?
+
     @Upsert
     suspend fun upsertAll(attachments: List<AttachmentEntity>)
 

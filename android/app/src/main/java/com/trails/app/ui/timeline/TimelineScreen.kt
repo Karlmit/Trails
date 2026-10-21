@@ -49,14 +49,8 @@ import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 
 internal data class SectionRunBoundary(val roundsTop: Boolean, val roundsBottom: Boolean)
 
-internal fun sectionRunBoundary(
-    previousSectionIndex: Int?,
-    sectionIndex: Int?,
-    nextSectionIndex: Int?,
-): SectionRunBoundary = SectionRunBoundary(
-    roundsTop = sectionIndex != null && previousSectionIndex != sectionIndex,
-    roundsBottom = sectionIndex != null && nextSectionIndex != sectionIndex,
-)
+internal fun tripBandBoundary(index: Int, count: Int): SectionRunBoundary =
+    SectionRunBoundary(roundsTop = index == 0, roundsBottom = index == count - 1)
 
 /**
  * The GitKraken-style branch/merge graph -- ported 1:1 from
@@ -100,7 +94,7 @@ fun TimelineScreen(
                         // next begins gets a half-and-half band instead of
                         // a flat color -- see DayRow's own comment.
                         val nextSectionIndex = if (index < layout.days.size - 1) layout.days[index + 1].day.sectionIndex else null
-                        val runBoundary = sectionRunBoundary(previousSectionIndex, day.day.sectionIndex, nextSectionIndex)
+                        val runBoundary = tripBandBoundary(index, layout.days.size)
                         val isSectionTransition =
                             day.day.sectionIndex != null && nextSectionIndex != null && nextSectionIndex != day.day.sectionIndex
                         val nextBandColor = if (isSectionTransition) {
@@ -175,6 +169,8 @@ private fun DayRow(
             day = day,
             trunkColor = trunkColor,
             canvasBackground = TrailsColors.Canvas,
+            insetTop = runBoundary.roundsTop,
+            insetBottom = runBoundary.roundsBottom,
             modifier = Modifier.width(graphWidth).fillMaxHeight(),
         )
         Column(modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 8.dp)) {

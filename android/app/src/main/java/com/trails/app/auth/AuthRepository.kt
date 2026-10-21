@@ -4,6 +4,7 @@ import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.LoginRequest
 import retrofit2.HttpException
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,7 +13,27 @@ class AuthRepository @Inject constructor(
     private val api: TrailsApiService,
     private val tokenStore: TokenStore,
 ) {
-    suspend fun hasStoredToken(): Boolean = tokenStore.currentToken() != null
+    val sessionState = tokenStore.sessionState
+
+    /**
+     * Confirms a persisted session with an authenticated endpoint. Network and
+     * server failures deliberately keep the offline session usable; only a
+     * confirmed 401 (also handled centrally by AuthInterceptor) signs out.
+     */
+    suspend fun hasValidStoredSession(): Boolean {
+        if (tokenStore.currentToken() == null) return false
+        return try {
+            api.listTrips()
+            true
+        } catch (failure: HttpException) {
+            if (failure.code() == 401) tokenStore.clear()
+            failure.code() != 401
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: IOException) {
+            true
+        }
+    }
 
     val username: kotlinx.coroutines.flow.Flow<String?> = tokenStore.username
 

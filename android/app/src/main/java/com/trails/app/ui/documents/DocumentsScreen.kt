@@ -18,26 +18,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
+import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.components.TrailsCardVariant
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.util.openCachedFile
 
 /** Mirrors app/(web)/trips/[tripId]/documents/page.tsx -- tapping a row opens the on-device cached copy (offline works), downloading it first if the sync pass hasn't yet. */
 @Composable
-fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hiltViewModel()) {
+fun DocumentsScreen(
+    padding: PaddingValues,
+    onOpenDocument: (String) -> Unit,
+    viewModel: DocumentsViewModel = hiltViewModel(),
+) {
     val groups by viewModel.groups.collectAsState()
     val downloadingIds by viewModel.downloadingIds.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val context = LocalContext.current
+    val openError by viewModel.openError.collectAsState()
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (groups.isEmpty()) {
@@ -65,18 +68,26 @@ fun DocumentsScreen(padding: PaddingValues, viewModel: DocumentsViewModel = hilt
                                         .fillMaxWidth()
                                         .padding(vertical = 10.dp)
                                         .clickable(enabled = !isDownloading) {
-                                            viewModel.ensureCached(attachment) { path ->
-                                                openCachedFile(context, path, attachment.mimeType)
+                                            viewModel.ensureCached(attachment) { _ ->
+                                                onOpenDocument(attachment.id)
                                             }
                                         },
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        attachment.originalFilename,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = TrailsColors.BrandAccent,
-                                        modifier = Modifier.weight(1f),
-                                    )
+                                    androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            attachment.originalFilename,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = TrailsColors.BrandAccent,
+                                        )
+                                        if (openError?.attachmentId == attachment.id) {
+                                            Text(
+                                                stringResource(R.string.document_open_failed),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    }
                                     if (isDownloading) {
                                         CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
                                     } else {

@@ -62,6 +62,15 @@
     <string name="document_size_bytes">%1$d B</string>
     <string name="document_size_kb">%1$d KB</string>
     <string name="document_size_mb">%1$.1f MB</string>
+    <string name="document_open_failed">Det gick inte att hämta filen. Tryck för att försöka igen.</string>
+    <string name="document_viewer_error">Filen kunde inte visas.</string>
+    <string name="document_unsupported">Den här filtypen kan inte förhandsvisas i Trails.</string>
+    <string name="document_share">Dela</string>
+    <string name="document_open_external">Öppna externt</string>
+    <string name="document_previous_page">Föregående sida</string>
+    <string name="document_next_page">Nästa sida</string>
+    <string name="document_page_count">Sida %1$d av %2$d</string>
+    <string name="document_more_actions">Fler dokumentåtgärder</string>
 
     <!-- Budget -->
     <string name="budget_empty_state">Inga utgifter registrerade än.\nLägg till en på en post så dyker den upp här.</string>

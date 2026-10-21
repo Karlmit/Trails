@@ -23,6 +23,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -43,6 +45,9 @@ import com.trails.app.ui.checklists.ChecklistEditViewModel
 import com.trails.app.ui.checklists.ChecklistsScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.documents.DocumentsScreen
+import com.trails.app.ui.documents.DocumentViewerScreen
+import com.trails.app.ui.documents.DocumentViewerState
+import com.trails.app.ui.documents.DocumentViewerViewModel
 import com.trails.app.ui.entrydetail.EntryDetailScreen
 import com.trails.app.ui.entrydetail.EntryEditScreen
 import com.trails.app.ui.ideas.IdeaDetailScreen
@@ -59,6 +64,16 @@ import com.trails.app.ui.sections.SectionsScreen
 import com.trails.app.ui.timeline.TimelineScreen
 import com.trails.app.ui.travelmode.TravelModeScreen
 import com.trails.app.ui.triplist.TripListScreen
+import com.trails.app.auth.AuthRepository
+import com.trails.app.auth.SessionState
+import javax.inject.Inject
+import com.trails.app.util.openCachedFile
+import com.trails.app.util.shareCachedFile
+
+@dagger.hilt.android.lifecycle.HiltViewModel
+class RootSessionViewModel @Inject constructor(authRepository: AuthRepository) : androidx.lifecycle.ViewModel() {
+    val sessionState = authRepository.sessionState
+}
 
 private const val ROUTE_LOGIN = "login"
 private const val ROUTE_TRIPS = "trips"
@@ -70,6 +85,11 @@ private const val ARG_CHECKLIST_ID = "checklistId"
 private const val ARG_INFO_ID = "infoId"
 private const val ARG_IDEA_ID = "ideaId"
 private const val NEW_ID = "new"
+internal const val ARG_ATTACHMENT_ID = "attachmentId"
+internal const val DOCUMENT_VIEWER_ROUTE = "document-viewer?$ARG_ATTACHMENT_ID={$ARG_ATTACHMENT_ID}"
+
+internal fun shouldNavigateToLogin(sessionState: SessionState, currentRoute: String?): Boolean =
+    sessionState == SessionState.Unauthenticated && currentRoute != ROUTE_LOGIN
 
 private fun tripRoute(tripId: String, tab: String) = "trip/$tripId/$tab"
 private fun entryDetailRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId"
@@ -85,6 +105,8 @@ private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/impor
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 private fun ideaDetailRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId"
 private fun convertEntryToIdeaRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId/convert-to-idea"
+internal fun documentViewerRoute(attachmentId: String) =
+    "document-viewer?$ARG_ATTACHMENT_ID=${Uri.encode(attachmentId)}"
 
 /**
  * Settings isn't Trip-scoped, so it can't use TripDrawerScaffold (which
@@ -138,7 +160,16 @@ private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onA
 }
 
 @Composable
-fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
+fun TrailsNavHost(
+    navController: NavHostController = rememberNavController(),
+    sessionViewModel: RootSessionViewModel = hiltViewModel(),
+) {
+    val sessionState by sessionViewModel.sessionState.collectAsState()
+    LaunchedEffect(sessionState) {
+        if (shouldNavigateToLogin(sessionState, navController.currentDestination?.route)) {
+            navController.navigate(ROUTE_LOGIN) { popUpTo(0) }
+        }
+    }
     // Fires at most once per app session, right after landing on the trip
     // list from login (fresh or auto-relogin) -- user-reported: "If a trip
     // is active the Android app automatically opens that trip's timeline."
@@ -467,7 +498,32 @@ fun TrailsNavHost(navController: NavHostController = rememberNavController()) {
             arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
-            TripDrawerScaffold(tripId, TripTab.DOCUMENTS, stringResource(R.string.shell_title_documents), navController) { padding -> DocumentsScreen(padding) }
+            TripDrawerScaffold(tripId, TripTab.DOCUMENTS, stringResource(R.string.shell_title_documents), navController) { padding ->
+                DocumentsScreen(padding, onOpenDocument = { navController.navigate(documentViewerRoute(it)) })
+            }
+        }
+
+        composable(
+            route = DOCUMENT_VIEWER_ROUTE,
+            arguments = listOf(
+                navArgument(ARG_ATTACHMENT_ID) { type = NavType.StringType },
+            ),
+        ) {
+            val viewModel: DocumentViewerViewModel = hiltViewModel()
+            val viewerState by viewModel.state.collectAsState()
+            val context = LocalContext.current
+            when (val state = viewerState) {
+                DocumentViewerState.Loading -> androidx.compose.material3.CircularProgressIndicator()
+                DocumentViewerState.Error -> Text(stringResource(R.string.document_viewer_error))
+                is DocumentViewerState.Ready -> DocumentViewerScreen(
+                    localPath = checkNotNull(state.attachment.localPath),
+                    mimeType = state.attachment.mimeType,
+                    filename = state.attachment.originalFilename,
+                    onBack = { navController.popBackStack() },
+                    onShare = { shareCachedFile(context, state.attachment.localPath!!, state.attachment.mimeType) },
+                    onOpenExternal = { openCachedFile(context, state.attachment.localPath!!, state.attachment.mimeType) },
+                )
+            }
         }
 
         composable(

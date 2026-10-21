@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 // User-requested: "Group the documents by activity or how they been added"
@@ -24,6 +25,13 @@ import javax.inject.Inject
 // be grouped by), with that item's own title as the group's header, so
 // the per-row subtitle repeating it is no longer needed.
 data class DocumentGroup(val emoji: String, val label: String, val rows: List<AttachmentEntity>)
+data class DocumentOpenError(val attachmentId: String)
+
+internal class DownloadGate {
+    private val active = mutableSetOf<String>()
+    @Synchronized fun tryStart(id: String): Boolean = active.add(id)
+    @Synchronized fun finish(id: String) { active.remove(id) }
+}
 
 private fun ownerEmoji(entryType: String) = when (entryType) {
     "STAY" -> "🏨"
@@ -55,6 +63,9 @@ class DocumentsViewModel @Inject constructor(
     }
 
     private val downloading = MutableStateFlow<Set<String>>(emptySet())
+    private val downloadGate = DownloadGate()
+    private val _openError = MutableStateFlow<DocumentOpenError?>(null)
+    val openError: StateFlow<DocumentOpenError?> = _openError
 
     val groups: StateFlow<List<DocumentGroup>> = combine(
         documentsRepository.observeAttachmentsForTrip(tripId),
@@ -87,15 +98,40 @@ class DocumentsViewModel @Inject constructor(
 
     /** Called when the user taps a not-yet-cached file -- returns the local path once available. */
     fun ensureCached(attachment: AttachmentEntity, onReady: (String) -> Unit) {
-        if (attachment.localPath != null) {
-            onReady(attachment.localPath)
-            return
-        }
+        if (!downloadGate.tryStart(attachment.id)) return
         viewModelScope.launch {
+            _openError.value = null
             downloading.value = downloading.value + attachment.id
-            val path = documentsRepository.ensureAttachmentCached(attachment)
-            downloading.value = downloading.value - attachment.id
-            if (path != null) onReady(path)
+            try {
+                val path = documentsRepository.ensureAttachmentCached(attachment)
+                if (path != null) onReady(path) else _openError.value = DocumentOpenError(attachment.id)
+            } finally {
+                downloading.value = downloading.value - attachment.id
+                downloadGate.finish(attachment.id)
+            }
+        }
+    }
+}
+
+sealed interface DocumentViewerState {
+    data object Loading : DocumentViewerState
+    data object Error : DocumentViewerState
+    data class Ready(val attachment: AttachmentEntity) : DocumentViewerState
+}
+
+@HiltViewModel
+class DocumentViewerViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    documentsRepository: DocumentsRepository,
+) : ViewModel() {
+    private val _state = MutableStateFlow<DocumentViewerState>(DocumentViewerState.Loading)
+    val state = _state.asStateFlow()
+
+    init {
+        val id = checkNotNull(savedStateHandle.get<String>("attachmentId"))
+        viewModelScope.launch {
+            _state.value = documentsRepository.getCachedAttachment(id)
+                ?.let(DocumentViewerState::Ready) ?: DocumentViewerState.Error
         }
     }
 }

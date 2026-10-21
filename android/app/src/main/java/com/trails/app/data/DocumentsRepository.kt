@@ -57,6 +57,9 @@ class DocumentsRepository @Inject constructor(
 
     fun observePhotosForTrip(tripId: String): Flow<List<PhotoEntity>> = photoDao.observeForTrip(tripId)
 
+    suspend fun getCachedAttachment(id: String): AttachmentEntity? =
+        attachmentDao.getById(id)?.takeIf(::isUsableAttachmentCache)
+
     /** Retries caching one file on demand (e.g. the bulk sync pass failed for it) -- returns the local path on success. */
     suspend fun ensureAttachmentCached(attachment: AttachmentEntity): String? {
         if (isUsableAttachmentCache(attachment)) return attachment.localPath
