@@ -29,8 +29,10 @@ class PdfRendererInstrumentedTest {
         val rendered = renderPdfPage(file, 0)
 
         assertEquals(1, rendered.pageCount)
-        assertEquals(80, rendered.bitmap.width)
-        assertEquals(60, rendered.bitmap.height)
+        assertEquals(400, rendered.bitmap.width)
+        assertEquals(300, rendered.bitmap.height)
+        assertTrue(rendered.bitmap.width > 80)
+        assertTrue(rendered.bitmap.height > 60)
         assertFalse(rendered.bitmap.isRecycled)
         rendered.bitmap.recycle()
         assertTrue(rendered.bitmap.isRecycled)

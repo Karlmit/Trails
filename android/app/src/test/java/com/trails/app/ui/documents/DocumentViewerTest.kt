@@ -3,6 +3,8 @@ package com.trails.app.ui.documents
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -45,8 +47,41 @@ class DocumentViewerTest {
         assertEquals(DocumentPreviewType.UNSUPPORTED, documentPreviewType("text/plain", "notes.txt"))
         assertEquals(DocumentPreviewType.UNSUPPORTED, documentPreviewType("text/plain", "misleading.pdf"))
         assertEquals(DocumentPreviewType.PDF, documentPreviewType("application/pdf", "misleading.jpg"))
-        assertEquals(1600 to 800, boundedPdfBitmapSize(4000, 2000))
-        assertEquals(800 to 1600, boundedPdfBitmapSize(2000, 4000))
+    }
+
+    @Test
+    fun `pdf bitmap size upscales typical pages at five times logical dimensions`() {
+        assertEquals(3000 to 4000, boundedPdfBitmapSize(600, 800))
+        assertEquals(4000 to 3000, boundedPdfBitmapSize(800, 600))
+    }
+
+    @Test
+    fun `pdf bitmap size preserves aspect ratio when dimension cap applies`() {
+        val (width, height) = boundedPdfBitmapSize(4000, 2000)
+
+        assertEquals(4096 to 2048, width to height)
+        assertEquals(2.0, width.toDouble() / height, 0.001)
+    }
+
+    @Test
+    fun `pdf bitmap size stays within pixel cap while preserving aspect ratio`() {
+        val (width, height) = boundedPdfBitmapSize(2000, 2000)
+
+        assertTrue(width <= 4096)
+        assertTrue(height <= 4096)
+        assertTrue(width.toLong() * height <= 12_000_000L)
+        assertEquals(1.0, width.toDouble() / height, 0.001)
+    }
+
+    @Test
+    fun `pdf bitmap size safely handles extreme and invalid dimensions`() {
+        val (width, height) = boundedPdfBitmapSize(Int.MAX_VALUE, 1)
+
+        assertTrue(width <= 4096)
+        assertTrue(height >= 1)
+        assertTrue(width.toLong() * height <= 12_000_000L)
+        assertThrows(IllegalArgumentException::class.java) { boundedPdfBitmapSize(0, 100) }
+        assertThrows(IllegalArgumentException::class.java) { boundedPdfBitmapSize(100, -1) }
     }
 
     @Test

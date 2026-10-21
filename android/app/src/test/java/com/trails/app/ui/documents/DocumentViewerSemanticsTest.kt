@@ -2,6 +2,9 @@ package com.trails.app.ui.documents
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
 @OptIn(ExperimentalTestApi::class)
@@ -58,9 +62,20 @@ class DocumentViewerSemanticsTest {
     fun `pdf pinch updates transform and page change resets it`() {
         val file = File.createTempFile("viewer", ".pdf")
         writeTinyPdf(file, 40, 40)
-        show(file, "application/pdf", "ticket.pdf", pdfRenderer = { _, _ ->
-            RenderedPdfPage(Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888), 2)
-        })
+        val renderedBitmaps = CopyOnWriteArrayList<Bitmap>()
+        var viewerVisible by mutableStateOf(true)
+        compose.setContent {
+            TrailsTheme {
+                if (viewerVisible) {
+                    DocumentViewerScreen(file.absolutePath, "application/pdf", "ticket.pdf", {}, {}, {}) { _, _ ->
+                        RenderedPdfPage(
+                            Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888).also(renderedBitmaps::add),
+                            2,
+                        )
+                    }
+                }
+            }
+        }
         compose.waitUntilAtLeastOneExists(hasTestTag("document-zoomable-viewport"))
         val viewport = compose.onNodeWithTag("document-zoomable-viewport")
 
@@ -76,9 +91,16 @@ class DocumentViewerSemanticsTest {
         assertTrue(viewport.fetchSemanticsNode().config[DocumentScaleKey] > 1f)
 
         compose.onNodeWithText(context.getString(R.string.document_next_page)).performClick()
-        compose.waitForIdle()
+        compose.waitUntil { renderedBitmaps.size == 2 && renderedBitmaps.first().isRecycled }
         assertEquals(1f, viewport.fetchSemanticsNode().config[DocumentScaleKey])
         assertEquals(androidx.compose.ui.geometry.Offset.Zero, viewport.fetchSemanticsNode().config[DocumentTranslationKey])
+        assertTrue(renderedBitmaps.first().isRecycled)
+        assertTrue(!renderedBitmaps.last().isRecycled)
+
+        compose.runOnUiThread { viewerVisible = false }
+        compose.waitForIdle()
+        compose.waitUntil { renderedBitmaps.last().isRecycled }
+        assertTrue(renderedBitmaps.last().isRecycled)
         file.delete()
     }
 

@@ -359,8 +359,13 @@ internal fun renderPdfPage(file: File, pageIndex: Int): RenderedPdfPage {
             renderer.openPage(safeIndex).use { page ->
                 val (width, height) = boundedPdfBitmapSize(page.width, page.height)
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                bitmap.eraseColor(android.graphics.Color.WHITE)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                try {
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                } catch (failure: Throwable) {
+                    bitmap.recycle()
+                    throw failure
+                }
                 RenderedPdfPage(bitmap, renderer.pageCount)
             }
         }
@@ -369,11 +374,13 @@ internal fun renderPdfPage(file: File, pageIndex: Int): RenderedPdfPage {
 
 internal fun boundedPdfBitmapSize(sourceWidth: Int, sourceHeight: Int): Pair<Int, Int> {
     require(sourceWidth > 0 && sourceHeight > 0)
-    val maxDimension = 1600f
-    val maxPixels = 3_000_000f
-    val dimensionScale = minOf(1f, maxDimension / sourceWidth, maxDimension / sourceHeight)
-    val pixelScale = kotlin.math.sqrt(maxPixels / (sourceWidth.toFloat() * sourceHeight)).coerceAtMost(1f)
-    val scale = minOf(dimensionScale, pixelScale)
+    val targetScale = 5.0
+    val maxDimension = 4096.0
+    val maxPixels = 12_000_000.0
+    val sourcePixels = sourceWidth.toDouble() * sourceHeight.toDouble()
+    val dimensionScale = minOf(maxDimension / sourceWidth, maxDimension / sourceHeight)
+    val pixelScale = kotlin.math.sqrt(maxPixels / sourcePixels)
+    val scale = minOf(targetScale, dimensionScale, pixelScale)
     return (sourceWidth * scale).toInt().coerceAtLeast(1) to (sourceHeight * scale).toInt().coerceAtLeast(1)
 }
 
