@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { UrlImportField } from '@/components/UrlImportField';
@@ -53,6 +53,7 @@ interface PhotoGalleryProps {
   // upload (file or URL) creates the owner on demand and returns its id.
   // See lib/hooks/useOwnerId.ts.
   ensureOwnerId?: () => Promise<string>;
+  pasteTargetRef?: RefObject<HTMLDivElement | null>;
 }
 
 const THUMB_SIZE = 140;
@@ -68,6 +69,7 @@ export function PhotoGallery({
   readOnly = false,
   initialPhotos,
   ensureOwnerId,
+  pasteTargetRef,
 }: PhotoGalleryProps) {
   const t = useTranslations('errors');
   const tShared = useTranslations('shared');
@@ -119,7 +121,11 @@ export function PhotoGallery({
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file || uploadInFlight.current) return;
+    if (file) await uploadFile(file);
+  }
+
+  async function uploadFile(file: File) {
+    if (uploadInFlight.current) return;
     uploadInFlight.current = true;
     setUploading(true);
     setError(null);
@@ -145,6 +151,21 @@ export function PhotoGallery({
       uploadInFlight.current = false;
     }
   }
+
+  useEffect(() => {
+    const target = pasteTargetRef?.current;
+    if (readOnly || !target) return;
+    function handlePaste(event: ClipboardEvent) {
+      const file = Array.from(event.clipboardData?.items ?? [])
+        .find((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        ?.getAsFile();
+      if (!file) return;
+      event.preventDefault();
+      void uploadFile(file);
+    }
+    target.addEventListener('paste', handlePaste);
+    return () => target.removeEventListener('paste', handlePaste);
+  });
 
   // User-requested: "anywhere I can upload a photo it's also possible to
   // just post an image URL, that way the user does not have to actually
@@ -297,6 +318,9 @@ export function PhotoGallery({
         )}
       </div>
 
+      {!readOnly && pasteTargetRef && (
+        <p className="text-soft">{tShared('photoGalleryPasteHint')}</p>
+      )}
       {error && <div className="form-error-banner">{error}</div>}
 
       {loading ? (

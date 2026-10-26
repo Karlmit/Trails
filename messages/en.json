@@ -279,6 +279,7 @@
     "linkStagingListAddButton": "Add",
     "photoGalleryLabel": "Photos",
     "photoGalleryUploading": "Uploading…",
+    "photoGalleryPasteHint": "Paste an image anywhere in this form (Ctrl+V or ⌘V) to upload it. Use “Set as cover” to choose your cover photo.",
     "photoGalleryUploadButton": "Upload",
     "photoGalleryUrlToggle": "Add from URL",
     "photoGalleryUrlPlaceholder": "https://example.com/photo.jpg",

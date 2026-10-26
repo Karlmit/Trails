@@ -67,6 +67,7 @@ export function IdeaForm({
   const t = useTranslations('errors');
   const ti = useTranslations('tripIdeas');
   const router = useRouter();
+  const pasteTargetRef = useRef<HTMLDivElement>(null);
   const seed = idea ?? initialValues;
   const [open, setOpen] = useState(mode === 'edit' || startOpen);
   const [title, setTitle] = useState(seed?.title ?? '');
@@ -282,7 +283,7 @@ export function IdeaForm({
     // HTML (silent hydration mismatch in production, a loud React warning
     // in dev). This way the whole thing -- fields, then Links/Photos --
     // still reads as one visual card.
-    <div className="card stack">
+    <div className="card stack" ref={pasteTargetRef}>
       <form onSubmit={handleSubmit} className="stack">
       {error && <div className="form-error-banner">{error}</div>}
 
@@ -442,6 +443,7 @@ export function IdeaForm({
             ensureOwnerId={canCreateOnAttach ? ensureIdeaId : undefined}
           />
           <PhotoGallery
+            pasteTargetRef={pasteTargetRef}
             tripId={idea?.tripId ?? tripId}
             ownerType="IDEA"
             ownerId={idea?.id ?? ''}

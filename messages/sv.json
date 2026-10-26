@@ -279,6 +279,7 @@
     "linkStagingListAddButton": "Lägg till",
     "photoGalleryLabel": "Foton",
     "photoGalleryUploading": "Laddar upp…",
+    "photoGalleryPasteHint": "Klistra in en bild var som helst i formuläret (Ctrl+V eller ⌘V) för att ladda upp den. Använd ”Ange som omslag” för att välja omslagsbild.",
     "photoGalleryUploadButton": "Ladda upp",
     "photoGalleryUrlToggle": "Lägg till från URL",
     "photoGalleryUrlPlaceholder": "https://exempel.se/foto.jpg",

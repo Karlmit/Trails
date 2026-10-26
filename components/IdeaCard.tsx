@@ -147,6 +147,7 @@ export function IdeaCard({
           tripId={idea.tripId}
           sections={sections}
           categoryOptions={categoryOptions}
+          onSaved={() => setEditing(false)}
           onCancel={() => setEditing(false)}
         />
         {error && <div className="form-error-banner">{error}</div>}
