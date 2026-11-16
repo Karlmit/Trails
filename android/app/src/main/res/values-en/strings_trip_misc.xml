@@ -125,4 +125,10 @@
     <string name="overview_error_invalid_timezone">\"%1$s\" isn\'t a valid IANA timezone (e.g. Europe/Stockholm).</string>
     <string name="overview_error_save_failed">Failed to save Trip.</string>
     <string name="overview_error_delete_failed">Failed to delete Trip.</string>
+    <string name="info_detail_location">Location</string>
+    <string name="info_detail_contact">Contact</string>
+    <string name="info_detail_tags">Tags</string>
+    <string name="info_detail_unavailable">This item is loading or is no longer available.</string>
+    <string name="info_detail_extras_failed">Could not load all extra information.</string>
+    <string name="info_detail_load_photo">Load photo: %1$s</string>
 </resources>

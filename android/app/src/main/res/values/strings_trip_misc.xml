@@ -125,4 +125,10 @@
     <string name="overview_error_invalid_timezone">\"%1$s\" är inte en giltig IANA-tidszon (t.ex. Europe/Stockholm).</string>
     <string name="overview_error_save_failed">Det gick inte att spara resan.</string>
     <string name="overview_error_delete_failed">Det gick inte att ta bort resan.</string>
+    <string name="info_detail_location">Plats</string>
+    <string name="info_detail_contact">Kontakt</string>
+    <string name="info_detail_tags">Taggar</string>
+    <string name="info_detail_unavailable">Objektet laddas eller är inte längre tillgängligt.</string>
+    <string name="info_detail_extras_failed">Kunde inte hämta all extra information.</string>
+    <string name="info_detail_load_photo">Hämta foto: %1$s</string>
 </resources>

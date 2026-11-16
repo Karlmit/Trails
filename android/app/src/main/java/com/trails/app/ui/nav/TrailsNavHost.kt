@@ -62,6 +62,8 @@ import com.trails.app.ui.ideas.IdeaDetailViewModel
 import com.trails.app.ui.ideas.IdeaEditScreen
 import com.trails.app.ui.ideas.IdeaEditViewModel
 import com.trails.app.ui.ideas.IdeasScreen
+import com.trails.app.ui.importantinfo.ImportantInfoDetailViewModel
+import com.trails.app.ui.importantinfo.ImportantInfoDetailScreen
 import com.trails.app.ui.importantinfo.ImportantInfoEditScreen
 import com.trails.app.ui.importantinfo.ImportantInfoScreen
 import com.trails.app.ui.login.LoginScreen
@@ -479,7 +481,31 @@ fun TrailsNavHost(
                 tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_important_info), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(infoEditRoute(tripId, null)) }) },
             ) { padding ->
-                ImportantInfoScreen(padding, onOpenItem = { id -> navController.navigate(infoEditRoute(tripId, id)) })
+                ImportantInfoScreen(padding, onOpenItem = { id -> navController.navigate("trip/$tripId/important-info/$id") })
+            }
+        }
+
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/important-info/{$ARG_INFO_ID}",
+            arguments = listOf(
+                navArgument(ARG_TRIP_ID) { type = NavType.StringType },
+                navArgument(ARG_INFO_ID) { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            val infoId = backStackEntry.arguments?.getString(ARG_INFO_ID).orEmpty()
+            val detailViewModel: ImportantInfoDetailViewModel = hiltViewModel()
+            val detailItemState by detailViewModel.itemState.collectAsState()
+            TripDrawerScaffold(
+                tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_important_info),
+                navController, showBackButton = true,
+                actions = {
+                    IconButton(enabled = detailItemState.item != null, onClick = { navController.navigate(infoEditRoute(tripId, infoId)) }) {
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.shell_cd_edit), tint = TrailsColors.Brand)
+                    }
+                },
+            ) { padding ->
+                ImportantInfoDetailScreen(padding, onMissing = { navController.popBackStack() }, viewModel = detailViewModel)
             }
         }
 
@@ -492,7 +518,8 @@ fun TrailsNavHost(
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_edit_important_info), navController, showBackButton = true) { padding ->
-                ImportantInfoEditScreen(padding, onDone = { navController.popBackStack() })
+                ImportantInfoEditScreen(padding, onDone = { navController.popBackStack() },
+                    onDeleted = { navController.popBackStack("trip/$tripId/important-info", inclusive = false) })
             }
         }
 

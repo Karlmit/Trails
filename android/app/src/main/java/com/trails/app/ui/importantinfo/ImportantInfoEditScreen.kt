@@ -57,6 +57,7 @@ import java.io.File
 fun ImportantInfoEditScreen(
     padding: PaddingValues,
     onDone: () -> Unit,
+    onDeleted: () -> Unit = onDone,
     viewModel: ImportantInfoEditViewModel = hiltViewModel(),
     listViewModel: ImportantInfoViewModel = hiltViewModel(),
 ) {
@@ -78,7 +79,7 @@ fun ImportantInfoEditScreen(
     }
 
     LaunchedEffect(items) { viewModel.loadIfEditing(items) }
-    LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
+    LaunchedEffect(state.saved, state.deleted) { if (state.deleted) onDeleted() else if (state.saved) onDone() }
 
     val scrollState = rememberScrollState()
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }

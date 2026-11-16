@@ -80,13 +80,13 @@ private fun ImportantInfoCard(
         variant = TrailsCardVariant.Compact,
         contentPadding = PaddingValues(0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.clickable(onClick = onClick).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "${item.emoji?.takeIf { it.isNotBlank() } ?: "📌"} ${item.title}",
                     style = MaterialTheme.typography.titleMedium,
                     color = TrailsColors.Text,
-                    modifier = Modifier.weight(1f).clickable(onClick = onClick),
+                    modifier = Modifier.weight(1f),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
                     IconButton(onClick = { onMove("up") }, enabled = !isFirst) {
