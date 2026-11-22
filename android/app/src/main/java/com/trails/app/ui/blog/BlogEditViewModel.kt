@@ -13,7 +13,9 @@ import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.apiErrorMessage
 import com.trails.app.network.dto.BlogPostRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.util.UUID
 import javax.inject.Inject
@@ -41,7 +44,10 @@ private const val OWNER_TYPE = "TIMELINE_ENTRY"
 sealed class BlogEditError {
     data class Message(val text: String) : BlogEditError()
     data class Resource(@StringRes val resId: Int) : BlogEditError()
+    data class ImageBatch(val failures: List<ImageUploadFailure>) : BlogEditError()
 }
+
+data class ImageUploadFailure(val filename: String, val reason: String?)
 
 data class BlogEditState(
     val entryId: String? = null,
@@ -180,18 +186,37 @@ class BlogEditViewModel @Inject constructor(
         }
     }
 
-    fun insertImage(uri: Uri, filename: String, untitledLabel: String) {
+    fun insertImages(uris: List<Uri>, displayName: (Uri) -> String, untitledLabel: String) {
+        if (uris.isEmpty() || _state.value.uploadingImage || _state.value.saving) return
+        _state.value = _state.value.copy(uploadingImage = true, error = null)
         viewModelScope.launch {
-            _state.value = _state.value.copy(uploadingImage = true, error = null)
-            runCatching {
+            try {
                 val postId = ensurePostId(untitledLabel)
-                documentsRepository.uploadPhoto(OWNER_TYPE, postId, uri, filename)
-            }.onSuccess { photo ->
-                val newBlock = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
-                _state.value = _state.value.copy(uploadingImage = false, blocks = _state.value.blocks + newBlock)
-            }.onFailure { e ->
-                val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_upload_failed)
-                _state.value = _state.value.copy(uploadingImage = false, error = error)
+                val failures = mutableListOf<ImageUploadFailure>()
+                for (uri in uris) {
+                    var filename = uri.lastPathSegment ?: "file"
+                    try {
+                        filename = withContext(Dispatchers.IO) { displayName(uri) }
+                        val photo = documentsRepository.uploadPhoto(OWNER_TYPE, postId, uri, filename)
+                        val block = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
+                        _state.value = _state.value.copy(blocks = _state.value.blocks + block)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failures += ImageUploadFailure(filename, e.apiErrorMessage())
+                    }
+                }
+                if (failures.isNotEmpty()) {
+                    _state.value = _state.value.copy(error = BlogEditError.ImageBatch(failures))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val error = e.apiErrorMessage()?.let { BlogEditError.Message(it) }
+                    ?: BlogEditError.Resource(R.string.blog_error_upload_failed)
+                _state.value = _state.value.copy(error = error)
+            } finally {
+                _state.value = _state.value.copy(uploadingImage = false)
             }
         }
     }
@@ -204,15 +229,16 @@ class BlogEditViewModel @Inject constructor(
      * Note what this deliberately does *not* do: it does not keep the pasted
      * URL as the block's image source. It imports the image into the post's
      * own Photos (the server fetches the bytes) and the block stores the
-     * resulting Photo id, exactly like `insertImage` above -- so a published
+     * resulting Photo id, exactly like `insertImages` above -- so a published
      * post doesn't go blank the day the remote host rotates that file, and
      * FileCacheManager can still cache it for offline reading. Same
      * `ensurePostId` call for the same reason: a Photo needs an owner, even a
      * Draft one.
      */
     fun insertImageFromUrl(sourceUrl: String, untitledLabel: String) {
+        if (_state.value.uploadingImage || _state.value.saving) return
+        _state.value = _state.value.copy(uploadingImage = true, error = null)
         viewModelScope.launch {
-            _state.value = _state.value.copy(uploadingImage = true, error = null)
             runCatching {
                 val postId = ensurePostId(untitledLabel)
                 documentsRepository.importPhotoFromUrl(OWNER_TYPE, postId, sourceUrl)
@@ -231,6 +257,7 @@ class BlogEditViewModel @Inject constructor(
     }
 
     fun save(untitledLabel: String) {
+        if (_state.value.uploadingImage || _state.value.saving) return
         val current = _state.value
         if (current.title.isBlank()) {
             _state.value = current.copy(error = BlogEditError.Resource(R.string.blog_error_title_required))
@@ -240,37 +267,48 @@ class BlogEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 val postId = ensurePostId(untitledLabel)
-                val request = BlogPostRequest(
-                    tripId = tripId,
-                    title = current.title.trim(),
-                    description = encodeEditableBlocks(current.blocks),
-                    startAt = current.startAt,
-                    isPrivate = current.isPrivate,
-                )
-                repository.updateBlogPost(postId, request)
+                saveContent(postId, current, untitledLabel)
             }.onSuccess { result ->
                 _state.value = _state.value.copy(saving = false, saved = true, entryId = result.id)
             }.onFailure { e ->
-                val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_save_failed)
+                val error = e.apiErrorMessage()?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_save_failed)
                 _state.value = _state.value.copy(saving = false, error = error)
             }
         }
     }
 
-    fun publish() {
-        val id = _state.value.entryId ?: return
-        _state.value = _state.value.copy(saving = true, error = null)
+    private suspend fun saveContent(postId: String, current: BlogEditState, untitledLabel: String) =
+        repository.updateBlogPost(
+            postId,
+            BlogPostRequest(
+                tripId = tripId,
+                title = current.title.trim().ifEmpty { untitledLabel },
+                description = encodeEditableBlocks(current.blocks),
+                startAt = current.startAt.ifBlank { _state.value.startAt },
+                isPrivate = current.isPrivate,
+            ),
+        )
+
+    fun publish(untitledLabel: String) {
+        if (_state.value.uploadingImage || _state.value.saving) return
+        val current = _state.value
+        val id = current.entryId ?: return
+        _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
-            runCatching { repository.publishBlogPost(id) }
+            runCatching {
+                saveContent(id, current, untitledLabel)
+                repository.publishBlogPost(id)
+            }
                 .onSuccess { _state.value = _state.value.copy(saving = false, saved = true) }
                 .onFailure { e ->
-                    val error = e.message?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_publish_failed)
+                    val error = e.apiErrorMessage()?.let { BlogEditError.Message(it) } ?: BlogEditError.Resource(R.string.blog_error_publish_failed)
                     _state.value = _state.value.copy(saving = false, error = error)
                 }
         }
     }
 
     fun unpublish() {
+        if (_state.value.uploadingImage || _state.value.saving) return
         val id = _state.value.entryId ?: return
         _state.value = _state.value.copy(saving = true, error = null)
         viewModelScope.launch {
@@ -284,6 +322,7 @@ class BlogEditViewModel @Inject constructor(
     }
 
     fun delete() {
+        if (_state.value.uploadingImage || _state.value.saving) return
         val id = _state.value.entryId ?: return
         _state.value = _state.value.copy(saving = true, error = null)
         viewModelScope.launch {

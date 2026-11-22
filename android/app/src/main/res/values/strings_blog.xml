@@ -14,7 +14,7 @@
     <string name="blog_remove_image_desc">Ta bort bild</string>
     <string name="blog_uploading_image">Laddar upp bild…</string>
     <string name="blog_uploading">Laddar upp…</string>
-    <string name="blog_add_image">+ Lägg till bild</string>
+    <string name="blog_add_image">+ Lägg till bilder</string>
 
     <string name="blog_save_button">Spara</string>
     <string name="blog_unpublish_button">Avpublicera</string>
@@ -33,6 +33,7 @@
 
     <string name="blog_untitled_default">Namnlös</string>
     <string name="blog_error_upload_failed">Kunde inte ladda upp bilden.</string>
+    <string name="blog_error_image_batch">Bilder som inte kunde laddas upp: %1$d\n%2$s</string>
     <string name="blog_error_title_required">Titel krävs.</string>
     <string name="blog_error_save_failed">Det gick inte att spara blogginlägget.</string>
     <string name="blog_error_publish_failed">Det gick inte att publicera.</string>

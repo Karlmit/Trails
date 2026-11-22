@@ -1,5 +1,6 @@
 package com.trails.app.network.dto
 
+import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -232,11 +233,11 @@ sealed class TimelineEntryWriteRequest {
 @Serializable
 data class BlogPostRequest(
     val tripId: String,
-    val entryType: String = "BLOG_POST",
+    @Required val entryType: String = "BLOG_POST",
     val title: String,
     val description: String? = null,
     val startAt: String,
-    val isPrivate: Boolean = false,
+    @Required val isPrivate: Boolean = false,
 )
 
 // User-requested manual reordering -- app/api/v1/important-info/[itemId]/move/route.ts.

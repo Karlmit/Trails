@@ -14,7 +14,7 @@
     <string name="blog_remove_image_desc">Remove image</string>
     <string name="blog_uploading_image">Uploading image…</string>
     <string name="blog_uploading">Uploading…</string>
-    <string name="blog_add_image">+ Add image</string>
+    <string name="blog_add_image">+ Add images</string>
 
     <string name="blog_save_button">Save</string>
     <string name="blog_unpublish_button">Unpublish</string>
@@ -33,6 +33,7 @@
 
     <string name="blog_untitled_default">Untitled</string>
     <string name="blog_error_upload_failed">Could not upload this image.</string>
+    <string name="blog_error_image_batch">Images that failed to upload: %1$d\n%2$s</string>
     <string name="blog_error_title_required">Title is required.</string>
     <string name="blog_error_save_failed">Failed to save Blog Post.</string>
     <string name="blog_error_publish_failed">Failed to publish.</string>

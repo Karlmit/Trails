@@ -80,17 +80,24 @@ class FileCacheManager @Inject constructor(
      * Retrofit's Multipart part needs a stable length upfront, which a
      * streaming ContentResolver InputStream can't offer.
      */
-    suspend fun prepareUploadPart(uri: Uri, partName: String, filename: String): MultipartBody.Part =
-        withContext(Dispatchers.IO) {
-            val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
-            val dir = File(context.cacheDir, "uploads").apply { mkdirs() }
-            val file = File(dir, "${System.nanoTime()}-${sanitizeFilename(filename)}")
+    suspend fun <T> withUploadPart(
+        uri: Uri,
+        filename: String,
+        upload: suspend (MultipartBody.Part) -> T,
+    ): T = withContext(Dispatchers.IO) {
+        val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+        val dir = File(context.cacheDir, "uploads").apply { mkdirs() }
+        val file = File.createTempFile("upload-", ".tmp", dir)
+        try {
             context.contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output -> input.copyTo(output) }
             } ?: throw IOException("Could not open picked file")
             val body = file.asRequestBody(mimeType.toMediaTypeOrNull())
-            MultipartBody.Part.createFormData(partName, filename, body)
+            upload(MultipartBody.Part.createFormData("file", filename, body))
+        } finally {
+            file.delete()
         }
+    }
 
     private fun sanitizeFilename(name: String): String = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
 }

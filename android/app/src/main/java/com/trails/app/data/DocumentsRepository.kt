@@ -85,8 +85,9 @@ class DocumentsRepository @Inject constructor(
 
     /** Uploads a picked file as an Attachment, then caches its metadata (and the just-uploaded bytes) locally. */
     suspend fun uploadAttachment(tripId: String, ownerType: String, ownerId: String, uri: Uri, filename: String): AttachmentEntity {
-        val part = fileCacheManager.prepareUploadPart(uri, "file", filename)
-        val created = api.uploadAttachment(ownerType.toPlainRequestBody(), ownerId.toPlainRequestBody(), part)
+        val created = fileCacheManager.withUploadPart(uri, filename) { part ->
+            api.uploadAttachment(ownerType.toPlainRequestBody(), ownerId.toPlainRequestBody(), part)
+        }
         val entity = created.toEntity()
         attachmentDao.upsertAll(listOf(entity))
         val localPath = runCatching { fileCacheManager.downloadAttachment(entity) }.getOrNull()
@@ -124,13 +125,14 @@ class DocumentsRepository @Inject constructor(
         filename: String,
         isPrivate: Boolean = false,
     ): PhotoEntity {
-        val part = fileCacheManager.prepareUploadPart(uri, "file", filename)
-        val created = api.uploadPhoto(
-            ownerType.toPlainRequestBody(),
-            ownerId.toPlainRequestBody(),
-            part,
-            isPrivate.toString().toPlainRequestBody(),
-        )
+        val created = fileCacheManager.withUploadPart(uri, filename) { part ->
+            api.uploadPhoto(
+                ownerType.toPlainRequestBody(),
+                ownerId.toPlainRequestBody(),
+                part,
+                isPrivate.toString().toPlainRequestBody(),
+            )
+        }
         val entity = created.toEntity()
         photoDao.upsertAll(listOf(entity))
         val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()

@@ -71,8 +71,8 @@ fun BlogEditScreen(
     var showImageUrlDialog by remember { mutableStateOf(false) }
     val untitledLabel = stringResource(R.string.blog_untitled_default)
 
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.insertImage(uri, queryDisplayName(context, uri), untitledLabel)
+    val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, untitledLabel)
     }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
@@ -101,6 +101,11 @@ fun BlogEditScreen(
             val message = when (error) {
                 is BlogEditError.Message -> error.text
                 is BlogEditError.Resource -> stringResource(error.resId)
+                is BlogEditError.ImageBatch -> {
+                    val fallback = stringResource(R.string.blog_error_upload_failed)
+                    val details = error.failures.joinToString("\n") { "${it.filename} — ${it.reason ?: fallback}" }
+                    stringResource(R.string.blog_error_image_batch, error.failures.size, details)
+                }
             }
             ErrorBanner(message)
         }
@@ -184,14 +189,14 @@ fun BlogEditScreen(
         }
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage) {
+            TextButton(onClick = { pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage && !state.saving) {
                 Text(if (state.uploadingImage) stringResource(R.string.blog_uploading) else stringResource(R.string.blog_add_image))
             }
             // User-requested "post an image URL instead of uploading". The
             // image is still imported into the post's own Photos -- see
             // BlogEditViewModel.insertImageFromUrl for why the pasted URL is
             // not kept as the block's source.
-            TextButton(onClick = { showImageUrlDialog = true }, enabled = !state.uploadingImage) {
+            TextButton(onClick = { showImageUrlDialog = true }, enabled = !state.uploadingImage && !state.saving) {
                 Text(stringResource(R.string.url_import_action))
             }
         }
@@ -201,14 +206,14 @@ fun BlogEditScreen(
         if (state.saving) {
             CircularProgressIndicator()
         } else {
-            PillButton(text = stringResource(R.string.blog_save_button), onClick = { viewModel.save(untitledLabel) }, modifier = Modifier.fillMaxWidth())
+            PillButton(text = stringResource(R.string.blog_save_button), onClick = { viewModel.save(untitledLabel) }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
             if (state.entryId != null) {
                 if (state.isPublished) {
-                    PillButton(text = stringResource(R.string.blog_unpublish_button), variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth())
+                    PillButton(text = stringResource(R.string.blog_unpublish_button), variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
                 } else {
-                    PillButton(text = stringResource(R.string.blog_publish_button), variant = PillButtonVariant.Outline, onClick = viewModel::publish, modifier = Modifier.fillMaxWidth())
+                    PillButton(text = stringResource(R.string.blog_publish_button), variant = PillButtonVariant.Outline, onClick = { viewModel.publish(untitledLabel) }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
                 }
-                PillButton(text = stringResource(R.string.blog_delete_post_button), variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth())
+                PillButton(text = stringResource(R.string.blog_delete_post_button), variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
             }
         }
     }
