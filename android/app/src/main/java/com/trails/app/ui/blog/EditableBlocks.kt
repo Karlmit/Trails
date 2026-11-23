@@ -40,8 +40,10 @@ enum class TextBlockKind { PARAGRAPH, HEADING_1, HEADING_2, HEADING_3, BULLET_LI
  * did so via [ParsedEditableContent.lostFormatting].
  */
 sealed class EditableBlock {
-    data class Text(val id: String, val kind: TextBlockKind, val runs: List<InlineRun>) : EditableBlock()
-    data class Image(val id: String, val photoId: String) : EditableBlock()
+    abstract val id: String
+
+    data class Text(override val id: String, val kind: TextBlockKind, val runs: List<InlineRun>) : EditableBlock()
+    data class Image(override val id: String, val photoId: String) : EditableBlock()
 }
 
 data class ParsedEditableContent(val blocks: List<EditableBlock>, val lostFormatting: Boolean)

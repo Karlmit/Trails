@@ -39,4 +39,8 @@
     <string name="blog_error_publish_failed">Det gick inte att publicera.</string>
     <string name="blog_error_unpublish_failed">Det gick inte att avpublicera.</string>
     <string name="blog_error_delete_failed">Det gick inte att ta bort.</string>
+    <string name="blog_pick_images">Välj bilder</string>
+    <string name="blog_reorder_block">Dra för att flytta blocket</string>
+    <string name="blog_move_block_up">Flytta blocket uppåt</string>
+    <string name="blog_move_block_down">Flytta blocket nedåt</string>
 </resources>

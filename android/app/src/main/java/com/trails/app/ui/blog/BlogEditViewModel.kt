@@ -139,7 +139,7 @@ class BlogEditViewModel @Inject constructor(
     /** Continues a bullet/numbered list on Enter (matches every other list editor); any other kind gets a fresh plain paragraph. */
     fun addTextBlockAfter(id: String) {
         val current = _state.value
-        val index = current.blocks.indexOfFirst { blockId(it) == id }
+        val index = current.blocks.indexOfFirst { it.id == id }
         val previous = current.blocks.getOrNull(index) as? EditableBlock.Text
         val kind = previous?.kind?.takeIf { it == TextBlockKind.BULLET_LIST || it == TextBlockKind.NUMBERED_LIST } ?: TextBlockKind.PARAGRAPH
         val newBlock = EditableBlock.Text(UUID.randomUUID().toString(), kind, listOf(InlineRun("")))
@@ -148,13 +148,27 @@ class BlogEditViewModel @Inject constructor(
     }
 
     fun removeBlock(id: String) {
-        val updated = _state.value.blocks.filterNot { blockId(it) == id }
+        if (_state.value.saving || _state.value.uploadingImage) return
+        val updated = _state.value.blocks.filterNot { it.id == id }
         _state.value = _state.value.copy(blocks = updated.ifEmpty { listOf(EditableBlock.Text(UUID.randomUUID().toString(), TextBlockKind.PARAGRAPH, listOf(InlineRun("")))) })
     }
 
-    private fun blockId(block: EditableBlock): String = when (block) {
-        is EditableBlock.Text -> block.id
-        is EditableBlock.Image -> block.id
+    fun moveBlockBefore(id: String, beforeId: String?) {
+        val current = _state.value
+        if (current.saving || current.uploadingImage || id == beforeId) return
+        val block = current.blocks.firstOrNull { it.id == id } ?: return
+        val reordered = current.blocks.filterNot { it.id == id }.toMutableList()
+        val destination = if (beforeId == null) reordered.size else reordered.indexOfFirst { it.id == beforeId }
+        if (destination < 0) return
+        reordered.add(destination, block)
+        _state.value = current.copy(blocks = reordered)
+    }
+
+    private fun insertPhotoAfter(afterId: String?, image: EditableBlock.Image) {
+        val current = _state.value
+        val index = current.blocks.indexOfFirst { it.id == afterId }
+        val blocks = current.blocks.toMutableList().apply { add(if (index >= 0) index + 1 else size, image) }
+        _state.value = current.copy(blocks = blocks)
     }
 
     /** Lazily creates the Draft on the very first image (or explicit save) -- same convention as BlogPostForm.tsx's own ensurePostId. */
@@ -186,20 +200,22 @@ class BlogEditViewModel @Inject constructor(
         }
     }
 
-    fun insertImages(uris: List<Uri>, displayName: (Uri) -> String, untitledLabel: String) {
+    fun insertImages(uris: List<Uri>, displayName: (Uri) -> String, untitledLabel: String, afterId: String? = null) {
         if (uris.isEmpty() || _state.value.uploadingImage || _state.value.saving) return
         _state.value = _state.value.copy(uploadingImage = true, error = null)
         viewModelScope.launch {
             try {
                 val postId = ensurePostId(untitledLabel)
                 val failures = mutableListOf<ImageUploadFailure>()
+                var insertionId = afterId
                 for (uri in uris) {
                     var filename = uri.lastPathSegment ?: "file"
                     try {
                         filename = withContext(Dispatchers.IO) { displayName(uri) }
                         val photo = documentsRepository.uploadPhoto(OWNER_TYPE, postId, uri, filename)
-                        val block = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
-                        _state.value = _state.value.copy(blocks = _state.value.blocks + block)
+                        val image = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
+                        insertPhotoAfter(insertionId, image)
+                        insertionId = image.id
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -235,7 +251,7 @@ class BlogEditViewModel @Inject constructor(
      * `ensurePostId` call for the same reason: a Photo needs an owner, even a
      * Draft one.
      */
-    fun insertImageFromUrl(sourceUrl: String, untitledLabel: String) {
+    fun insertImageFromUrl(sourceUrl: String, untitledLabel: String, afterId: String? = null) {
         if (_state.value.uploadingImage || _state.value.saving) return
         _state.value = _state.value.copy(uploadingImage = true, error = null)
         viewModelScope.launch {
@@ -244,7 +260,8 @@ class BlogEditViewModel @Inject constructor(
                 documentsRepository.importPhotoFromUrl(OWNER_TYPE, postId, sourceUrl)
             }.onSuccess { photo ->
                 val newBlock = EditableBlock.Image(UUID.randomUUID().toString(), photo.id)
-                _state.value = _state.value.copy(uploadingImage = false, blocks = _state.value.blocks + newBlock)
+                insertPhotoAfter(afterId, newBlock)
+                _state.value = _state.value.copy(uploadingImage = false)
             }.onFailure { e ->
                 // The server's own reason ("That URL could not be reached",
                 // "not a supported file type") is the whole message for a bad

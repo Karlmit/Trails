@@ -39,4 +39,8 @@
     <string name="blog_error_publish_failed">Failed to publish.</string>
     <string name="blog_error_unpublish_failed">Failed to unpublish.</string>
     <string name="blog_error_delete_failed">Failed to delete.</string>
+    <string name="blog_pick_images">Choose images</string>
+    <string name="blog_reorder_block">Drag to reorder block</string>
+    <string name="blog_move_block_up">Move block up</string>
+    <string name="blog_move_block_down">Move block down</string>
 </resources>

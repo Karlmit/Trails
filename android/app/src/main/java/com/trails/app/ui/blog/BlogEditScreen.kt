@@ -5,7 +5,10 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,17 +33,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
@@ -70,16 +81,21 @@ fun BlogEditScreen(
     val photosById by viewModel.photosById.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showImageUrlDialog by remember { mutableStateOf(false) }
+    var pickerAfterId by rememberSaveable { mutableStateOf<String?>(null) }
+    var urlAfterId by rememberSaveable { mutableStateOf<String?>(null) }
     val untitledLabel = stringResource(R.string.blog_untitled_default)
 
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-        viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, untitledLabel)
+        viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, untitledLabel, pickerAfterId)
+        pickerAfterId = null
     }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
 
     val scrollState = rememberScrollState()
+    val drag = remember { BlogBlockDrag() }
+    AutoScrollBlogDrag(drag, scrollState)
+    val dropBeforeId = if (drag.draggedId != null) drag.beforeId(state.blocks) else null
     LaunchedEffect(state.error) { if (state.error != null) scrollState.animateScrollTo(0) }
 
     // Deliberately no TrailsCard wrapper here -- per an earlier, explicit
@@ -91,6 +107,7 @@ fun BlogEditScreen(
         modifier = Modifier
             .padding(padding)
             .fillMaxSize()
+            .onGloballyPositioned { drag.viewport = it }
             .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -150,69 +167,103 @@ fun BlogEditScreen(
             map
         }
 
-        state.blocks.forEach { block ->
-            when (block) {
-                is EditableBlock.Text -> key(block.id) {
-                    TextBlockEditor(
-                        block = block,
-                        listNumber = listNumberByBlockId[block.id],
-                        onRunsChange = { viewModel.updateRuns(block.id, it) },
-                        onKindChange = { viewModel.setBlockKind(block.id, it) },
-                        onRemove = { viewModel.removeBlock(block.id) },
-                        onAddAfter = { viewModel.addTextBlockAfter(block.id) },
-                    )
+        state.blocks.forEachIndexed { index, block ->
+            key(block.id) {
+                DisposableEffect(block.id) {
+                    onDispose { drag.centers.remove(block.id) }
                 }
-                is EditableBlock.Image -> {
-                    val photo = photosById[block.photoId]
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        if (photo?.localPath != null) {
-                            Row(verticalAlignment = Alignment.Top) {
-                                AsyncImage(
-                                    model = File(photo.localPath),
-                                    contentDescription = photo.originalFilename,
-                                    contentScale = ContentScale.FillWidth,
-                                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp))
-                                        .clickable { onOpenPhoto(photo.id) },
-                                )
-                                IconButton(onClick = { viewModel.removeBlock(block.id) }) {
-                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
-                                }
+                val moved = drag.draggedId == block.id
+                val showDropLine = drag.draggedId != null && dropBeforeId == block.id
+                val showEndLine = drag.draggedId != null && dropBeforeId == null && index == state.blocks.lastIndex
+                Column(
+                    Modifier.fillMaxWidth()
+                        .onGloballyPositioned { drag.updateCenter(block.id, it) }
+                        .drawBehind {
+                            if (showDropLine || showEndLine) {
+                                val width = 3.dp.toPx()
+                                val y = if (showEndLine) size.height - width / 2f else width / 2f
+                                drawLine(TrailsColors.BrandAccent, Offset(0f, y), Offset(size.width, y), width)
                             }
-                        } else if (photo != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    photo.originalFilename,
-                                    color = TrailsColors.BrandAccent,
-                                    modifier = Modifier.weight(1f).clickable { onOpenPhoto(photo.id) }.padding(8.dp),
-                                )
-                                IconButton(onClick = { viewModel.removeBlock(block.id) }) {
-                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
-                                }
-                            }
-                        } else {
-                            Surface(color = TrailsColors.SurfaceCool, shape = TrailsShapes.Input) {
-                                Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                                    Text(stringResource(R.string.blog_uploading_image), color = TrailsColors.TextSoft)
+                        }
+                        .alpha(if (moved) 0.55f else 1f),
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        BlogBlockDragHandle(
+                            id = block.id,
+                            drag = drag,
+                            enabled = !state.saving && !state.uploadingImage,
+                            onDrop = { viewModel.moveBlockBefore(block.id, drag.beforeId(state.blocks)) },
+                            onMoveUp = state.blocks.getOrNull(index - 1)?.let { previous ->
+                                { viewModel.moveBlockBefore(block.id, previous.id) }
+                            },
+                            onMoveDown = if (index < state.blocks.lastIndex) {
+                                { viewModel.moveBlockBefore(block.id, state.blocks.getOrNull(index + 2)?.id) }
+                            } else null,
+                        )
+                    }
+                    when (block) {
+                        is EditableBlock.Text -> TextBlockEditor(
+                            block = block,
+                            listNumber = listNumberByBlockId[block.id],
+                            onRunsChange = { viewModel.updateRuns(block.id, it) },
+                            onKindChange = { viewModel.setBlockKind(block.id, it) },
+                            onRemove = { viewModel.removeBlock(block.id) },
+                            removeEnabled = !state.saving && !state.uploadingImage,
+                        )
+                        is EditableBlock.Image -> {
+                            val photo = photosById[block.photoId]
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                if (photo?.localPath != null) {
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        AsyncImage(
+                                            model = File(photo.localPath),
+                                            contentDescription = photo.originalFilename,
+                                            contentScale = ContentScale.FillWidth,
+                                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp))
+                                                .clickable { onOpenPhoto(photo.id) },
+                                        )
+                                        IconButton(onClick = { viewModel.removeBlock(block.id) }, enabled = !state.saving && !state.uploadingImage) {
+                                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
+                                        }
+                                    }
+                                } else if (photo != null) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            photo.originalFilename,
+                                            color = TrailsColors.BrandAccent,
+                                            modifier = Modifier.weight(1f).clickable { onOpenPhoto(photo.id) }.padding(8.dp),
+                                        )
+                                        IconButton(onClick = { viewModel.removeBlock(block.id) }, enabled = !state.saving && !state.uploadingImage) {
+                                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
+                                        }
+                                    }
+                                } else {
+                                    Surface(color = TrailsColors.SurfaceCool, shape = TrailsShapes.Input) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                                            Text(stringResource(R.string.blog_uploading_image), color = TrailsColors.TextSoft)
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                    BlogBlockInsertion(
+                        kind = (block as? EditableBlock.Text)?.kind,
+                        paragraphEnabled = !state.saving,
+                        imagesEnabled = !state.uploadingImage && !state.saving,
+                        onAddParagraph = { viewModel.addTextBlockAfter(block.id) },
+                        onPickImages = {
+                            pickerAfterId = block.id
+                            pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onImageUrl = { urlAfterId = block.id },
+                    )
                 }
             }
         }
-
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = !state.uploadingImage && !state.saving) {
-                Text(if (state.uploadingImage) stringResource(R.string.blog_uploading) else stringResource(R.string.blog_add_image))
-            }
-            // User-requested "post an image URL instead of uploading". The
-            // image is still imported into the post's own Photos -- see
-            // BlogEditViewModel.insertImageFromUrl for why the pasted URL is
-            // not kept as the block's source.
-            TextButton(onClick = { showImageUrlDialog = true }, enabled = !state.uploadingImage && !state.saving) {
-                Text(stringResource(R.string.url_import_action))
-            }
+        if (state.uploadingImage) {
+            Text(stringResource(R.string.blog_uploading), color = TrailsColors.TextSoft)
         }
 
         HorizontalDivider()
@@ -232,13 +283,13 @@ fun BlogEditScreen(
         }
     }
 
-    if (showImageUrlDialog) {
+    urlAfterId?.let { afterId ->
         UrlImportDialog(
             title = stringResource(R.string.url_import_photo_title),
-            onDismiss = { showImageUrlDialog = false },
+            onDismiss = { urlAfterId = null },
             onConfirm = { url ->
-                showImageUrlDialog = false
-                viewModel.insertImageFromUrl(url, untitledLabel)
+                urlAfterId = null
+                viewModel.insertImageFromUrl(url, untitledLabel, afterId)
             },
         )
     }
@@ -269,7 +320,7 @@ private fun TextBlockEditor(
     onRunsChange: (List<InlineRun>) -> Unit,
     onKindChange: (TextBlockKind) -> Unit,
     onRemove: () -> Unit,
-    onAddAfter: () -> Unit,
+    removeEnabled: Boolean,
 ) {
     var fieldValue by remember(block.id) { mutableStateOf(TextFieldValue(block.runs.toAnnotatedString())) }
     val blockPlainText = remember(block.runs) { block.runs.joinToString("") { it.text } }
@@ -386,15 +437,45 @@ private fun TextBlockEditor(
                     unfocusedContainerColor = TrailsColors.SurfaceCool,
                 ),
             )
-            IconButton(onClick = onRemove) {
+            IconButton(onClick = onRemove, enabled = removeEnabled) {
                 Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_block_desc))
             }
         }
-        val addLabel = when (block.kind) {
-            TextBlockKind.BULLET_LIST -> stringResource(R.string.blog_add_bullet)
-            TextBlockKind.NUMBERED_LIST -> stringResource(R.string.blog_add_number)
-            else -> stringResource(R.string.blog_add_paragraph)
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BlogBlockInsertion(
+    kind: TextBlockKind?,
+    paragraphEnabled: Boolean,
+    imagesEnabled: Boolean,
+    onAddParagraph: () -> Unit,
+    onPickImages: () -> Unit,
+    onImageUrl: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val addLabel = when (kind) {
+        TextBlockKind.BULLET_LIST -> R.string.blog_add_bullet
+        TextBlockKind.NUMBERED_LIST -> R.string.blog_add_number
+        else -> R.string.blog_add_paragraph
+    }
+    FlowRow(modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = onAddParagraph, enabled = paragraphEnabled) { Text(stringResource(addLabel)) }
+        Box {
+            TextButton(onClick = { expanded = true }, enabled = imagesEnabled) {
+                Text(stringResource(R.string.blog_add_image))
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.blog_pick_images)) },
+                    onClick = { expanded = false; onPickImages() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.url_import_action)) },
+                    onClick = { expanded = false; onImageUrl() },
+                )
+            }
         }
-        TextButton(onClick = onAddAfter) { Text(addLabel) }
     }
 }
