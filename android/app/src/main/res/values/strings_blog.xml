@@ -43,4 +43,16 @@
     <string name="blog_reorder_block">Dra för att flytta blocket</string>
     <string name="blog_move_block_up">Flytta blocket uppåt</string>
     <string name="blog_move_block_down">Flytta blocket nedåt</string>
+    <string name="blog_device_draft">Lokalt utkast</string>
+    <string name="blog_save_device">Spara utkast på enheten</string>
+    <string name="blog_discard_draft">Ta bort utkast</string>
+    <string name="blog_publish_changes">Publicera ändringar</string>
+    <string name="blog_publishing">Publicerar inlägg och bilder…</string>
+    <string name="blog_staging_images">Sparar bilder på enheten…</string>
+    <string name="blog_image_url_queued">Bilden hämtas när du publicerar.</string>
+    <string name="blog_image_unavailable">Bilden är inte tillgänglig</string>
+    <string name="blog_error_draft_load">Det gick inte att öppna utkastet.</string>
+    <string name="blog_error_publish_retry">Det gick inte att publicera. Utkastet finns kvar på enheten. Försök igen.</string>
+    <string name="blog_error_stage_image">Bilden kunde inte sparas på enheten.</string>
+    <string name="blog_error_stage_image_batch">Bilder som inte kunde sparas på enheten: %1$d\n%2$s</string>
 </resources>

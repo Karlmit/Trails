@@ -135,8 +135,8 @@ internal fun DocumentViewerScreen(
     mimeType: String,
     filename: String,
     onBack: () -> Unit,
-    onShare: () -> Unit,
-    onOpenExternal: () -> Unit,
+    onShare: (() -> Unit)? = null,
+    onOpenExternal: (() -> Unit)? = null,
     pdfRenderer: suspend (File, Int) -> RenderedPdfPage = { file, page -> renderPdfPage(file, page) },
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -151,18 +151,24 @@ internal fun DocumentViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_more_actions))
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.document_share)) },
-                            onClick = { menuExpanded = false; onShare() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.document_open_external)) },
-                            onClick = { menuExpanded = false; onOpenExternal() },
-                        )
+                    if (onShare != null || onOpenExternal != null) {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_more_actions))
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            if (onShare != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.document_share)) },
+                                    onClick = { menuExpanded = false; onShare() },
+                                )
+                            }
+                            if (onOpenExternal != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.document_open_external)) },
+                                    onClick = { menuExpanded = false; onOpenExternal() },
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -385,14 +391,14 @@ internal fun boundedPdfBitmapSize(sourceWidth: Int, sourceHeight: Int): Pair<Int
 }
 
 @Composable
-private fun UnsupportedViewer(onOpenExternal: () -> Unit, modifier: Modifier = Modifier) {
+private fun UnsupportedViewer(onOpenExternal: (() -> Unit)?, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp).testTag("document-unsupported-preview"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(stringResource(R.string.document_unsupported), color = Color.White)
-        Button(onClick = onOpenExternal, modifier = Modifier.padding(top = 16.dp)) {
+        if (onOpenExternal != null) Button(onClick = onOpenExternal, modifier = Modifier.padding(top = 16.dp)) {
             Text(stringResource(R.string.document_open_external))
         }
     }

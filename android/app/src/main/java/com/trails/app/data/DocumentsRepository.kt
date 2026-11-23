@@ -14,6 +14,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.MultipartBody
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -154,18 +156,42 @@ class DocumentsRepository @Inject constructor(
         return entity
     }
 
-    /** URL-import counterpart of `uploadPhoto` -- see `importAttachmentFromUrl`. */
+    suspend fun uploadStagedPhoto(
+        ownerType: String,
+        ownerId: String,
+        file: File,
+        filename: String,
+        mimeType: String,
+        isPrivate: Boolean,
+    ): PhotoEntity {
+        val part = MultipartBody.Part.createFormData("file", filename, file.asRequestBody(mimeType.toMediaTypeOrNull()))
+        return api.uploadPhoto(
+            ownerType.toPlainRequestBody(),
+            ownerId.toPlainRequestBody(),
+            part,
+            isPrivate.toString().toPlainRequestBody(),
+        ).toEntity()
+    }
+
+    suspend fun cacheStagedPhoto(photo: PhotoEntity, file: File) {
+        val localPath = fileCacheManager.cacheUploadedPhoto(photo, file)
+        photoDao.upsertAll(listOf(photo.copy(localPath = localPath)))
+    }
+
+    /** URL-import counterpart of [uploadPhoto]. */
     suspend fun importPhotoFromUrl(
         ownerType: String,
         ownerId: String,
         sourceUrl: String,
         isPrivate: Boolean = false,
+        cacheLocally: Boolean = true,
     ): PhotoEntity {
-        val created = api.importPhotoFromUrl(PhotoUrlRequest(ownerType, ownerId, sourceUrl, isPrivate))
-        val entity = created.toEntity()
-        photoDao.upsertAll(listOf(entity))
-        val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()
-        if (localPath != null) photoDao.setLocalPath(entity.id, localPath)
+        val entity = api.importPhotoFromUrl(PhotoUrlRequest(ownerType, ownerId, sourceUrl, isPrivate)).toEntity()
+        if (cacheLocally) {
+            photoDao.upsertAll(listOf(entity))
+            val localPath = runCatching { fileCacheManager.downloadPhoto(entity) }.getOrNull()
+            if (localPath != null) photoDao.setLocalPath(entity.id, localPath)
+        }
         return entity
     }
 

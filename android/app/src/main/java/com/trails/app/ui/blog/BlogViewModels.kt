@@ -28,6 +28,7 @@ class BlogListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     timelineRepository: TimelineRepository,
     syncScheduler: SyncScheduler,
+    draftStore: BlogDraftStore,
 ) : ViewModel() {
     private val tripId: String = checkNotNull(savedStateHandle["tripId"])
 
@@ -42,6 +43,9 @@ class BlogListViewModel @Inject constructor(
     init {
         refresh()
     }
+
+    val drafts: StateFlow<List<DeviceBlogDraft>> = draftStore.observe(tripId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val posts: StateFlow<List<BlogListItem>> = timelineRepository.observeEntries(tripId)
         .map { entries ->

@@ -74,6 +74,13 @@ class FileCacheManager @Inject constructor(
         file.absolutePath
     }
 
+    suspend fun cacheUploadedPhoto(photo: PhotoEntity, source: File): String = withContext(Dispatchers.IO) {
+        val dir = File(context.filesDir, "photos/${photo.tripId}").apply { mkdirs() }
+        val file = File(dir, "${photo.id}-${sanitizeFilename(photo.originalFilename)}")
+        writeVerifiedDownload(source.inputStream(), file, photo.sizeBytes)
+        file.absolutePath
+    }
+
     /**
      * Copies a content:// Uri picked from the system file/photo picker into a
      * cache file so it can be wrapped in a plain File-backed RequestBody --

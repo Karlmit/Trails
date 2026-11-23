@@ -54,6 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
@@ -65,6 +67,7 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.UrlImportDialog
+import com.trails.app.ui.documents.DocumentViewerScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.queryDisplayName
@@ -80,13 +83,14 @@ fun BlogEditScreen(
     val state by viewModel.state.collectAsState()
     val photosById by viewModel.photosById.collectAsState()
     val context = LocalContext.current
+    var showDiscardConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pickerAfterId by rememberSaveable { mutableStateOf<String?>(null) }
     var urlAfterId by rememberSaveable { mutableStateOf<String?>(null) }
-    val untitledLabel = stringResource(R.string.blog_untitled_default)
+    var localPreviewId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-        viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, untitledLabel, pickerAfterId)
+        viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, pickerAfterId)
         pickerAfterId = null
     }
 
@@ -120,13 +124,20 @@ fun BlogEditScreen(
             val message = when (error) {
                 is BlogEditError.Message -> error.text
                 is BlogEditError.Resource -> stringResource(error.resId)
+                is BlogEditError.PublishFailure -> listOfNotNull(
+                    stringResource(R.string.blog_error_publish_retry), error.reason,
+                ).joinToString("\n")
                 is BlogEditError.ImageBatch -> {
-                    val fallback = stringResource(R.string.blog_error_upload_failed)
+                    val fallback = stringResource(R.string.blog_error_stage_image)
                     val details = error.failures.joinToString("\n") { "${it.filename} — ${it.reason ?: fallback}" }
-                    stringResource(R.string.blog_error_image_batch, error.failures.size, details)
+                    stringResource(R.string.blog_error_stage_image_batch, error.failures.size, details)
                 }
             }
             ErrorBanner(message)
+        }
+        if (!state.ready) {
+            if (state.error == null) CircularProgressIndicator()
+            return@Column
         }
         if (state.lostFormattingWarning) {
             Surface(color = TrailsColors.BrandMint, shape = TrailsShapes.Input) {
@@ -191,7 +202,7 @@ fun BlogEditScreen(
                         BlogBlockDragHandle(
                             id = block.id,
                             drag = drag,
-                            enabled = !state.saving && !state.uploadingImage,
+                            enabled = !state.saving && !state.stagingImages,
                             onDrop = { viewModel.moveBlockBefore(block.id, drag.beforeId(state.blocks)) },
                             onMoveUp = state.blocks.getOrNull(index - 1)?.let { previous ->
                                 { viewModel.moveBlockBefore(block.id, previous.id) }
@@ -208,42 +219,43 @@ fun BlogEditScreen(
                             onRunsChange = { viewModel.updateRuns(block.id, it) },
                             onKindChange = { viewModel.setBlockKind(block.id, it) },
                             onRemove = { viewModel.removeBlock(block.id) },
-                            removeEnabled = !state.saving && !state.uploadingImage,
+                            removeEnabled = !state.saving && !state.stagingImages,
+                            editable = !state.saving,
                         )
                         is EditableBlock.Image -> {
-                            val photo = photosById[block.photoId]
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                if (photo?.localPath != null) {
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        AsyncImage(
-                                            model = File(photo.localPath),
-                                            contentDescription = photo.originalFilename,
-                                            contentScale = ContentScale.FillWidth,
-                                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp))
-                                                .clickable { onOpenPhoto(photo.id) },
-                                        )
-                                        IconButton(onClick = { viewModel.removeBlock(block.id) }, enabled = !state.saving && !state.uploadingImage) {
-                                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
-                                        }
-                                    }
-                                } else if (photo != null) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            photo.originalFilename,
-                                            color = TrailsColors.BrandAccent,
-                                            modifier = Modifier.weight(1f).clickable { onOpenPhoto(photo.id) }.padding(8.dp),
-                                        )
-                                        IconButton(onClick = { viewModel.removeBlock(block.id) }, enabled = !state.saving && !state.uploadingImage) {
-                                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
-                                        }
-                                    }
+                            val staged = state.pendingPhotos[block.id]
+                            val remote = photosById[block.photoId]
+                            val file = staged?.let(viewModel::localPhoto) ?: remote?.localPath?.let(::File)
+                            val label = staged?.filename ?: remote?.originalFilename
+                                ?: stringResource(R.string.blog_image_unavailable)
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                if (file != null) {
+                                    AsyncImage(
+                                        model = file,
+                                        contentDescription = label,
+                                        contentScale = ContentScale.FillWidth,
+                                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).clickable {
+                                            if (staged != null) localPreviewId = block.id
+                                            else onOpenPhoto(block.photoId)
+                                        },
+                                    )
                                 } else {
-                                    Surface(color = TrailsColors.SurfaceCool, shape = TrailsShapes.Input) {
-                                        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                                            Text(stringResource(R.string.blog_uploading_image), color = TrailsColors.TextSoft)
+                                    Column(Modifier.weight(1f).padding(8.dp)) {
+                                        Text(
+                                            label,
+                                            color = TrailsColors.BrandAccent,
+                                            modifier = if (remote != null) Modifier.clickable { onOpenPhoto(remote.id) } else Modifier,
+                                        )
+                                        if (staged?.sourceUrl != null) {
+                                            Text(stringResource(R.string.blog_image_url_queued), style = MaterialTheme.typography.bodySmall)
                                         }
                                     }
+                                }
+                                IconButton(
+                                    onClick = { viewModel.removeBlock(block.id) },
+                                    enabled = !state.saving && !state.stagingImages,
+                                ) {
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
                                 }
                             }
                         }
@@ -251,7 +263,7 @@ fun BlogEditScreen(
                     BlogBlockInsertion(
                         kind = (block as? EditableBlock.Text)?.kind,
                         paragraphEnabled = !state.saving,
-                        imagesEnabled = !state.uploadingImage && !state.saving,
+                        imagesEnabled = !state.stagingImages && !state.saving,
                         onAddParagraph = { viewModel.addTextBlockAfter(block.id) },
                         onPickImages = {
                             pickerAfterId = block.id
@@ -262,23 +274,62 @@ fun BlogEditScreen(
                 }
             }
         }
-        if (state.uploadingImage) {
-            Text(stringResource(R.string.blog_uploading), color = TrailsColors.TextSoft)
+        if (state.stagingImages) {
+            Text(stringResource(R.string.blog_staging_images), color = TrailsColors.TextSoft)
         }
 
         HorizontalDivider()
 
         if (state.saving) {
-            CircularProgressIndicator()
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator()
+                if (state.publishing) Text(stringResource(R.string.blog_publishing))
+            }
         } else {
-            PillButton(text = stringResource(R.string.blog_save_button), onClick = { viewModel.save(untitledLabel) }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
-            if (state.entryId != null) {
-                if (state.isPublished) {
-                    PillButton(text = stringResource(R.string.blog_unpublish_button), variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
-                } else {
-                    PillButton(text = stringResource(R.string.blog_publish_button), variant = PillButtonVariant.Outline, onClick = { viewModel.publish(untitledLabel) }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
-                }
-                PillButton(text = stringResource(R.string.blog_delete_post_button), variant = PillButtonVariant.Danger, onClick = { showDeleteConfirm = true }, modifier = Modifier.fillMaxWidth(), enabled = !state.uploadingImage)
+            PillButton(
+                text = stringResource(if (state.isPublished) R.string.blog_publish_changes else R.string.blog_publish_button),
+                onClick = viewModel::publish,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.stagingImages,
+            )
+            PillButton(
+                text = stringResource(R.string.blog_save_device),
+                variant = PillButtonVariant.Outline,
+                onClick = viewModel::save,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.stagingImages,
+            )
+            if (state.isPublished) {
+                PillButton(text = stringResource(R.string.blog_unpublish_button), variant = PillButtonVariant.Outline, onClick = viewModel::unpublish, modifier = Modifier.fillMaxWidth(), enabled = !state.stagingImages)
+                PillButton(
+                    text = stringResource(R.string.blog_delete_post_button),
+                    variant = PillButtonVariant.Danger,
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.stagingImages,
+                )
+            }
+            PillButton(
+                text = stringResource(R.string.blog_discard_draft),
+                variant = PillButtonVariant.Outline,
+                onClick = { showDiscardConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.stagingImages,
+            )
+        }
+    }
+
+    localPreviewId?.let { id ->
+        val photo = state.pendingPhotos[id]
+        val file = photo?.let(viewModel::localPhoto)
+        if (file != null && photo.mimeType != null) {
+            Dialog(onDismissRequest = { localPreviewId = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                DocumentViewerScreen(
+                    localPath = file.absolutePath,
+                    mimeType = photo.mimeType,
+                    filename = photo.filename,
+                    onBack = { localPreviewId = null },
+                )
             }
         }
     }
@@ -289,8 +340,18 @@ fun BlogEditScreen(
             onDismiss = { urlAfterId = null },
             onConfirm = { url ->
                 urlAfterId = null
-                viewModel.insertImageFromUrl(url, untitledLabel, afterId)
+                viewModel.insertImageFromUrl(url, afterId)
             },
+        )
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text(stringResource(R.string.blog_discard_draft)) },
+            text = { Text(stringResource(R.string.blog_delete_confirm_text)) },
+            confirmButton = { TextButton(onClick = { showDiscardConfirm = false; viewModel.discardDraft() }) { Text(stringResource(R.string.blog_delete_confirm_button)) } },
+            dismissButton = { TextButton(onClick = { showDiscardConfirm = false }) { Text(stringResource(R.string.blog_cancel_button)) } },
         )
     }
 
@@ -299,7 +360,7 @@ fun BlogEditScreen(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.blog_delete_confirm_title)) },
             text = { Text(stringResource(R.string.blog_delete_confirm_text)) },
-            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.delete() }) { Text(stringResource(R.string.blog_delete_confirm_button)) } },
+            confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.deletePost() }) { Text(stringResource(R.string.blog_delete_confirm_button)) } },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.blog_cancel_button)) } },
         )
     }
@@ -321,6 +382,7 @@ private fun TextBlockEditor(
     onKindChange: (TextBlockKind) -> Unit,
     onRemove: () -> Unit,
     removeEnabled: Boolean,
+    editable: Boolean,
 ) {
     var fieldValue by remember(block.id) { mutableStateOf(TextFieldValue(block.runs.toAnnotatedString())) }
     val blockPlainText = remember(block.runs) { block.runs.joinToString("") { it.text } }
@@ -365,7 +427,7 @@ private fun TextBlockEditor(
                 TextBlockKind.NUMBERED_LIST to "1.",
             ).forEach { (kind, label) ->
                 val selected = block.kind == kind
-                TextButton(onClick = { onKindChange(kind) }) {
+                TextButton(onClick = { onKindChange(kind) }, enabled = editable) {
                     Text(
                         label,
                         color = if (selected) TrailsColors.BrandAccent else TrailsColors.TextSoft,
@@ -375,21 +437,21 @@ private fun TextBlockEditor(
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-            TextButton(onClick = { toggle(bold = true) }) {
+            TextButton(onClick = { toggle(bold = true) }, enabled = editable) {
                 Text(
                     "B",
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     color = if (activeStyle.bold) TrailsColors.BrandAccent else TrailsColors.TextSoft,
                 )
             }
-            TextButton(onClick = { toggle(italic = true) }) {
+            TextButton(onClick = { toggle(italic = true) }, enabled = editable) {
                 Text(
                     "I",
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                     color = if (activeStyle.italic) TrailsColors.BrandAccent else TrailsColors.TextSoft,
                 )
             }
-            TextButton(onClick = { toggle(underline = true) }) {
+            TextButton(onClick = { toggle(underline = true) }, enabled = editable) {
                 Text(
                     "U",
                     textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
@@ -415,6 +477,7 @@ private fun TextBlockEditor(
             }
             OutlinedTextField(
                 value = fieldValue,
+                readOnly = !editable,
                 onValueChange = { newValue ->
                     val merged = mergeTypingEdit(fieldValue, newValue, activeStyle)
                     fieldValue = merged

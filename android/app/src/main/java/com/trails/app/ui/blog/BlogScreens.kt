@@ -55,13 +55,17 @@ private fun runsToAnnotatedString(runs: List<InlineRun>) = buildAnnotatedString 
 fun BlogListScreen(
     padding: PaddingValues,
     onOpenPost: (String) -> Unit,
+    onOpenDraft: (String) -> Unit,
     viewModel: BlogListViewModel = hiltViewModel(),
 ) {
     val posts by viewModel.posts.collectAsState()
+    val drafts by viewModel.drafts.collectAsState()
+    val draftEntryIds = drafts.mapNotNull { it.entryId }.toSet()
+    val visiblePosts = posts.filterNot { it.entry.publishedAt == null && it.entry.id in draftEntryIds }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
-        if (posts.isEmpty()) {
+        if (visiblePosts.isEmpty() && drafts.isEmpty()) {
             EmptyState(
                 emoji = "📖",
                 message = stringResource(R.string.blog_empty_state),
@@ -69,7 +73,20 @@ fun BlogListScreen(
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                items(posts, key = { it.entry.id }) { item ->
+                items(drafts, key = { "draft-${it.id}" }) { draft ->
+                    TrailsCard(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenDraft(draft.id) },
+                        variant = TrailsCardVariant.Standard,
+                    ) {
+                        Text(
+                            draft.title.ifBlank { stringResource(R.string.blog_untitled_default) },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TrailsColors.BrandDeep,
+                        )
+                        Text(stringResource(R.string.blog_device_draft), color = TrailsColors.TextSoft)
+                    }
+                }
+                items(visiblePosts, key = { it.entry.id }) { item ->
                     TrailsCard(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
                         variant = TrailsCardVariant.Standard,

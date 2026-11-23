@@ -1,5 +1,6 @@
 package com.trails.app.ui.blog
 
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -39,15 +40,19 @@ enum class TextBlockKind { PARAGRAPH, HEADING_1, HEADING_2, HEADING_3, BULLET_LI
  * plain paragraph (keeping its real inline styling) and reports that it
  * did so via [ParsedEditableContent.lostFormatting].
  */
+@Serializable
 sealed class EditableBlock {
     abstract val id: String
 
+    @Serializable
     data class Text(override val id: String, val kind: TextBlockKind, val runs: List<InlineRun>) : EditableBlock()
+    @Serializable
     data class Image(override val id: String, val photoId: String) : EditableBlock()
 }
 
 data class ParsedEditableContent(val blocks: List<EditableBlock>, val lostFormatting: Boolean)
 
+@Serializable
 data class InlineRun(val text: String, val bold: Boolean = false, val italic: Boolean = false, val underline: Boolean = false)
 
 private val PHOTO_ID_REGEX = Regex("/api/v1/photos/([^/]+)/file")

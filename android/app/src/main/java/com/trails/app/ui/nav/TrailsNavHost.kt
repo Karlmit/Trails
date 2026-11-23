@@ -48,6 +48,8 @@ import com.trails.app.ui.settings.SettingsScreen
 import com.trails.app.ui.blog.BlogDetailScreen
 import com.trails.app.ui.blog.BlogEditScreen
 import com.trails.app.ui.blog.BlogListScreen
+import com.trails.app.ui.blog.LOCAL_BLOG_PREFIX
+import java.util.UUID
 import com.trails.app.ui.budget.BudgetScreen
 import com.trails.app.ui.checklists.ChecklistDetailScreen
 import com.trails.app.ui.checklists.ChecklistDetailViewModel
@@ -110,7 +112,7 @@ private fun tripRoute(tripId: String, tab: String) = "trip/$tripId/$tab"
 private fun entryDetailRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId"
 private fun entryEditRoute(tripId: String, entryId: String?) = "trip/$tripId/entries/${entryId ?: NEW_ID}/edit"
 private fun blogDetailRoute(tripId: String, entryId: String) = "trip/$tripId/blog/$entryId"
-private fun blogEditRoute(tripId: String, entryId: String?) = "trip/$tripId/blog/${entryId ?: NEW_ID}/edit"
+private fun blogEditRoute(tripId: String, entryId: String?) = "trip/$tripId/blog/${entryId ?: "$LOCAL_BLOG_PREFIX${UUID.randomUUID()}"}/edit"
 private fun sectionEditRoute(tripId: String, sectionId: String?) = "trip/$tripId/sections/${sectionId ?: NEW_ID}/edit"
 private fun checklistDetailRoute(tripId: String, checklistId: String) = "trip/$tripId/checklists/$checklistId"
 private fun checklistEditRoute(tripId: String, checklistId: String?) = "trip/$tripId/checklists/${checklistId ?: NEW_ID}/edit"
@@ -550,7 +552,11 @@ fun TrailsNavHost(
                 tripId, TripTab.BLOG, stringResource(R.string.shell_title_blog), navController,
                 floatingActionButton = { AddFab(onClick = { navController.navigate(blogEditRoute(tripId, null)) }) },
             ) { padding ->
-                BlogListScreen(padding, onOpenPost = { entryId -> navController.navigate(blogDetailRoute(tripId, entryId)) })
+                BlogListScreen(
+                    padding,
+                    onOpenPost = { entryId -> navController.navigate(blogDetailRoute(tripId, entryId)) },
+                    onOpenDraft = { id -> navController.navigate(blogEditRoute(tripId, id)) },
+                )
             }
         }
 

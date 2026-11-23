@@ -100,17 +100,12 @@ class TimelineRepository @Inject constructor(
         timelineEntryDao.deleteById(entryId)
     }
 
-    suspend fun createBlogPost(request: BlogPostRequest): TimelineEntryEntity {
-        val created = api.createBlogPost(request)
-        val entity = created.toEntity()
-        timelineEntryDao.upsertAll(listOf(entity))
-        return entity
-    }
+    suspend fun createBlogPost(request: BlogPostRequest): TimelineEntryEntity =
+        api.createBlogPost(request).toEntity()
 
-    suspend fun updateBlogPost(entryId: String, request: BlogPostRequest): TimelineEntryEntity {
-        val updated = api.updateBlogPost(entryId, request)
-        val entity = updated.toEntity()
-        timelineEntryDao.upsertAll(listOf(entity))
+    suspend fun updateBlogPost(entryId: String, request: BlogPostRequest, cacheLocally: Boolean = true): TimelineEntryEntity {
+        val entity = api.updateBlogPost(entryId, request).toEntity()
+        if (cacheLocally) timelineEntryDao.upsertAll(listOf(entity))
         return entity
     }
 

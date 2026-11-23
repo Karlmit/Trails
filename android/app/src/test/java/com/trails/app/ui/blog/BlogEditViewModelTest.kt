@@ -6,125 +6,172 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.TripRepository
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.dto.BlogPostRequest
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 import java.io.IOException
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BlogEditViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val timeline = mockk<TimelineRepository>()
     private val documents = mockk<DocumentsRepository>()
     private val trips = mockk<TripRepository>()
+    private val store = mockk<BlogDraftStore>()
+    private var draft: DeviceBlogDraft? = null
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        every { trips.observeTrip("trip") } returns flowOf(null)
+        coEvery { store.scopeFor("trip") } returns "scope"
+        coEvery { store.load("scope", any()) } answers { draft }
+        every { store.save("scope", any()) } answers {
+            draft = secondArg()
+            CompletableDeferred(Result.success(Unit))
+        }
+        coEvery { store.delete("scope", any()) } answers { draft = null }
+        coEvery { store.deletePhoto("scope", any()) } returns Unit
+        coEvery { documents.cacheStagedPhoto(any(), any()) } returns Unit
     }
 
     @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
+    fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun `publishing saves successful images in selection order after a partial upload failure`() = runTest(dispatcher) {
-        val first = pickedImage("first.jpg")
-        val missing = pickedImage("missing.jpg")
-        val last = pickedImage("last.jpg")
-        val entry = mockk<TimelineEntryEntity> {
-            every { id } returns "post"
-        }
-        every { trips.observeTrip("trip") } returns flowOf(null)
-        coEvery { timeline.createBlogPost(any()) } returns entry
-        coEvery { documents.uploadPhoto("TIMELINE_ENTRY", "post", first, "first.jpg") } returns mockk {
-            every { id } returns "first-photo"
-        }
-        coEvery { documents.uploadPhoto("TIMELINE_ENTRY", "post", missing, "missing.jpg") } throws IOException()
-        coEvery { documents.uploadPhoto("TIMELINE_ENTRY", "post", last, "last.jpg") } returns mockk {
-            every { id } returns "last-photo"
-        }
-        val savedRequest = slot<BlogPostRequest>()
-        coEvery { timeline.updateBlogPost("post", capture(savedRequest)) } returns entry
-        coEvery { timeline.publishBlogPost("post") } returns entry
-        val editor = BlogEditViewModel(SavedStateHandle(mapOf("tripId" to "trip")), timeline, documents, trips)
-
-        editor.onTitleChange("Trip photos")
-        editor.insertImages(listOf(first, missing, last), { checkNotNull(it.lastPathSegment) }, "Untitled")
-        val uploaded = editor.state.first { !it.uploadingImage }
-        val failures = (uploaded.error as BlogEditError.ImageBatch).failures
-        assertEquals(listOf("missing.jpg"), failures.map { it.filename })
-        editor.publish("Untitled")
-        editor.state.first { !it.saving }
-
-        coVerifyOrder {
-            timeline.createBlogPost(any())
-            timeline.updateBlogPost("post", any())
-            timeline.publishBlogPost("post")
-        }
-        val images = parseEditableBlocks(savedRequest.captured.description).blocks.filterIsInstance<EditableBlock.Image>()
-        assertEquals(listOf("first-photo", "last-photo"), images.map { it.photoId })
-    }
-
-    @Test
-    fun `photos insert between paragraphs and mixed blocks save in reordered order`() = runTest(dispatcher) {
-        val entry = mockk<TimelineEntryEntity> { every { id } returns "post" }
-        every { trips.observeTrip("trip") } returns flowOf(null)
-        coEvery { timeline.createBlogPost(any()) } returns entry
-        val uri = pickedImage("lake.jpg")
-        coEvery { documents.uploadPhoto("TIMELINE_ENTRY", "post", uri, "lake.jpg") } returns mockk {
+    fun `compose offline then publish mixed blocks in editor order`() = runTest(dispatcher) {
+        val editor = editor()
+        runCurrent()
+        val entry = serverEntry()
+        val file = stageImage("lake.jpg")
+        val saved = slot<BlogPostRequest>()
+        coEvery { timeline.updateBlogPost("post", capture(saved), false) } returns entry
+        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", file, "lake.jpg", "image/jpeg", false) } returns mockk {
             every { id } returns "lake"
         }
-        coEvery { documents.importPhotoFromUrl("TIMELINE_ENTRY", "post", "https://example.com/peak.jpg") } returns mockk {
+        coEvery { documents.importPhotoFromUrl("TIMELINE_ENTRY", "post", "https://example.com/peak.jpg", false, false) } returns mockk {
             every { id } returns "peak"
         }
-        val saved = slot<BlogPostRequest>()
-        coEvery { timeline.updateBlogPost("post", capture(saved)) } returns entry
-        val editor = BlogEditViewModel(SavedStateHandle(mapOf("tripId" to "trip")), timeline, documents, trips)
+
         editor.onTitleChange("Trip")
         val first = editor.state.value.blocks.single().id
         editor.updateRuns(first, listOf(InlineRun("First", bold = true)))
         editor.addTextBlockAfter(first)
         val last = editor.state.value.blocks.last().id
         editor.updateRuns(last, listOf(InlineRun("Last")))
-
-        editor.insertImages(listOf(uri), { "lake.jpg" }, "Untitled", first)
-        val afterUpload = editor.state.first { !it.uploadingImage }.blocks
-        val lake = (afterUpload[1] as EditableBlock.Image).id
-        assertEquals(listOf(first, lake, last), afterUpload.map { it.id })
-
-        editor.addTextBlockAfter(lake)
-        val middle = editor.state.value.blocks[2].id
-        editor.updateRuns(middle, listOf(InlineRun("Middle")))
-        editor.insertImageFromUrl("https://example.com/peak.jpg", "Untitled", lake)
-        val afterImport = editor.state.first { !it.uploadingImage }.blocks
-        val peak = (afterImport[2] as EditableBlock.Image).id
-        assertEquals(listOf(first, lake, peak, middle, last), afterImport.map { it.id })
-
+        editor.insertImages(listOf(pickedImage("lake.jpg")), { "lake.jpg" }, first)
+        val lake = editor.state.first { !it.stagingImages }.blocks[1].id
+        editor.insertImageFromUrl("https://example.com/peak.jpg", lake)
+        val peak = editor.state.value.blocks[2].id
         editor.moveBlockBefore(last, first)
-        editor.moveBlockBefore(lake, null)
-        val reordered = editor.state.value.blocks
-        assertEquals(listOf(last, first, peak, middle, lake), reordered.map { it.id })
-        editor.save("Untitled")
+        editor.save()
         editor.state.first { !it.saving }
-        assertEquals(reordered, parseEditableBlocks(saved.captured.description).blocks)
+
+        coVerify(exactly = 0) { timeline.createBlogPost(any()) }
+        coVerify(exactly = 0) { documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { documents.importPhotoFromUrl(any(), any(), any(), any(), any()) }
+        assertEquals(listOf(last, first, lake, peak), draft?.blocks?.map { it.id })
+
+        val reopened = editor()
+        runCurrent()
+        assertEquals(editor.state.value.blocks, reopened.state.value.blocks)
+        reopened.publish()
+        val result = reopened.state.first { !it.saving }
+        assertTrue(result.saved)
+        assertNull(draft)
+
+        coVerifyOrder {
+            timeline.createBlogPost(any())
+            documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any())
+            documents.importPhotoFromUrl(any(), any(), any(), any(), any())
+            timeline.updateBlogPost("post", any(), false)
+            timeline.publishBlogPost("post")
+        }
+        val blocks = parseEditableBlocks(saved.captured.description).blocks
+        assertEquals(listOf(last, first, lake, peak), blocks.map { it.id })
+        assertEquals(listOf("lake", "peak"), blocks.filterIsInstance<EditableBlock.Image>().map { it.photoId })
+        assertEquals(listOf(InlineRun("First", bold = true)), (blocks[1] as EditableBlock.Text).runs)
     }
 
-    private fun pickedImage(name: String): Uri = mockk {
-        every { lastPathSegment } returns name
+    @Test
+    fun `failed publish retains the post and upload checkpoints across reopening`() = runTest(dispatcher) {
+        val entry = serverEntry()
+        val first = stageImage("first.jpg")
+        val last = stageImage("last.jpg")
+        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", first, "first.jpg", "image/jpeg", false) } returns mockk {
+            every { id } returns "first-photo"
+        }
+        coEvery {
+            documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", last, "last.jpg", "image/jpeg", false)
+        } throws IOException("offline") andThen mockk<PhotoEntity> { every { id } returns "last-photo" }
+        coEvery { timeline.updateBlogPost("post", any(), false) } returns entry
+
+        val editor = editor()
+        runCurrent()
+        editor.onTitleChange("Trip photos")
+        editor.insertImages(listOf(pickedImage("first.jpg"), pickedImage("last.jpg")), { checkNotNull(it.lastPathSegment) })
+        editor.state.first { !it.stagingImages }
+        editor.publish()
+        assertTrue(editor.state.first { !it.saving }.error is BlogEditError.PublishFailure)
+        assertEquals("post", draft?.entryId)
+        assertEquals(2, draft?.pendingPhotos?.size)
+        assertEquals(listOf("first-photo"), draft?.pendingPhotos?.values?.mapNotNull { it.uploadedId })
+        assertNotNull(draft)
+        coVerify(exactly = 0) { timeline.publishBlogPost(any()) }
+
+        val reopened = editor()
+        runCurrent()
+        reopened.publish()
+        assertTrue(reopened.state.first { !it.saving }.saved)
+        assertNull(draft)
+        coVerify(exactly = 1) { timeline.createBlogPost(any()) }
+        coVerify(exactly = 1) { documents.uploadStagedPhoto(any(), any(), first, any(), any(), any()) }
+        coVerify(exactly = 2) { documents.uploadStagedPhoto(any(), any(), last, any(), any(), any()) }
+        coVerify(exactly = 1) { timeline.publishBlogPost("post") }
     }
+
+    private fun editor() = BlogEditViewModel(
+        SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store,
+    )
+
+    private fun serverEntry(): TimelineEntryEntity = mockk<TimelineEntryEntity> {
+        every { id } returns "post"
+    }.also { entry ->
+        coEvery { timeline.createBlogPost(any()) } returns entry
+        coEvery { timeline.publishBlogPost("post") } returns entry
+    }
+
+    private fun stageImage(filename: String): File {
+        val photo = DraftPhoto(filename, fileId = filename, mimeType = "image/jpeg")
+        val file = File(filename)
+        coEvery { store.stage("scope", any(), filename) } returns photo
+        every { store.photoFile("scope", photo) } returns file
+        every { store.photoFile("scope", match { it.sourceUrl != null }) } returns null
+        return file
+    }
+
+    private fun pickedImage(name: String): Uri = mockk { every { lastPathSegment } returns name }
 }

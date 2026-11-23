@@ -43,4 +43,16 @@
     <string name="blog_reorder_block">Drag to reorder block</string>
     <string name="blog_move_block_up">Move block up</string>
     <string name="blog_move_block_down">Move block down</string>
+    <string name="blog_device_draft">On-device draft</string>
+    <string name="blog_save_device">Save draft on device</string>
+    <string name="blog_discard_draft">Discard draft</string>
+    <string name="blog_publish_changes">Publish changes</string>
+    <string name="blog_publishing">Publishing post and images…</string>
+    <string name="blog_staging_images">Saving images on device…</string>
+    <string name="blog_image_url_queued">Image will be imported when you publish.</string>
+    <string name="blog_image_unavailable">Image unavailable</string>
+    <string name="blog_error_draft_load">Could not open the draft.</string>
+    <string name="blog_error_publish_retry">Could not publish. Your draft is still on this device. Try again.</string>
+    <string name="blog_error_stage_image">Could not save this image on the device.</string>
+    <string name="blog_error_stage_image_batch">Images that could not be saved on the device: %1$d\n%2$s</string>
 </resources>
