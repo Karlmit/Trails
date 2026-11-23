@@ -27,4 +27,12 @@ class RootSessionNavigationTest {
         assertEquals(id, Uri.parse(route).getQueryParameter(ARG_ATTACHMENT_ID))
         assertFalse(route.contains("documentPath"))
     }
+
+    @Test
+    fun `photo viewer route carries a distinct media flag`() {
+        val id = "image / #1?å"
+        val route = Uri.parse(documentViewerRoute(id, isPhoto = true))
+        assertEquals(id, route.getQueryParameter(ARG_ATTACHMENT_ID))
+        assertEquals("true", route.getQueryParameter(ARG_VIEW_PHOTO))
+    }
 }

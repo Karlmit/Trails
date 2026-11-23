@@ -49,13 +49,14 @@ import com.trails.app.ui.components.TagsEditor
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.components.UrlImportDialog
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.util.openCachedFile
 import com.trails.app.util.queryDisplayName
 import java.io.File
 
 @Composable
 fun ImportantInfoEditScreen(
     padding: PaddingValues,
+    onOpenAttachment: (String) -> Unit,
+    onOpenPhoto: (String) -> Unit,
     onDone: () -> Unit,
     onDeleted: () -> Unit = onDone,
     viewModel: ImportantInfoEditViewModel = hiltViewModel(),
@@ -173,10 +174,13 @@ fun ImportantInfoEditScreen(
                             if (photo.localPath != null) {
                                 AsyncImage(
                                     model = File(photo.localPath),
-                                    contentDescription = null,
+                                    contentDescription = photo.originalFilename,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(96.dp).padding(end = 8.dp).clip(RoundedCornerShape(4.dp)),
+                                    modifier = Modifier.size(96.dp).padding(end = 8.dp).clip(RoundedCornerShape(4.dp))
+                                        .clickable { onOpenPhoto(photo.id) },
                                 )
+                            } else {
+                                Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
                             }
                         }
                     }
@@ -187,7 +191,7 @@ fun ImportantInfoEditScreen(
                         attachments.forEach { attachment ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable {
-                                    viewModel.ensureAttachmentCached(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
+                                    onOpenAttachment(attachment.id)
                                 },
                             ) {
                                 Text(attachment.originalFilename, style = MaterialTheme.typography.bodyLarge, color = TrailsColors.BrandAccent)

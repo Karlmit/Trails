@@ -65,6 +65,7 @@
     <string name="idea_edit_button_create">Skapa idé</string>
     <string name="idea_edit_button_convert">Konvertera till idé</string>
     <string name="idea_edit_button_save">Spara ändringar</string>
+    <string name="idea_edit_set_cover_photo">Ange som omslagsbild</string>
     <string name="idea_edit_cover_photo_heading">Omslagsbild</string>
     <string name="idea_edit_uploading_photo">Laddar upp…</string>
     <string name="idea_edit_add_photo">+ Lägg till bild</string>

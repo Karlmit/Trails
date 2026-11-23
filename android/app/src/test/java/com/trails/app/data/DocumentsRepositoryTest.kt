@@ -10,6 +10,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
@@ -71,7 +72,9 @@ class DocumentsRepositoryTest {
             stale.absolutePath
         }
 
-        repository.ensureAttachmentCached(attachment)
+        coEvery { attachments.getById("attachment") } returns attachment
+
+        assertEquals(stale.absolutePath, repository.attachmentForPreview("attachment")?.localPath)
 
         coVerify(ordering = io.mockk.Ordering.ORDERED) {
             attachments.setLocalPath("attachment", null)

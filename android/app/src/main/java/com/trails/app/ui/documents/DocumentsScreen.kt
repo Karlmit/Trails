@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,7 +20,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
-import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.components.ScreenHeading
@@ -38,9 +35,7 @@ fun DocumentsScreen(
     viewModel: DocumentsViewModel = hiltViewModel(),
 ) {
     val groups by viewModel.groups.collectAsState()
-    val downloadingIds by viewModel.downloadingIds.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val openError by viewModel.openError.collectAsState()
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
         if (groups.isEmpty()) {
@@ -62,37 +57,20 @@ fun DocumentsScreen(
                                 if (index > 0) {
                                     HorizontalDivider(color = TrailsColors.HairlineOnLight)
                                 }
-                                val isDownloading = attachment.id in downloadingIds
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 10.dp)
-                                        .clickable(enabled = !isDownloading) {
-                                            viewModel.ensureCached(attachment) { _ ->
-                                                onOpenDocument(attachment.id)
-                                            }
-                                        },
+                                        .clickable { onOpenDocument(attachment.id) },
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            attachment.originalFilename,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = TrailsColors.BrandAccent,
-                                        )
-                                        if (openError?.attachmentId == attachment.id) {
-                                            Text(
-                                                stringResource(R.string.document_open_failed),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.error,
-                                            )
-                                        }
-                                    }
-                                    if (isDownloading) {
-                                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = TrailsColors.BrandAccent, strokeWidth = 2.dp)
-                                    } else {
-                                        Text(formatSize(attachment.sizeBytes), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
-                                    }
+                                    Text(
+                                        attachment.originalFilename,
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = TrailsColors.BrandAccent,
+                                    )
+                                    Text(formatSize(attachment.sizeBytes), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
                                 }
                             }
                         }

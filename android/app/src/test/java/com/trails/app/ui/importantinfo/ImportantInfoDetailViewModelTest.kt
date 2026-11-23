@@ -1,11 +1,9 @@
 package com.trails.app.ui.importantinfo
 
 import androidx.lifecycle.SavedStateHandle
-import com.trails.app.R
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.LinksTagsRepository
-import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.network.dto.LinkDto
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -43,16 +41,5 @@ class ImportantInfoDetailViewModelTest {
         model.refreshExtras()
         runCurrent()
         assertEquals(listOf(updated), model.links.value)
-    }
-
-    @Test fun `failed attachment cache shows feedback and does not open a file`() = runTest(dispatcher) {
-        val attachment = mockk<AttachmentEntity>()
-        coEvery { documents.ensureAttachmentCached(attachment) } returns null
-        val model = model()
-        var opened = false
-        model.openAttachment(attachment) { opened = true }
-        runCurrent()
-        assertFalse(opened)
-        assertEquals(R.string.document_open_failed, model.errorRes.value)
     }
 }

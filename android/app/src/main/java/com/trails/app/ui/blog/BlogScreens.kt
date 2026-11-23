@@ -90,7 +90,7 @@ fun BlogListScreen(
 }
 
 @Composable
-fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hiltViewModel()) {
+fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, viewModel: BlogDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
     val isRefreshing by viewModel.isRefreshing.collectAsState()
@@ -152,10 +152,13 @@ fun BlogDetailScreen(padding: PaddingValues, viewModel: BlogDetailViewModel = hi
                             if (photo?.localPath != null) {
                                 AsyncImage(
                                     model = File(photo.localPath),
-                                    contentDescription = null,
+                                    contentDescription = photo.originalFilename,
                                     contentScale = ContentScale.FillWidth,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(4.dp)),
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(4.dp))
+                                        .clickable { onOpenPhoto(photo.id) },
                                 )
+                            } else if (photo != null) {
+                                Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
                             }
                         }
                     }

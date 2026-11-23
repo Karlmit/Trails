@@ -20,12 +20,12 @@ import java.nio.file.StandardCopyOption
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal fun writeVerifiedPhoto(input: InputStream, file: File, expectedSize: Int) {
+internal fun writeVerifiedDownload(input: InputStream, file: File, expectedSize: Int) {
     val temporary = File.createTempFile("${file.nameWithoutExtension}-", ".download", file.parentFile)
     try {
         input.use { source -> temporary.outputStream().use { output -> source.copyTo(output) } }
         if (temporary.length() != expectedSize.toLong() || expectedSize <= 0) {
-            throw IOException("Downloaded photo size does not match metadata")
+            throw IOException("Downloaded file size does not match metadata")
         }
         try {
             Files.move(
@@ -60,7 +60,7 @@ class FileCacheManager @Inject constructor(
         val body = response.body() ?: throw IOException("Empty attachment body")
         val dir = File(context.filesDir, "attachments/${attachment.tripId}").apply { mkdirs() }
         val file = File(dir, "${attachment.id}-${sanitizeFilename(attachment.originalFilename)}")
-        body.byteStream().use { input -> file.outputStream().use { output -> input.copyTo(output) } }
+        writeVerifiedDownload(body.byteStream(), file, attachment.sizeBytes)
         file.absolutePath
     }
 
@@ -70,7 +70,7 @@ class FileCacheManager @Inject constructor(
         val body = response.body() ?: throw IOException("Empty photo body")
         val dir = File(context.filesDir, "photos/${photo.tripId}").apply { mkdirs() }
         val file = File(dir, "${photo.id}-${sanitizeFilename(photo.originalFilename)}")
-        writeVerifiedPhoto(body.byteStream(), file, photo.sizeBytes)
+        writeVerifiedDownload(body.byteStream(), file, photo.sizeBytes)
         file.absolutePath
     }
 

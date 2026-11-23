@@ -207,17 +207,6 @@ class ImportantInfoEditViewModel @Inject constructor(
         }
     }
 
-    /** Same on-demand retry-download as DocumentsScreen/EntryDetailScreen -- if the bulk sync pass missed this file, tapping it tries again before opening. */
-    fun ensureAttachmentCached(attachment: AttachmentEntity, onReady: (String) -> Unit) {
-        if (attachment.localPath != null) {
-            onReady(attachment.localPath)
-            return
-        }
-        viewModelScope.launch {
-            documentsRepository.ensureAttachmentCached(attachment)?.let(onReady)
-        }
-    }
-
     fun addLink(url: String, label: String?) {
         val ownerId = _state.value.infoId
         if (ownerId == null) {

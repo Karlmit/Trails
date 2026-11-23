@@ -3,6 +3,7 @@ package com.trails.app.ui.blog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -61,6 +62,7 @@ import java.io.File
 @Composable
 fun BlogEditScreen(
     padding: PaddingValues,
+    onOpenPhoto: (String) -> Unit,
     onDone: () -> Unit,
     viewModel: BlogEditViewModel = hiltViewModel(),
 ) {
@@ -167,9 +169,21 @@ fun BlogEditScreen(
                             Row(verticalAlignment = Alignment.Top) {
                                 AsyncImage(
                                     model = File(photo.localPath),
-                                    contentDescription = null,
+                                    contentDescription = photo.originalFilename,
                                     contentScale = ContentScale.FillWidth,
-                                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)),
+                                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp))
+                                        .clickable { onOpenPhoto(photo.id) },
+                                )
+                                IconButton(onClick = { viewModel.removeBlock(block.id) }) {
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))
+                                }
+                            }
+                        } else if (photo != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    photo.originalFilename,
+                                    color = TrailsColors.BrandAccent,
+                                    modifier = Modifier.weight(1f).clickable { onOpenPhoto(photo.id) }.padding(8.dp),
                                 )
                                 IconButton(onClick = { viewModel.removeBlock(block.id) }) {
                                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_remove_image_desc))

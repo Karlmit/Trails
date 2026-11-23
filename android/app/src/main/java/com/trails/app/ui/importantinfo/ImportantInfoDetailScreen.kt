@@ -19,13 +19,14 @@ import com.trails.app.R
 import com.trails.app.data.isUsablePhotoCache
 import com.trails.app.ui.components.*
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.util.openCachedFile
 import com.trails.app.util.openExternalUrl
 import java.io.File
 
 @Composable
 fun ImportantInfoDetailScreen(
     padding: PaddingValues,
+    onOpenAttachment: (String) -> Unit,
+    onOpenPhoto: (String) -> Unit,
     onMissing: () -> Unit,
     viewModel: ImportantInfoDetailViewModel = hiltViewModel(),
 ) {
@@ -105,17 +106,17 @@ fun ImportantInfoDetailScreen(
         if (photos.isNotEmpty() || attachments.isNotEmpty()) TrailsCard {
             ScreenHeading(emoji = "📎", title = stringResource(R.string.info_documents_photos_heading))
             photos.filterNot(::isUsablePhotoCache).forEach { photo ->
-                InfoDetailLink(stringResource(R.string.info_detail_load_photo, photo.originalFilename)) { viewModel.retryPhotos() }
+                InfoDetailLink(stringResource(R.string.info_detail_load_photo, photo.originalFilename)) { onOpenPhoto(photo.id) }
             }
             photos.filter(::isUsablePhotoCache).forEach { photo ->
                 AsyncImage(model = File(checkNotNull(photo.localPath)), contentDescription = photo.originalFilename,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).clickable {
-                        openCachedFile(context, checkNotNull(photo.localPath), photo.mimeType)
+                        onOpenPhoto(photo.id)
                     })
             }
             attachments.forEach { attachment ->
                 InfoDetailLink(attachment.originalFilename) {
-                    viewModel.openAttachment(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
+                    onOpenAttachment(attachment.id)
                 }
             }
         }

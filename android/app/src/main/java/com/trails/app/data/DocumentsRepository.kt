@@ -10,6 +10,8 @@ import com.trails.app.network.dto.AttachmentUrlRequest
 import com.trails.app.network.dto.PhotoUrlRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
@@ -47,6 +49,9 @@ class DocumentsRepository @Inject constructor(
     private val photoDao: PhotoDao,
     private val fileCacheManager: FileCacheManager,
 ) {
+    private val attachmentCacheLock = Mutex()
+    private val photoCacheLock = Mutex()
+
     fun observeAttachmentsForTrip(tripId: String): Flow<List<AttachmentEntity>> = attachmentDao.observeForTrip(tripId)
 
     fun observeAttachmentsForOwner(ownerType: String, ownerId: String): Flow<List<AttachmentEntity>> =
@@ -57,8 +62,17 @@ class DocumentsRepository @Inject constructor(
 
     fun observePhotosForTrip(tripId: String): Flow<List<PhotoEntity>> = photoDao.observeForTrip(tripId)
 
-    suspend fun getCachedAttachment(id: String): AttachmentEntity? =
-        attachmentDao.getById(id)?.takeIf(::isUsableAttachmentCache)
+    suspend fun attachmentForPreview(id: String): AttachmentEntity? {
+        val attachment = attachmentDao.getById(id) ?: return null
+        val path = ensureAttachmentCached(attachment) ?: return null
+        return attachment.copy(localPath = path)
+    }
+
+    suspend fun photoForPreview(id: String): PhotoEntity? {
+        val photo = photoDao.getById(id) ?: return null
+        val path = ensurePhotoCached(photo) ?: return null
+        return photo.copy(localPath = path)
+    }
 
     /** Retries caching one file on demand (e.g. the bulk sync pass failed for it) -- returns the local path on success. */
     suspend fun ensureAttachmentCached(attachment: AttachmentEntity): String? {
@@ -263,17 +277,23 @@ class DocumentsRepository @Inject constructor(
         }
     }
 
-    private suspend fun cacheAttachment(attachment: AttachmentEntity): String {
-        // Publish null before a repair even when the eventual path is the
-        // same, so Room/Coil observers discard a stale broken model.
-        if (attachment.localPath != null) attachmentDao.setLocalPath(attachment.id, null)
-        return fileCacheManager.downloadAttachment(attachment)
-            .also { attachmentDao.setLocalPath(attachment.id, it) }
+    private suspend fun cacheAttachment(attachment: AttachmentEntity): String = attachmentCacheLock.withLock {
+        val current = attachmentDao.getById(attachment.id) ?: attachment
+        if (isUsableAttachmentCache(current)) return@withLock checkNotNull(current.localPath)
+
+        // Clear stale paths so observers reload even when the repair writes the same path.
+        if (current.localPath != null) attachmentDao.setLocalPath(current.id, null)
+        fileCacheManager.downloadAttachment(current)
+            .also { attachmentDao.setLocalPath(current.id, it) }
     }
 
-    private suspend fun cachePhoto(photo: PhotoEntity): String {
-        if (photo.localPath != null) photoDao.setLocalPath(photo.id, null)
-        return fileCacheManager.downloadPhoto(photo)
-            .also { photoDao.setLocalPath(photo.id, it) }
+    private suspend fun cachePhoto(photo: PhotoEntity): String = photoCacheLock.withLock {
+        val current = photoDao.getById(photo.id) ?: photo
+        if (isUsablePhotoCache(current)) return@withLock checkNotNull(current.localPath)
+
+        // Clear stale paths so observers reload even when the repair writes the same path.
+        if (current.localPath != null) photoDao.setLocalPath(current.id, null)
+        fileCacheManager.downloadPhoto(current)
+            .also { photoDao.setLocalPath(current.id, it) }
     }
 }

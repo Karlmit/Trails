@@ -56,6 +56,7 @@ import java.io.File
 @Composable
 fun IdeaEditScreen(
     padding: PaddingValues,
+    onOpenPhoto: (String) -> Unit,
     onDone: () -> Unit,
     viewModel: IdeaEditViewModel = hiltViewModel(),
     ideasViewModel: IdeasViewModel = hiltViewModel(),
@@ -181,17 +182,24 @@ fun IdeaEditScreen(
             ScreenHeading(emoji = "📷", title = stringResource(R.string.idea_edit_cover_photo_heading))
             LazyRow {
                 items(photos, key = { it.id }) { photo ->
-                    Row(modifier = Modifier.padding(end = 8.dp)) {
+                    Column(modifier = Modifier.padding(end = 8.dp)) {
                         if (photo.localPath != null) {
                             AsyncImage(
                                 model = File(photo.localPath),
-                                contentDescription = null,
+                                contentDescription = photo.originalFilename,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(88.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { viewModel.markPhotoPrimary(photo.id) },
+                                    .clickable { onOpenPhoto(photo.id) },
                             )
+                        } else {
+                            Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
+                        }
+                        if (!photo.isPrimary) {
+                            TextButton(onClick = { viewModel.markPhotoPrimary(photo.id) }) {
+                                Text(stringResource(R.string.idea_edit_set_cover_photo))
+                            }
                         }
                     }
                 }

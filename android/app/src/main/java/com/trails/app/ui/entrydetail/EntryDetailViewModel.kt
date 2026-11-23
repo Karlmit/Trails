@@ -108,17 +108,6 @@ class EntryDetailViewModel @Inject constructor(
         }
     }
 
-    /** Same on-demand retry-download as DocumentsScreen -- if the bulk sync pass missed this file, tapping it tries again before opening. */
-    fun ensureCached(attachment: AttachmentEntity, onReady: (String) -> Unit) {
-        if (attachment.localPath != null) {
-            onReady(attachment.localPath)
-            return
-        }
-        viewModelScope.launch {
-            documentsRepository.ensureAttachmentCached(attachment)?.let(onReady)
-        }
-    }
-
     val uiState: StateFlow<EntryDetailUiState> = combine(
         timelineRepository.observeEntry(entryId),
         documentsRepository.observeAttachmentsForOwner("TIMELINE_ENTRY", entryId),

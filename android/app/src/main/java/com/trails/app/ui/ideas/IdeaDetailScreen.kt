@@ -42,6 +42,7 @@ internal fun selectIdeaDetailPhotos(photos: List<PhotoEntity>): IdeaDetailPhotos
 @OptIn(ExperimentalLayoutApi::class)
 fun IdeaDetailScreen(
     padding: PaddingValues,
+    onOpenPhoto: (String) -> Unit,
     onConverted: () -> Unit,
     viewModel: IdeaDetailViewModel = hiltViewModel(),
     sectionsViewModel: SectionsViewModel = hiltViewModel(),
@@ -64,6 +65,7 @@ fun IdeaDetailScreen(
         return
     }
     val displayPhotos = remember(photos) { selectIdeaDetailPhotos(photos) }
+    val uncachedPhotos = remember(photos) { photos.filterNot(::isUsablePhotoCache) }
     val sectionName = currentIdea.sectionId?.let { id -> sections.find { it.id == id }?.name }
 
     Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -74,7 +76,7 @@ fun IdeaDetailScreen(
             val errorText = error ?: errorRes?.let { stringResource(it) }
             errorText?.let { ErrorBanner(it) }
 
-            IdeaHero(displayPhotos.cover)
+            IdeaHero(displayPhotos.cover, onOpenPhoto)
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 IdeaTitle(currentIdea.title)
@@ -110,7 +112,17 @@ fun IdeaDetailScreen(
                 }
             }
 
-            IdeaGallery(displayPhotos.additional)
+            IdeaGallery(displayPhotos.additional, onOpenPhoto)
+            if (uncachedPhotos.isNotEmpty()) TrailsCard {
+                ScreenHeading(emoji = "📷", title = stringResource(R.string.idea_detail_photos_heading))
+                uncachedPhotos.forEach { photo ->
+                    Text(
+                        photo.originalFilename,
+                        color = TrailsColors.BrandAccent,
+                        modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(vertical = 8.dp),
+                    )
+                }
+            }
 
             if (converting) CircularProgressIndicator() else PillButton(
                 text = stringResource(R.string.idea_edit_convert_button), variant = PillButtonVariant.Outline,
@@ -134,23 +146,30 @@ internal fun IdeaTitle(title: String) {
 }
 
 @Composable
-internal fun IdeaHero(cover: PhotoEntity?) {
+internal fun IdeaHero(cover: PhotoEntity?, onOpenPhoto: ((String) -> Unit)? = null) {
     cover?.let {
         AsyncImage(
-            model = File(checkNotNull(it.localPath)), contentDescription = null,
+            model = File(checkNotNull(it.localPath)), contentDescription = it.originalFilename,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f).clip(TrailsShapes.Hero).testTag("idea-hero"),
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f).clip(TrailsShapes.Hero).testTag("idea-hero")
+                .then(if (onOpenPhoto == null) Modifier else Modifier.clickable { onOpenPhoto(it.id) }),
         )
     }
 }
 
 @Composable
-internal fun IdeaGallery(additional: List<PhotoEntity>) {
+internal fun IdeaGallery(additional: List<PhotoEntity>, onOpenPhoto: ((String) -> Unit)? = null) {
     if (additional.isNotEmpty()) TrailsCard(modifier = Modifier.testTag("idea-gallery")) {
         ScreenHeading(emoji = "📷", title = stringResource(R.string.idea_detail_photos_heading))
         LazyRow {
             items(additional, key = { it.id }) { photo ->
-                AsyncImage(model = File(checkNotNull(photo.localPath)), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(120.dp).padding(end = 8.dp).clip(TrailsShapes.Compact))
+                AsyncImage(
+                    model = File(checkNotNull(photo.localPath)),
+                    contentDescription = photo.originalFilename,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(120.dp).padding(end = 8.dp).clip(TrailsShapes.Compact)
+                        .then(if (onOpenPhoto == null) Modifier else Modifier.clickable { onOpenPhoto(photo.id) }),
+                )
             }
         }
     }

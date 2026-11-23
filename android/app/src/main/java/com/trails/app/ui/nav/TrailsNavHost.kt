@@ -4,6 +4,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -25,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
@@ -96,7 +100,8 @@ private const val ARG_INFO_ID = "infoId"
 private const val ARG_IDEA_ID = "ideaId"
 private const val NEW_ID = "new"
 internal const val ARG_ATTACHMENT_ID = "attachmentId"
-internal const val DOCUMENT_VIEWER_ROUTE = "document-viewer?$ARG_ATTACHMENT_ID={$ARG_ATTACHMENT_ID}"
+internal const val ARG_VIEW_PHOTO = "photo"
+internal const val DOCUMENT_VIEWER_ROUTE = "document-viewer?$ARG_ATTACHMENT_ID={$ARG_ATTACHMENT_ID}&$ARG_VIEW_PHOTO={$ARG_VIEW_PHOTO}"
 
 internal fun shouldNavigateToLogin(sessionState: SessionState, currentRoute: String?): Boolean =
     sessionState == SessionState.Unauthenticated && currentRoute != ROUTE_LOGIN
@@ -115,8 +120,10 @@ private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/impor
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 private fun ideaDetailRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId"
 private fun convertEntryToIdeaRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId/convert-to-idea"
-internal fun documentViewerRoute(attachmentId: String) =
-    "document-viewer?$ARG_ATTACHMENT_ID=${Uri.encode(attachmentId)}"
+internal fun documentViewerRoute(attachmentId: String, isPhoto: Boolean = false): String {
+    val route = "document-viewer?$ARG_ATTACHMENT_ID=${Uri.encode(attachmentId)}"
+    return if (isPhoto) "$route&$ARG_VIEW_PHOTO=true" else route
+}
 
 /**
  * Settings isn't Trip-scoped, so it can't use TripDrawerScaffold (which
@@ -192,6 +199,7 @@ private fun AddEntryOrIdeaFab(onAddEntry: () -> Unit, onAddIdea: () -> Unit, onA
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun TrailsNavHost(
     navController: NavHostController = rememberNavController(),
     sessionViewModel: RootSessionViewModel = hiltViewModel(),
@@ -209,6 +217,14 @@ fun TrailsNavHost(
     // drawer's "All Trips" item), which must stay a real escape hatch back
     // to the list rather than bouncing straight back into the active trip.
     var autoOpenActiveTripPending by remember { mutableStateOf(true) }
+
+    fun openAttachment(id: String) {
+        navController.navigate(documentViewerRoute(id)) { launchSingleTop = true }
+    }
+
+    fun openPhoto(id: String) {
+        navController.navigate(documentViewerRoute(id, isPhoto = true)) { launchSingleTop = true }
+    }
 
     NavHost(navController = navController, startDestination = ROUTE_LOGIN) {
         composable(ROUTE_LOGIN) {
@@ -356,6 +372,7 @@ fun TrailsNavHost(
             ) { padding ->
                 IdeaDetailScreen(
                     padding,
+                    onOpenPhoto = ::openPhoto,
                     onConverted = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
                     viewModel = detailViewModel,
                 )
@@ -384,6 +401,7 @@ fun TrailsNavHost(
                 // back on that now-stale Detail screen instead of the list.
                 IdeaEditScreen(
                     padding,
+                    onOpenPhoto = ::openPhoto,
                     onDone = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
                     viewModel = editViewModel,
                 )
@@ -505,7 +523,7 @@ fun TrailsNavHost(
                     }
                 },
             ) { padding ->
-                ImportantInfoDetailScreen(padding, onMissing = { navController.popBackStack() }, viewModel = detailViewModel)
+                ImportantInfoDetailScreen(padding, onOpenAttachment = ::openAttachment, onOpenPhoto = ::openPhoto, onMissing = { navController.popBackStack() }, viewModel = detailViewModel)
             }
         }
 
@@ -518,7 +536,7 @@ fun TrailsNavHost(
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(tripId, TripTab.IMPORTANT_INFO, stringResource(R.string.shell_title_edit_important_info), navController, showBackButton = true) { padding ->
-                ImportantInfoEditScreen(padding, onDone = { navController.popBackStack() },
+                ImportantInfoEditScreen(padding, onOpenAttachment = ::openAttachment, onOpenPhoto = ::openPhoto, onDone = { navController.popBackStack() },
                     onDeleted = { navController.popBackStack("trip/$tripId/important-info", inclusive = false) })
             }
         }
@@ -545,7 +563,7 @@ fun TrailsNavHost(
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(tripId, TripTab.BLOG, stringResource(R.string.shell_title_edit_blog_post), navController, showBackButton = true) { padding ->
-                BlogEditScreen(padding, onDone = { navController.popBackStack() })
+                BlogEditScreen(padding, onOpenPhoto = ::openPhoto, onDone = { navController.popBackStack() })
             }
         }
 
@@ -565,7 +583,7 @@ fun TrailsNavHost(
         ) { backStackEntry ->
             val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
             TripDrawerScaffold(tripId, TripTab.DOCUMENTS, stringResource(R.string.shell_title_documents), navController) { padding ->
-                DocumentsScreen(padding, onOpenDocument = { navController.navigate(documentViewerRoute(it)) })
+                DocumentsScreen(padding, onOpenDocument = ::openAttachment)
             }
         }
 
@@ -573,21 +591,43 @@ fun TrailsNavHost(
             route = DOCUMENT_VIEWER_ROUTE,
             arguments = listOf(
                 navArgument(ARG_ATTACHMENT_ID) { type = NavType.StringType },
+                navArgument(ARG_VIEW_PHOTO) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
             ),
         ) {
             val viewModel: DocumentViewerViewModel = hiltViewModel()
             val viewerState by viewModel.state.collectAsState()
             val context = LocalContext.current
             when (val state = viewerState) {
-                DocumentViewerState.Loading -> androidx.compose.material3.CircularProgressIndicator()
-                DocumentViewerState.Error -> Text(stringResource(R.string.document_viewer_error))
+                DocumentViewerState.Loading, DocumentViewerState.Error -> Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = {},
+                            navigationIcon = {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.shell_cd_back))
+                                }
+                            },
+                        )
+                    },
+                ) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                        if (state == DocumentViewerState.Loading) {
+                            CircularProgressIndicator()
+                        } else {
+                            TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.document_open_failed)) }
+                        }
+                    }
+                }
                 is DocumentViewerState.Ready -> DocumentViewerScreen(
-                    localPath = checkNotNull(state.attachment.localPath),
-                    mimeType = state.attachment.mimeType,
-                    filename = state.attachment.originalFilename,
+                    localPath = state.localPath,
+                    mimeType = state.mimeType,
+                    filename = state.filename,
                     onBack = { navController.popBackStack() },
-                    onShare = { shareCachedFile(context, state.attachment.localPath!!, state.attachment.mimeType) },
-                    onOpenExternal = { openCachedFile(context, state.attachment.localPath!!, state.attachment.mimeType) },
+                    onShare = { shareCachedFile(context, state.localPath, state.mimeType) },
+                    onOpenExternal = { openCachedFile(context, state.localPath, state.mimeType) },
                 )
             }
         }
@@ -633,7 +673,7 @@ fun TrailsNavHost(
                     }
                 },
             ) { padding ->
-                EntryDetailScreen(padding, onConvertToIdea = { navController.navigate(convertEntryToIdeaRoute(tripId, entryId)) })
+                EntryDetailScreen(padding, onOpenAttachment = ::openAttachment, onOpenPhoto = ::openPhoto, onConvertToIdea = { navController.navigate(convertEntryToIdeaRoute(tripId, entryId)) })
             }
         }
 
@@ -660,6 +700,7 @@ fun TrailsNavHost(
             ) { padding ->
                 IdeaEditScreen(
                     padding,
+                    onOpenPhoto = ::openPhoto,
                     // Unlike ideas/{ideaId}/edit's own onDone (popBackStack
                     // to the Ideas list, always safely on the backstack
                     // there since that's how the user reached it), this
@@ -699,7 +740,7 @@ fun TrailsNavHost(
                     }
                 },
             ) { padding ->
-                BlogDetailScreen(padding)
+                BlogDetailScreen(padding, onOpenPhoto = ::openPhoto)
             }
         }
     }

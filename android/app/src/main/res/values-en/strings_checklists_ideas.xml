@@ -65,6 +65,7 @@
     <string name="idea_edit_button_create">Create idea</string>
     <string name="idea_edit_button_convert">Convert to Idea</string>
     <string name="idea_edit_button_save">Save changes</string>
+    <string name="idea_edit_set_cover_photo">Set as cover photo</string>
     <string name="idea_edit_cover_photo_heading">Cover photo</string>
     <string name="idea_edit_uploading_photo">Uploading…</string>
     <string name="idea_edit_add_photo">+ Add photo</string>

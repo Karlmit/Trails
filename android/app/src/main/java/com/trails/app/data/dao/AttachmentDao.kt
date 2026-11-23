@@ -48,6 +48,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE tripId = :tripId")
     suspend fun getAllForTrip(tripId: String): List<PhotoEntity>
 
+    @Query("SELECT * FROM photos WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): PhotoEntity?
+
     @Upsert
     suspend fun upsertAll(photos: List<PhotoEntity>)
 

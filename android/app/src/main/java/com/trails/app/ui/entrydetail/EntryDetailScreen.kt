@@ -47,7 +47,6 @@ import com.trails.app.ui.timeline.graph.entryTypeLabelResolved
 import com.trails.app.ui.timeline.graph.formatEntryEndpoint
 import com.trails.app.ui.timeline.graph.subtypeLabelResolved
 import com.trails.app.util.entryMapsUrl
-import com.trails.app.util.openCachedFile
 import com.trails.app.util.openExternalUrl
 import com.trails.app.util.queryDisplayName
 import java.io.File
@@ -63,6 +62,8 @@ private fun entryTypeEmoji(entryType: String) = when (entryType) {
 @Composable
 fun EntryDetailScreen(
     padding: PaddingValues,
+    onOpenAttachment: (String) -> Unit,
+    onOpenPhoto: (String) -> Unit,
     onConvertToIdea: () -> Unit = {},
     viewModel: EntryDetailViewModel = hiltViewModel(),
 ) {
@@ -249,10 +250,13 @@ fun EntryDetailScreen(
                             if (photo.localPath != null) {
                                 AsyncImage(
                                     model = File(photo.localPath),
-                                    contentDescription = null,
+                                    contentDescription = photo.originalFilename,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(96.dp).padding(end = 8.dp).clip(RoundedCornerShape(4.dp)),
+                                    modifier = Modifier.size(96.dp).padding(end = 8.dp).clip(RoundedCornerShape(4.dp))
+                                        .clickable { onOpenPhoto(photo.id) },
                                 )
+                            } else {
+                                Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
                             }
                         }
                     }
@@ -263,7 +267,7 @@ fun EntryDetailScreen(
                         state.attachments.forEach { attachment ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable {
-                                    viewModel.ensureCached(attachment) { path -> openCachedFile(context, path, attachment.mimeType) }
+                                    onOpenAttachment(attachment.id)
                                 },
                             ) {
                                 Text(

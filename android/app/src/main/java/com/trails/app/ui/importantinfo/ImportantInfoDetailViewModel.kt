@@ -8,7 +8,6 @@ import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.ImportantInfoRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.entity.ImportantInfoEntity
-import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.isUsablePhotoCache
 import com.trails.app.network.dto.LinkDto
 import com.trails.app.network.dto.TagDto
@@ -52,14 +51,6 @@ class ImportantInfoDetailViewModel @Inject constructor(
         }
     }
 
-    fun retryPhotos() {
-        viewModelScope.launch {
-            photos.value.filterNot(::isUsablePhotoCache).forEach { photo ->
-                if (documentsRepository.ensurePhotoCached(photo) == null) errorRes.value = R.string.document_open_failed
-            }
-        }
-    }
-
     fun refreshExtras() {
         viewModelScope.launch {
             error.value = null
@@ -68,16 +59,6 @@ class ImportantInfoDetailViewModel @Inject constructor(
                 .onSuccess { links.value = it }.onFailure { error.value = it.message; errorRes.value = R.string.info_detail_extras_failed }
             runCatching { linksTagsRepository.listTags(OWNER_TYPE, infoId) }
                 .onSuccess { tags.value = it }.onFailure { error.value = it.message; errorRes.value = R.string.info_detail_extras_failed }
-        }
-    }
-
-    fun openAttachment(attachment: AttachmentEntity, onReady: (String) -> Unit) {
-        viewModelScope.launch {
-            runCatching { documentsRepository.ensureAttachmentCached(attachment) }
-                .onSuccess { path ->
-                    if (path != null) onReady(path) else errorRes.value = R.string.document_open_failed
-                }
-                .onFailure { error.value = it.message; errorRes.value = R.string.info_detail_extras_failed }
         }
     }
 }
