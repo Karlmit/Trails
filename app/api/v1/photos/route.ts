@@ -10,6 +10,7 @@ import {
   buildUploadPath,
   isAllowedMimeType,
   isPhotoOwnerType,
+  MAX_MULTIPART_UPLOAD_BYTES,
   MAX_UPLOAD_BYTES,
   PHOTO_OWNER_TYPES,
   type PhotoOwnerType,
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
 
   // Same declared-Content-Length pre-check as app/api/v1/attachments/route.ts.
   const declaredLength = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES + 64 * 1024) {
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_MULTIPART_UPLOAD_BYTES) {
     return Errors.validation(`Request exceeds the maximum upload size of ${MAX_UPLOAD_BYTES} bytes`);
   }
 

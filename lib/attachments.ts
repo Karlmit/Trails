@@ -17,6 +17,7 @@ export function isAllowedMimeType(mimeType: string): mimeType is AllowedMimeType
 
 // 25 MB -- a documented default, not a PRD-specified limit (spec's Code Map).
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_MULTIPART_UPLOAD_BYTES = MAX_UPLOAD_BYTES + 64 * 1024;
 
 // AD-5's mandatory upload volume mount point (docker-compose.yml's `uploads`
 // volume). Never written to `public/`, never stored in Postgres.

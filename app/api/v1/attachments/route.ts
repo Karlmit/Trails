@@ -6,7 +6,7 @@ import type { PolymorphicOwnerType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
-import { ALLOWED_MIME_TYPES, MAX_UPLOAD_BYTES, buildUploadPath, isAllowedMimeType } from '@/lib/attachments';
+import { ALLOWED_MIME_TYPES, MAX_MULTIPART_UPLOAD_BYTES, MAX_UPLOAD_BYTES, buildUploadPath, isAllowedMimeType } from '@/lib/attachments';
 import { fetchRemoteFile } from '@/lib/remote-media';
 import { serializeAttachment } from '@/lib/serializers';
 import { isForeignKeyViolationError } from '@/lib/db-errors';
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
   // self-hosted/trusted-user threat model -- the same risk tolerance
   // already applied to e.g. no login rate-limiting (see deferred-work.md).
   const declaredLength = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES + 64 * 1024) {
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_MULTIPART_UPLOAD_BYTES) {
     return Errors.validation(`Request exceeds the maximum upload size of ${MAX_UPLOAD_BYTES} bytes`);
   }
 

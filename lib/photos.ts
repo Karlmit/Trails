@@ -7,7 +7,7 @@
 // AD-5 path shape or the 25 MB cap. Only the MIME allowlist itself differs
 // -- restricted to image types (no PDF: "these are Photos, not generic
 // Attachments"); see ALLOWED_MIME_TYPES below.
-export { MAX_UPLOAD_BYTES, buildUploadPath, formatAttachmentSize, sanitizeFilename, UPLOAD_ROOT } from '@/lib/attachments';
+export { MAX_MULTIPART_UPLOAD_BYTES, MAX_UPLOAD_BYTES, buildUploadPath, formatAttachmentSize, sanitizeFilename, UPLOAD_ROOT } from '@/lib/attachments';
 
 // User-requested URL import ("make it so anywhere I can upload a photo it's
 // also possible to just post an image URL"): the allowlist grew from the

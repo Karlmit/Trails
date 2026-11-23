@@ -34,6 +34,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/lib/attachments.ts ./lib/attachments.ts
 # Reuse the client generated in `builder` rather than re-running
 # `prisma generate` (which would need another DATABASE_URL placeholder) --
 # `.prisma/client` is the only generated output; `@prisma/client`'s static
