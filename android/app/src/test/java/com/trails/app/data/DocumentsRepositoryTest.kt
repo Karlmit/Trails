@@ -23,6 +23,11 @@ class DocumentsRepositoryTest {
     private val files = mockk<FileCacheManager>()
     private val repository = DocumentsRepository(api, attachments, photos, files)
 
+    init {
+        coEvery { attachments.getById(any()) } returns null
+        coEvery { photos.getById(any()) } returns null
+    }
+
     @Test
     fun `photo metadata still syncs when attachment metadata fails`() = runTest {
         coEvery { api.listAttachments("trip") } throws IllegalStateException("attachments failed")
