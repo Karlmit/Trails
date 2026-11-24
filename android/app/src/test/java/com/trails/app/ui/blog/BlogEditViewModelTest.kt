@@ -69,7 +69,7 @@ class BlogEditViewModelTest {
         val file = stageImage("lake.jpg")
         val saved = slot<BlogPostRequest>()
         coEvery { timeline.updateBlogPost("post", capture(saved), false) } returns entry
-        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", file, "lake.jpg", "image/jpeg", false) } returns mockk {
+        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", file, "lake.jpg", "image/jpeg", false, any()) } returns mockk {
             every { id } returns "lake"
         }
         coEvery { documents.importPhotoFromUrl("TIMELINE_ENTRY", "post", "https://example.com/peak.jpg", false, false) } returns mockk {
@@ -91,7 +91,7 @@ class BlogEditViewModelTest {
         editor.state.first { !it.saving }
 
         coVerify(exactly = 0) { timeline.createBlogPost(any()) }
-        coVerify(exactly = 0) { documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any(), any()) }
         coVerify(exactly = 0) { documents.importPhotoFromUrl(any(), any(), any(), any(), any()) }
         assertEquals(listOf(last, first, lake, peak), draft?.blocks?.map { it.id })
 
@@ -105,7 +105,7 @@ class BlogEditViewModelTest {
 
         coVerifyOrder {
             timeline.createBlogPost(any())
-            documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any())
+            documents.uploadStagedPhoto(any(), any(), any(), any(), any(), any(), any())
             documents.importPhotoFromUrl(any(), any(), any(), any(), any())
             timeline.updateBlogPost("post", any(), false)
             timeline.publishBlogPost("post")
@@ -121,11 +121,11 @@ class BlogEditViewModelTest {
         val entry = serverEntry()
         val first = stageImage("first.jpg")
         val last = stageImage("last.jpg")
-        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", first, "first.jpg", "image/jpeg", false) } returns mockk {
+        coEvery { documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", first, "first.jpg", "image/jpeg", false, any()) } returns mockk {
             every { id } returns "first-photo"
         }
         coEvery {
-            documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", last, "last.jpg", "image/jpeg", false)
+            documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", last, "last.jpg", "image/jpeg", false, any())
         } throws IOException("offline") andThen mockk<PhotoEntity> { every { id } returns "last-photo" }
         coEvery { timeline.updateBlogPost("post", any(), false) } returns entry
 
@@ -148,8 +148,8 @@ class BlogEditViewModelTest {
         assertTrue(reopened.state.first { !it.saving }.saved)
         assertNull(draft)
         coVerify(exactly = 1) { timeline.createBlogPost(any()) }
-        coVerify(exactly = 1) { documents.uploadStagedPhoto(any(), any(), first, any(), any(), any()) }
-        coVerify(exactly = 2) { documents.uploadStagedPhoto(any(), any(), last, any(), any(), any()) }
+        coVerify(exactly = 1) { documents.uploadStagedPhoto(any(), any(), first, any(), any(), any(), any()) }
+        coVerify(exactly = 2) { documents.uploadStagedPhoto(any(), any(), last, any(), any(), any(), any()) }
         coVerify(exactly = 1) { timeline.publishBlogPost("post") }
     }
 

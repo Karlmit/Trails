@@ -6,6 +6,7 @@ import com.trails.app.data.dao.PhotoDao
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.network.TrailsApiService
+import com.trails.app.network.UploadProgressBody
 import com.trails.app.network.dto.AttachmentUrlRequest
 import com.trails.app.network.dto.PhotoUrlRequest
 import kotlinx.coroutines.CancellationException
@@ -163,8 +164,10 @@ class DocumentsRepository @Inject constructor(
         filename: String,
         mimeType: String,
         isPrivate: Boolean,
+        onBytesSent: (Long) -> Unit,
     ): PhotoEntity {
-        val part = MultipartBody.Part.createFormData("file", filename, file.asRequestBody(mimeType.toMediaTypeOrNull()))
+        val body = UploadProgressBody(file.asRequestBody(mimeType.toMediaTypeOrNull()), onBytesSent)
+        val part = MultipartBody.Part.createFormData("file", filename, body)
         return api.uploadPhoto(
             ownerType.toPlainRequestBody(),
             ownerId.toPlainRequestBody(),

@@ -55,4 +55,11 @@
     <string name="blog_error_publish_retry">Det gick inte att publicera. Utkastet finns kvar på enheten. Försök igen.</string>
     <string name="blog_error_stage_image">Bilden kunde inte sparas på enheten.</string>
     <string name="blog_error_stage_image_batch">Bilder som inte kunde sparas på enheten: %1$d\n%2$s</string>
+    <string name="blog_upload_photo_count">%1$d av %2$d bilder klara</string>
+    <string name="blog_upload_bytes">%1$s av %2$s skickat</string>
+    <string name="blog_upload_minutes">Cirka %1$d min kvar</string>
+    <string name="blog_upload_seconds">Cirka %1$d sek kvar</string>
+    <string name="blog_upload_importing">Hämtar bilden från länken…</string>
+    <string name="blog_upload_confirming">Väntar på serverns bekräftelse…</string>
+    <string name="blog_upload_finalizing">Publicerar inlägget…</string>
 </resources>

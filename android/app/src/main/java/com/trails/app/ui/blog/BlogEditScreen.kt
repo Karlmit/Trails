@@ -1,5 +1,6 @@
 package com.trails.app.ui.blog
 
+import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +27,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -281,9 +283,10 @@ fun BlogEditScreen(
         HorizontalDivider()
 
         if (state.saving) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (state.publishing) {
+                BlogPublishStatus(state.uploadProgress)
+            } else {
                 CircularProgressIndicator()
-                if (state.publishing) Text(stringResource(R.string.blog_publishing))
             }
         } else {
             PillButton(
@@ -363,6 +366,40 @@ fun BlogEditScreen(
             confirmButton = { TextButton(onClick = { showDeleteConfirm = false; viewModel.deletePost() }) { Text(stringResource(R.string.blog_delete_confirm_button)) } },
             dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.blog_cancel_button)) } },
         )
+    }
+}
+
+@Composable
+private fun BlogPublishStatus(progress: BlogUploadProgress?) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (progress == null) {
+            Text(stringResource(R.string.blog_publishing))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        } else {
+            Text(stringResource(R.string.blog_upload_photo_count, progress.completedPhotos, progress.totalPhotos))
+            LinearProgressIndicator(progress = { progress.fraction }, modifier = Modifier.fillMaxWidth())
+            if (progress.totalBytes > 0) {
+                Text(
+                    stringResource(
+                        R.string.blog_upload_bytes,
+                        Formatter.formatShortFileSize(context, progress.sentBytes),
+                        Formatter.formatShortFileSize(context, progress.totalBytes),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            val seconds = progress.remainingSeconds
+            val detail = when {
+                progress.completedPhotos == progress.totalPhotos -> stringResource(R.string.blog_upload_finalizing)
+                progress.importingUrl -> stringResource(R.string.blog_upload_importing)
+                seconds != null && seconds >= 60 -> stringResource(R.string.blog_upload_minutes, (seconds.toLong() + 59) / 60)
+                seconds != null -> stringResource(R.string.blog_upload_seconds, seconds)
+                progress.currentPhotoFraction >= 0.99f -> stringResource(R.string.blog_upload_confirming)
+                else -> null
+            }
+            detail?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
     }
 }
 
