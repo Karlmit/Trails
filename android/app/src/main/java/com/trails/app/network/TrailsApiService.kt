@@ -21,6 +21,7 @@ import com.trails.app.network.dto.LoginResponse
 import com.trails.app.network.dto.MoveDirectionRequest
 import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.PhotoDto
+import com.trails.app.network.dto.BlogPhotoUploadDto
 import com.trails.app.network.dto.PhotoUrlRequest
 import com.trails.app.network.dto.SectionDto
 import com.trails.app.network.dto.SectionRequest
@@ -38,6 +39,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -120,7 +122,11 @@ interface TrailsApiService {
     suspend fun updateBlogPost(@Path("id") id: String, @Body body: BlogPostRequest): TimelineEntryDto
 
     @PUT("api/v1/timeline-entries/{id}/publish")
-    suspend fun publishBlogPost(@Path("id") id: String, @Tag timeout: BlogPublishTimeout): TimelineEntryDto
+    suspend fun publishBlogPost(
+        @Path("id") id: String,
+        @Tag timeout: BlogPublishTimeout,
+        @Query("resume") resume: Boolean = true,
+    ): TimelineEntryDto
 
     @DELETE("api/v1/timeline-entries/{id}/publish")
     suspend fun unpublishBlogPost(@Path("id") id: String): Response<ResponseBody>
@@ -226,6 +232,30 @@ interface TrailsApiService {
     // intake shape from Content-Type (see PhotoUrlRequest's own doc comment).
     @POST("api/v1/photos")
     suspend fun importPhotoFromUrl(@Body body: PhotoUrlRequest): PhotoDto
+
+    @GET("api/v1/blog-photo-uploads/{entryId}/{uploadId}")
+    suspend fun blogPhotoUploadStatus(
+        @Path("entryId") entryId: String,
+        @Path("uploadId") uploadId: String,
+        @Header("X-Photo-Name") filename: String,
+        @Header("X-Photo-Mime") mimeType: String,
+        @Query("size") size: Long,
+        @Header("X-Photo-Sha256") sha256: String,
+        @Tag timeout: BlogPublishTimeout,
+    ): BlogPhotoUploadDto
+
+    @PUT("api/v1/blog-photo-uploads/{entryId}/{uploadId}")
+    suspend fun uploadBlogPhotoPart(
+        @Path("entryId") entryId: String,
+        @Path("uploadId") uploadId: String,
+        @Header("X-Photo-Name") filename: String,
+        @Header("X-Photo-Mime") mimeType: String,
+        @Query("size") size: Long,
+        @Header("X-Photo-Sha256") sha256: String,
+        @Query("part") part: Int,
+        @Body body: okhttp3.RequestBody,
+        @Tag timeout: BlogPublishTimeout,
+    ): BlogPhotoUploadDto
 
     @DELETE("api/v1/photos/{id}")
     suspend fun deletePhoto(@Path("id") id: String): Response<ResponseBody>

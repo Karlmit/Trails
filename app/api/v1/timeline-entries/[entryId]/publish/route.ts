@@ -98,10 +98,19 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!existing) return Errors.notFound('Blog Post not found');
 
   try {
-    const entry = await prisma.timelineEntry.update({
-      where: { id: entryId },
-      data: { publishedAt: new Date() },
-    });
+    const resumable = request.nextUrl.searchParams.get('resume') === 'true';
+    const entry = resumable
+      ? await prisma.$transaction(async (tx) => {
+          await tx.timelineEntry.updateMany({
+            where: { id: entryId, publishedAt: null },
+            data: { publishedAt: new Date() },
+          });
+          return tx.timelineEntry.findUniqueOrThrow({ where: { id: entryId } });
+        })
+      : await prisma.timelineEntry.update({
+          where: { id: entryId },
+          data: { publishedAt: new Date() },
+        });
 
     revalidateBlogPost(existing.tripId, entryId);
 

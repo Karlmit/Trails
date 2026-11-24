@@ -57,6 +57,7 @@ class BlogEditViewModelTest {
         coEvery { store.delete("scope", any()) } answers { draft = null }
         coEvery { store.deletePhoto("scope", any()) } returns Unit
         coEvery { documents.cacheStagedPhoto(any(), any()) } returns Unit
+        coEvery { documents.resumeBlogPhoto(any(), any(), any(), any(), any(), any()) } returns null
     }
 
     @After

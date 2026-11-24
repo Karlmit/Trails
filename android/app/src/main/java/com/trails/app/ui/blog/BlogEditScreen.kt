@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -84,6 +85,12 @@ fun BlogEditScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val photosById by viewModel.photosById.collectAsState()
+    val view = LocalView.current
+    DisposableEffect(view, state.publishing) {
+        val previous = view.keepScreenOn
+        if (state.publishing) view.keepScreenOn = true
+        onDispose { if (state.publishing) view.keepScreenOn = previous }
+    }
     val context = LocalContext.current
     var showDiscardConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }

@@ -93,11 +93,14 @@ data class BlogUploadProgress(
     val fraction: Float
         get() = (completedPhotos + currentPhotoFraction) / totalPhotos.coerceAtLeast(1)
 
-    internal fun sending(photoBytes: Long, bytes: Long, elapsedMillis: Long, hasPendingImports: Boolean): BlogUploadProgress {
+    internal fun sending(
+        photoBytes: Long, bytes: Long, elapsedMillis: Long, hasPendingImports: Boolean, resumedBytes: Long = 0L,
+    ): BlogUploadProgress {
         val transferred = bytes.coerceIn(0L, photoBytes)
         val sent = sentBytes + transferred
-        val remaining = if (!hasPendingImports && transferred > 0L && elapsedMillis >= 1000L && sent < totalBytes) {
-            kotlin.math.ceil((totalBytes - sent).toDouble() / transferred * elapsedMillis / 1000)
+        val transferredThisAttempt = transferred - resumedBytes
+        val remaining = if (!hasPendingImports && transferredThisAttempt > 0L && elapsedMillis >= 1000L && sent < totalBytes) {
+            kotlin.math.ceil((totalBytes - sent).toDouble() / transferredThisAttempt * elapsedMillis / 1000)
                 .coerceAtMost(Int.MAX_VALUE.toDouble()).toInt()
         } else null
         return copy(
@@ -403,15 +406,20 @@ class BlogEditViewModel @Inject constructor(
                                 }
                                 val attempt = initial
                                 val attemptBytes = photoBytes
-                                val started = TimeSource.Monotonic.markNow()
+                                var started = TimeSource.Monotonic.markNow()
+                                var resumedBytes = 0L
                                 var lastUpdateMillis = -250L
                                 val onBytesSent: (Long) -> Unit = { bytes ->
+                                    if (lastUpdateMillis < 0) {
+                                        resumedBytes = bytes
+                                        started = TimeSource.Monotonic.markNow()
+                                    }
                                     val elapsedMillis = started.elapsedNow().inWholeMilliseconds
                                     if (bytes == 0L || bytes >= attemptBytes || elapsedMillis - lastUpdateMillis >= 250) {
                                         lastUpdateMillis = elapsedMillis
                                         _state.update {
                                             if (publishContext.isActive && it.publishing) {
-                                                it.copy(uploadProgress = attempt.sending(attemptBytes, bytes, elapsedMillis, hasPendingImports))
+                                                it.copy(uploadProgress = attempt.sending(attemptBytes, bytes, elapsedMillis, hasPendingImports, resumedBytes))
                                             } else it
                                         }
                                     }
@@ -460,6 +468,11 @@ class BlogEditViewModel @Inject constructor(
         val file = checkNotNull(localPhoto(photo))
         val mimeType = checkNotNull(photo.mimeType)
         val originalBytes = withContext(Dispatchers.IO) { file.length() }
+        val resumed = documentsRepository.resumeBlogPhoto(
+            entryId, blockId, file, photo.filename, mimeType, onBytesSent = progressFor(originalBytes),
+        )
+        if (resumed != null) return confirmUpload(blockId, photo, resumed, file)
+
         suspend fun send(source: File, name: String, mime: String, bytes: Long): PhotoEntity =
             documentsRepository.uploadStagedPhoto(
                 OWNER_TYPE, entryId, source, name, mime, isPrivate = false, onBytesSent = progressFor(bytes),

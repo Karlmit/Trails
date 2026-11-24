@@ -158,6 +158,10 @@ class DocumentsRepository @Inject constructor(
         return entity
     }
 
+    suspend fun resumeBlogPhoto(
+        entryId: String, uploadId: String, file: File, filename: String, mimeType: String, onBytesSent: (Long) -> Unit,
+    ): PhotoEntity? = uploadBlogPhotoInParts(api, entryId, uploadId, file, filename, mimeType, onBytesSent)?.toEntity()
+
     suspend fun uploadStagedPhoto(
         ownerType: String,
         ownerId: String,
