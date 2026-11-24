@@ -27,7 +27,7 @@ private val lenientJson = Json { ignoreUnknownKeys = true }
  */
 fun Throwable.apiErrorMessage(): String? {
     val http = this as? HttpException ?: return null
-    val body = runCatching { http.response()?.errorBody()?.string() }.getOrNull()
+    val body = runCatching { http.response()?.errorBody()?.source()?.peek()?.readUtf8() }.getOrNull()
     if (body.isNullOrBlank()) return null
     return runCatching {
         lenientJson.parseToJsonElement(body)

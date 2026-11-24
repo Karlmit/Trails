@@ -62,4 +62,5 @@
     <string name="blog_upload_importing">Importing image from the link…</string>
     <string name="blog_upload_confirming">Waiting for server confirmation…</string>
     <string name="blog_upload_finalizing">Publishing the post…</string>
+    <string name="blog_upload_smaller_photo">Retrying with a smaller copy of the photo…</string>
 </resources>

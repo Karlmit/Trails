@@ -389,6 +389,9 @@ private fun BlogPublishStatus(progress: BlogUploadProgress?) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+            if (progress.retryingSmaller) {
+                Text(stringResource(R.string.blog_upload_smaller_photo), style = MaterialTheme.typography.bodySmall)
+            }
             val seconds = progress.remainingSeconds
             val detail = when {
                 progress.completedPhotos == progress.totalPhotos -> stringResource(R.string.blog_upload_finalizing)

@@ -35,6 +35,7 @@ import java.io.File
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.time.TimeSource
+import retrofit2.HttpException
 import javax.inject.Inject
 
 private const val OWNER_TYPE = "TIMELINE_ENTRY"
@@ -63,6 +64,7 @@ data class BlogUploadProgress(
     val currentPhotoFraction: Float = 0f,
     val remainingSeconds: Int? = null,
     val importingUrl: Boolean = false,
+    val retryingSmaller: Boolean = false,
 ) {
     val fraction: Float
         get() = (completedPhotos + currentPhotoFraction) / totalPhotos.coerceAtLeast(1)
@@ -348,7 +350,7 @@ class BlogEditViewModel @Inject constructor(
                 val sizes = withContext(Dispatchers.IO) {
                     pending.associate { (id, photo) -> id to (localPhoto(photo)?.length() ?: 0L) }
                 }
-                val totalBytes = sizes.values.sum()
+                var totalBytes = sizes.values.sum()
                 var confirmedBytes = 0L
                 var completed = 0
                 var remainingImports = pending.count { (_, photo) -> photo.sourceUrl != null }
@@ -356,8 +358,8 @@ class BlogEditViewModel @Inject constructor(
                     val photo = current.pendingPhotos[block.id]
                     if (block is EditableBlock.Image && photo != null) {
                         val uploadedId = photo.uploadedId ?: run {
-                            val photoBytes = sizes.getValue(block.id)
-                            val initial = BlogUploadProgress(
+                            var photoBytes = sizes.getValue(block.id)
+                            var initial = BlogUploadProgress(
                                 totalPhotos = pending.size,
                                 completedPhotos = completed,
                                 totalBytes = totalBytes,
@@ -366,26 +368,36 @@ class BlogEditViewModel @Inject constructor(
                             )
                             _state.update { it.copy(uploadProgress = initial) }
                             val hasPendingImports = remainingImports > 0
-                            val started = TimeSource.Monotonic.markNow()
-                            var lastUpdateMillis = -250L
-                            val result = uploadPhoto(id, block.id, photo) { bytes ->
-                                val elapsedMillis = started.elapsedNow().inWholeMilliseconds
-                                if (bytes != 0L && bytes < photoBytes && elapsedMillis - lastUpdateMillis < 250) {
-                                    return@uploadPhoto
+                            val result = uploadPhoto(id, block.id, photo) { bytesInAttempt ->
+                                if (bytesInAttempt != photoBytes) {
+                                    totalBytes += bytesInAttempt - photoBytes
+                                    photoBytes = bytesInAttempt
+                                    initial = initial.copy(totalBytes = totalBytes, retryingSmaller = true)
+                                    _state.update { it.copy(uploadProgress = initial) }
                                 }
-                                lastUpdateMillis = elapsedMillis
-                                _state.update {
-                                    if (publishContext.isActive && it.publishing) {
-                                        it.copy(uploadProgress = initial.sending(photoBytes, bytes, elapsedMillis, hasPendingImports))
-                                    } else it
+                                val attempt = initial
+                                val attemptBytes = photoBytes
+                                val started = TimeSource.Monotonic.markNow()
+                                var lastUpdateMillis = -250L
+                                val onBytesSent: (Long) -> Unit = { bytes ->
+                                    val elapsedMillis = started.elapsedNow().inWholeMilliseconds
+                                    if (bytes == 0L || bytes >= attemptBytes || elapsedMillis - lastUpdateMillis >= 250) {
+                                        lastUpdateMillis = elapsedMillis
+                                        _state.update {
+                                            if (publishContext.isActive && it.publishing) {
+                                                it.copy(uploadProgress = attempt.sending(attemptBytes, bytes, elapsedMillis, hasPendingImports))
+                                            } else it
+                                        }
+                                    }
                                 }
+                                onBytesSent
                             }
                             confirmedBytes += photoBytes
                             completed++
                             if (photo.sourceUrl != null) remainingImports--
                             _state.update {
                                 it.copy(uploadProgress = initial.copy(
-                                    completedPhotos = completed, sentBytes = confirmedBytes, importingUrl = false,
+                                    completedPhotos = completed, sentBytes = confirmedBytes, importingUrl = false, retryingSmaller = false,
                                 ))
                             }
                             result
@@ -410,17 +422,36 @@ class BlogEditViewModel @Inject constructor(
     }
 
     private suspend fun uploadPhoto(
-        entryId: String, blockId: String, photo: DraftPhoto, onBytesSent: (Long) -> Unit,
+        entryId: String, blockId: String, photo: DraftPhoto, progressFor: (Long) -> (Long) -> Unit,
     ): String {
-        val file = localPhoto(photo)
-        val uploaded = if (photo.sourceUrl != null) {
-            documentsRepository.importPhotoFromUrl(OWNER_TYPE, entryId, photo.sourceUrl, cacheLocally = false)
-        } else {
-            documentsRepository.uploadStagedPhoto(
-                OWNER_TYPE, entryId, checkNotNull(file), photo.filename,
-                checkNotNull(photo.mimeType), isPrivate = false, onBytesSent = onBytesSent,
-            )
+        val url = photo.sourceUrl
+        if (url != null) {
+            val uploaded = documentsRepository.importPhotoFromUrl(OWNER_TYPE, entryId, url, cacheLocally = false)
+            return confirmUpload(blockId, photo, uploaded, null)
         }
+
+        val file = checkNotNull(localPhoto(photo))
+        val mimeType = checkNotNull(photo.mimeType)
+        val originalBytes = withContext(Dispatchers.IO) { file.length() }
+        suspend fun send(source: File, name: String, mime: String, bytes: Long): PhotoEntity =
+            documentsRepository.uploadStagedPhoto(
+                OWNER_TYPE, entryId, source, name, mime, isPrivate = false, onBytesSent = progressFor(bytes),
+            )
+
+        val uploaded = try {
+            send(file, photo.filename, mimeType, originalBytes)
+        } catch (failure: HttpException) {
+            if (!canRetryWithSmallerPhoto(originalBytes, mimeType, failure.code(), failure.apiErrorMessage())) throw failure
+            return withSmallerBlogPhoto(file, photo.filename) { smaller ->
+                val bytes = withContext(Dispatchers.IO) { smaller.file.length() }
+                val resized = send(smaller.file, smaller.filename, smaller.mimeType, bytes)
+                confirmUpload(blockId, photo, resized, smaller.file)
+            }
+        }
+        return confirmUpload(blockId, photo, uploaded, file)
+    }
+
+    private suspend fun confirmUpload(blockId: String, photo: DraftPhoto, uploaded: PhotoEntity, file: File?): String {
         val updated = _state.value.pendingPhotos + (blockId to photo.copy(uploadedId = uploaded.id))
         _state.value = _state.value.copy(pendingPhotos = updated)
         persist()

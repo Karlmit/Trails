@@ -62,4 +62,5 @@
     <string name="blog_upload_importing">Hämtar bilden från länken…</string>
     <string name="blog_upload_confirming">Väntar på serverns bekräftelse…</string>
     <string name="blog_upload_finalizing">Publicerar inlägget…</string>
+    <string name="blog_upload_smaller_photo">Försöker igen med en mindre bildkopia…</string>
 </resources>
