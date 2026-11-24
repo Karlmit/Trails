@@ -32,6 +32,12 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.time.LocalDate
 import java.util.UUID
 import kotlin.time.TimeSource
@@ -51,7 +57,25 @@ sealed class BlogEditError {
     data class Message(val text: String) : BlogEditError()
     data class Resource(@StringRes val resId: Int) : BlogEditError()
     data class ImageBatch(val failures: List<ImageUploadFailure>) : BlogEditError()
-    data class PublishFailure(val reason: String?) : BlogEditError()
+    data class PublishFailure(
+        val reason: String?,
+        @StringRes val reasonRes: Int?,
+        val httpStatus: Int?,
+        val photoName: String?,
+    ) : BlogEditError()
+}
+
+internal fun publishFailure(failure: Exception, photoName: String?): BlogEditError.PublishFailure {
+    val reason = failure.apiErrorMessage()
+    val status = (failure as? HttpException)?.code()
+    val reasonRes = if (reason == null && status == null) when (failure) {
+        is SocketTimeoutException -> R.string.blog_publish_timeout
+        is UnknownHostException, is ConnectException, is SocketException -> R.string.blog_publish_connection
+        is FileNotFoundException -> R.string.blog_publish_file_missing
+        is IOException -> R.string.blog_publish_interrupted
+        else -> R.string.blog_publish_unexpected
+    } else null
+    return BlogEditError.PublishFailure(reason, reasonRes, status, photoName)
 }
 
 data class ImageUploadFailure(val filename: String, val reason: String?)
@@ -334,6 +358,7 @@ class BlogEditViewModel @Inject constructor(
         _state.value = current.copy(saving = true, publishing = true, error = null)
         viewModelScope.launch {
             val publishContext = coroutineContext
+            var activePhoto: String? = null
             try {
                 persist()
                 val request = BlogPostRequest(
@@ -358,6 +383,7 @@ class BlogEditViewModel @Inject constructor(
                     val photo = current.pendingPhotos[block.id]
                     if (block is EditableBlock.Image && photo != null) {
                         val uploadedId = photo.uploadedId ?: run {
+                            activePhoto = photo.filename
                             var photoBytes = sizes.getValue(block.id)
                             var initial = BlogUploadProgress(
                                 totalPhotos = pending.size,
@@ -392,6 +418,7 @@ class BlogEditViewModel @Inject constructor(
                                 }
                                 onBytesSent
                             }
+                            activePhoto = null
                             confirmedBytes += photoBytes
                             completed++
                             if (photo.sourceUrl != null) remainingImports--
@@ -414,7 +441,7 @@ class BlogEditViewModel @Inject constructor(
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: Exception) {
-                _state.value = _state.value.copy(error = BlogEditError.PublishFailure(failure.apiErrorMessage()))
+                _state.value = _state.value.copy(error = publishFailure(failure, activePhoto))
             } finally {
                 _state.value = _state.value.copy(saving = false, publishing = false, uploadProgress = null)
             }

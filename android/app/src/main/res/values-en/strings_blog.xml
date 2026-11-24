@@ -63,4 +63,11 @@
     <string name="blog_upload_confirming">Waiting for server confirmation…</string>
     <string name="blog_upload_finalizing">Publishing the post…</string>
     <string name="blog_upload_smaller_photo">Retrying with a smaller copy of the photo…</string>
+    <string name="blog_publish_timeout">The connection timed out. Try again when the connection is steady.</string>
+    <string name="blog_publish_connection">Could not connect to the server. Check your internet connection.</string>
+    <string name="blog_publish_file_missing">The photo file is missing from this device. Add the photo again.</string>
+    <string name="blog_publish_interrupted">The connection was interrupted or the file could not be read.</string>
+    <string name="blog_publish_unexpected">An unexpected error occurred during publishing.</string>
+    <string name="blog_publish_http_error">The server returned HTTP %1$d.</string>
+    <string name="blog_publish_photo_error">Error while publishing photo %1$s</string>
 </resources>

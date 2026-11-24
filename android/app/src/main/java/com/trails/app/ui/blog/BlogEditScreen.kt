@@ -126,9 +126,15 @@ fun BlogEditScreen(
             val message = when (error) {
                 is BlogEditError.Message -> error.text
                 is BlogEditError.Resource -> stringResource(error.resId)
-                is BlogEditError.PublishFailure -> listOfNotNull(
-                    stringResource(R.string.blog_error_publish_retry), error.reason,
-                ).joinToString("\n")
+                is BlogEditError.PublishFailure -> {
+                    val detail = error.reason ?: error.reasonRes?.let { stringResource(it) }
+                        ?: error.httpStatus?.let { stringResource(R.string.blog_publish_http_error, it) }
+                    listOfNotNull(
+                        stringResource(R.string.blog_error_publish_retry),
+                        error.photoName?.let { stringResource(R.string.blog_publish_photo_error, it) },
+                        detail,
+                    ).joinToString("\n")
+                }
                 is BlogEditError.ImageBatch -> {
                     val fallback = stringResource(R.string.blog_error_stage_image)
                     val details = error.failures.joinToString("\n") { "${it.filename} — ${it.reason ?: fallback}" }

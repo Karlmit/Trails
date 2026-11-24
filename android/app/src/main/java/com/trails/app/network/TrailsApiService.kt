@@ -46,6 +46,7 @@ import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
+import retrofit2.http.Tag
 
 // One interface per the Trails API v1 contract -- every resource this app's
 // screens need, both read and write. Every write call requires connectivity
@@ -218,6 +219,7 @@ interface TrailsApiService {
         @Part("ownerId") ownerId: okhttp3.RequestBody,
         @Part file: MultipartBody.Part,
         @Part("isPrivate") isPrivate: okhttp3.RequestBody? = null,
+        @Tag timeout: BlogPhotoUploadTimeout? = null,
     ): PhotoDto
 
     // URL import -- same path as uploadPhoto above; the server picks the

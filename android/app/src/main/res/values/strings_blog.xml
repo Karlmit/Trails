@@ -63,4 +63,11 @@
     <string name="blog_upload_confirming">Väntar på serverns bekräftelse…</string>
     <string name="blog_upload_finalizing">Publicerar inlägget…</string>
     <string name="blog_upload_smaller_photo">Försöker igen med en mindre bildkopia…</string>
+    <string name="blog_publish_timeout">Anslutningen tog för lång tid. Försök igen när anslutningen är stabil.</string>
+    <string name="blog_publish_connection">Det gick inte att ansluta till servern. Kontrollera internetanslutningen.</string>
+    <string name="blog_publish_file_missing">Bildfilen saknas på enheten. Lägg till bilden igen.</string>
+    <string name="blog_publish_interrupted">Anslutningen avbröts eller så gick det inte att läsa filen.</string>
+    <string name="blog_publish_unexpected">Ett oväntat fel uppstod under publiceringen.</string>
+    <string name="blog_publish_http_error">Servern svarade med HTTP %1$d.</string>
+    <string name="blog_publish_photo_error">Fel vid publicering av bilden %1$s</string>
 </resources>

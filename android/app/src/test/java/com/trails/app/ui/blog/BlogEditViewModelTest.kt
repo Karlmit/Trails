@@ -32,7 +32,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
-import java.io.IOException
+import java.net.SocketTimeoutException
+import com.trails.app.R
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BlogEditViewModelTest {
@@ -126,7 +127,7 @@ class BlogEditViewModelTest {
         }
         coEvery {
             documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", last, "last.jpg", "image/jpeg", false, any())
-        } throws IOException("offline") andThen mockk<PhotoEntity> { every { id } returns "last-photo" }
+        } throws SocketTimeoutException("slow connection") andThen mockk<PhotoEntity> { every { id } returns "last-photo" }
         coEvery { timeline.updateBlogPost("post", any(), false) } returns entry
 
         val editor = editor()
@@ -135,7 +136,9 @@ class BlogEditViewModelTest {
         editor.insertImages(listOf(pickedImage("first.jpg"), pickedImage("last.jpg")), { checkNotNull(it.lastPathSegment) })
         editor.state.first { !it.stagingImages }
         editor.publish()
-        assertTrue(editor.state.first { !it.saving }.error is BlogEditError.PublishFailure)
+        val error = editor.state.first { !it.saving }.error as BlogEditError.PublishFailure
+        assertEquals(R.string.blog_publish_timeout, error.reasonRes)
+        assertEquals("last.jpg", error.photoName)
         assertEquals("post", draft?.entryId)
         assertEquals(2, draft?.pendingPhotos?.size)
         assertEquals(listOf("first-photo"), draft?.pendingPhotos?.values?.mapNotNull { it.uploadedId })
