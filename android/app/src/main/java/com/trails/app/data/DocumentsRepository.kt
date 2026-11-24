@@ -5,7 +5,7 @@ import com.trails.app.data.dao.AttachmentDao
 import com.trails.app.data.dao.PhotoDao
 import com.trails.app.data.entity.AttachmentEntity
 import com.trails.app.data.entity.PhotoEntity
-import com.trails.app.network.BlogPhotoUploadTimeout
+import com.trails.app.network.BlogPublishTimeout
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.UploadProgressBody
 import com.trails.app.network.dto.AttachmentUrlRequest
@@ -174,7 +174,7 @@ class DocumentsRepository @Inject constructor(
             ownerId.toPlainRequestBody(),
             part,
             isPrivate.toString().toPlainRequestBody(),
-            timeout = BlogPhotoUploadTimeout,
+            timeout = BlogPublishTimeout,
         ).toEntity()
     }
 

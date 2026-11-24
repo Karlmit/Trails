@@ -4,6 +4,7 @@ import com.trails.app.data.dao.SectionDao
 import com.trails.app.data.dao.TimelineEntryDao
 import com.trails.app.data.entity.SectionEntity
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.network.BlogPublishTimeout
 import com.trails.app.network.TrailsApiService
 import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.SectionRequest
@@ -110,7 +111,7 @@ class TimelineRepository @Inject constructor(
     }
 
     suspend fun publishBlogPost(entryId: String): TimelineEntryEntity {
-        val updated = api.publishBlogPost(entryId)
+        val updated = api.publishBlogPost(entryId, BlogPublishTimeout)
         val entity = updated.toEntity()
         timelineEntryDao.upsertAll(listOf(entity))
         return entity

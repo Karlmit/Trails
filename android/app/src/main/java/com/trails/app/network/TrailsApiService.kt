@@ -120,7 +120,7 @@ interface TrailsApiService {
     suspend fun updateBlogPost(@Path("id") id: String, @Body body: BlogPostRequest): TimelineEntryDto
 
     @PUT("api/v1/timeline-entries/{id}/publish")
-    suspend fun publishBlogPost(@Path("id") id: String): TimelineEntryDto
+    suspend fun publishBlogPost(@Path("id") id: String, @Tag timeout: BlogPublishTimeout): TimelineEntryDto
 
     @DELETE("api/v1/timeline-entries/{id}/publish")
     suspend fun unpublishBlogPost(@Path("id") id: String): Response<ResponseBody>
@@ -219,7 +219,7 @@ interface TrailsApiService {
         @Part("ownerId") ownerId: okhttp3.RequestBody,
         @Part file: MultipartBody.Part,
         @Part("isPrivate") isPrivate: okhttp3.RequestBody? = null,
-        @Tag timeout: BlogPhotoUploadTimeout? = null,
+        @Tag timeout: BlogPublishTimeout? = null,
     ): PhotoDto
 
     // URL import -- same path as uploadPhoto above; the server picks the

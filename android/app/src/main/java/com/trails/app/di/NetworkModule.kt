@@ -2,7 +2,7 @@ package com.trails.app.di
 
 import com.trails.app.auth.TokenStore
 import com.trails.app.network.AuthInterceptor
-import com.trails.app.network.BlogPhotoUploadTimeout
+import com.trails.app.network.BlogPublishTimeout
 import com.trails.app.network.TrailsApiService
 import dagger.Module
 import dagger.Provides
@@ -36,7 +36,7 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(tokenStore: TokenStore): OkHttpClient =
         OkHttpClient.Builder()
-            .addInterceptor(BlogPhotoUploadTimeout)
+            .addInterceptor(BlogPublishTimeout)
             .addInterceptor(AuthInterceptor(tokenStore))
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
             .build()

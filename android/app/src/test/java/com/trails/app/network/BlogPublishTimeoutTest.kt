@@ -10,11 +10,11 @@ import org.junit.Assert.assertSame
 import org.junit.Test
 import java.util.concurrent.TimeUnit
 
-class BlogPhotoUploadTimeoutTest {
+class BlogPublishTimeoutTest {
     @Test
     fun `extends timeouts for staged photo requests only`() {
         val normal = Request.Builder().url("https://example.test/api/v1/photos").build()
-        val staged = normal.newBuilder().tag(BlogPhotoUploadTimeout::class.java, BlogPhotoUploadTimeout).build()
+        val staged = normal.newBuilder().tag(BlogPublishTimeout::class.java, BlogPublishTimeout).build()
         val regularChain = mockk<Interceptor.Chain>()
         val stagedChain = mockk<Interceptor.Chain>()
         val slowWrite = mockk<Interceptor.Chain>()
@@ -27,8 +27,8 @@ class BlogPhotoUploadTimeoutTest {
         every { slowWrite.withReadTimeout(120, TimeUnit.SECONDS) } returns slowReadWrite
         every { slowReadWrite.proceed(staged) } returns response
 
-        assertSame(response, BlogPhotoUploadTimeout.intercept(regularChain))
-        assertSame(response, BlogPhotoUploadTimeout.intercept(stagedChain))
+        assertSame(response, BlogPublishTimeout.intercept(regularChain))
+        assertSame(response, BlogPublishTimeout.intercept(stagedChain))
         verify(exactly = 0) { regularChain.withWriteTimeout(any(), any()) }
         verify(exactly = 1) { slowReadWrite.proceed(staged) }
     }
