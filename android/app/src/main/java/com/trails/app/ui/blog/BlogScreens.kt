@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.MediaController
+import android.widget.VideoView
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -168,8 +173,31 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                         is BlogBlock.ImageBlock -> {
                             val photo = state.photosById[block.photoId]
                             if (block.isVideo) {
-                                TextButton(onClick = { onOpenPhoto(block.photoId) }, enabled = photo != null) {
-                                    Text(stringResource(R.string.blog_play_video, photo?.originalFilename.orEmpty()))
+                                val path = photo?.localPath
+                                if (path != null) {
+                                    AndroidView(
+                                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                                            .padding(bottom = 12.dp).clip(RoundedCornerShape(8.dp)),
+                                        factory = { context ->
+                                            VideoView(context).apply {
+                                                val controller = MediaController(context)
+                                                controller.setAnchorView(this)
+                                                setMediaController(controller)
+                                                setVideoURI(Uri.fromFile(File(path)))
+                                            }
+                                        },
+                                        update = { view ->
+                                            if (view.tag != path) {
+                                                view.tag = path
+                                                view.setVideoURI(Uri.fromFile(File(path)))
+                                            }
+                                        },
+                                        onRelease = { it.stopPlayback() },
+                                    )
+                                } else if (photo != null) {
+                                    TextButton(onClick = { onOpenPhoto(block.photoId) }) {
+                                        Text(stringResource(R.string.blog_play_video, photo.originalFilename))
+                                    }
                                 }
                             } else if (photo?.localPath != null) {
                                 AsyncImage(

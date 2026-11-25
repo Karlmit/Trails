@@ -114,7 +114,7 @@ data class IdeaRequest(
 @Serializable
 data class NoteEntryRequest(
     val tripId: String,
-    val entryType: String = "NOTE",
+    @Required val entryType: String = "NOTE",
     val title: String,
     val description: String? = null,
     val startAt: String,
@@ -129,7 +129,7 @@ data class NoteEntryRequest(
 @Serializable
 data class StayEntryRequest(
     val tripId: String,
-    val entryType: String = "STAY",
+    @Required val entryType: String = "STAY",
     val subtype: String,
     val title: String,
     val description: String? = null,
@@ -159,7 +159,7 @@ data class StayEntryRequest(
 @Serializable
 data class TransportEntryRequest(
     val tripId: String,
-    val entryType: String = "TRANSPORT",
+    @Required val entryType: String = "TRANSPORT",
     val subtype: String,
     val title: String,
     val description: String? = null,
@@ -195,7 +195,7 @@ data class TransportEntryRequest(
 @Serializable
 data class ActivityEntryRequest(
     val tripId: String,
-    val entryType: String = "ACTIVITY",
+    @Required val entryType: String = "ACTIVITY",
     val subtype: String,
     val title: String,
     val description: String? = null,
