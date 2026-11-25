@@ -1,6 +1,6 @@
 'use client';
 
-import { uploadBlogVideo } from '@/lib/blog-video-upload';
+import { uploadBlogMedia } from '@/lib/blog-media-upload';
 import '@blocknote/mantine/style.css';
 import { useMemo, useRef, useState, type ChangeEvent, type MutableRefObject } from 'react';
 import { BlockNoteSchema, defaultBlockSpecs, type PartialBlock } from '@blocknote/core';
@@ -212,22 +212,8 @@ export function parseBlogContent(raw: string | null | undefined): PartialBlock[]
 // its id; every later call (from the same or a different image) just
 // returns the id it already created. This function no longer needs to
 // know or care whether that create-on-demand happened.
-async function uploadBlogImage(
-  file: File,
-  ensurePostId: () => Promise<string>,
-  t: ReturnType<typeof useTranslations>,
-): Promise<string> {
-  const postId = await ensurePostId();
-  if (file.type.startsWith('video/')) return uploadBlogVideo(file, postId);
-  const formData = new FormData();
-  formData.append('ownerType', 'TIMELINE_ENTRY');
-  formData.append('ownerId', postId);
-  formData.append('file', file);
-  const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
-  const photo = await response.json().catch(() => null);
-  if (!response.ok || !photo?.id) {
-    throw new Error(translateApiError(t, photo?.error?.message) ?? 'Could not upload this image.');
-  }
+async function uploadBlogImage(file: File, ensurePostId: () => Promise<string>): Promise<string> {
+  const photo = await uploadBlogMedia(file, await ensurePostId());
   return `/api/v1/photos/${photo.id}/file`;
 }
 
@@ -281,7 +267,7 @@ function useBlogEditor(initialContent: string | null | undefined, ensurePostId: 
   const editor = useCreateBlockNote({
     schema: blogPostSchema,
     initialContent: useMemo(() => parseBlogContent(initialContent), [initialContent]),
-    uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current(), t),
+    uploadFile: (file) => uploadBlogImage(file, () => ensurePostIdRef.current()),
   });
   // BlockNote has no `uploadFile` equivalent for "import from a URL", and
   // `layoutImageBlock`'s render function only ever receives the editor --

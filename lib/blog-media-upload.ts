@@ -1,8 +1,9 @@
 import { createSHA256 } from 'hash-wasm';
+import type { serializePhoto } from '@/lib/serializers';
 
 const CHUNK_BYTES = 256 * 1024;
 
-export async function uploadBlogVideo(file: File, postId: string): Promise<string> {
+export async function uploadBlogMedia(file: File, postId: string): Promise<ReturnType<typeof serializePhoto>> {
   const hash = await createSHA256();
   for (let offset = 0; offset < file.size; offset += CHUNK_BYTES) {
     hash.update(new Uint8Array(await file.slice(offset, offset + CHUNK_BYTES).arrayBuffer()));
@@ -24,10 +25,10 @@ export async function uploadBlogVideo(file: File, postId: string): Promise<strin
     const body = file.slice(part * CHUNK_BYTES, (part + 1) * CHUNK_BYTES, 'application/octet-stream');
     const response = await fetch(`${url}&part=${part}`, { method: 'PUT', headers, body });
     const result = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(result?.error?.message ?? 'Could not upload this video.');
-    if (result?.photo?.id) return `/api/v1/photos/${result.photo.id}/file`;
+    if (!response.ok) throw new Error(result?.error?.message ?? 'Could not upload this file.');
+    if (result?.photo?.id) return result.photo;
     if (!Number.isSafeInteger(result?.nextPart) || result.nextPart <= part) break;
     part = result.nextPart;
   }
-  throw new Error('The video upload did not finish.');
+  throw new Error('The upload did not finish.');
 }

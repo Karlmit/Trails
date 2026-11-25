@@ -53,6 +53,7 @@ interface PhotoGalleryProps {
   // upload (file or URL) creates the owner on demand and returns its id.
   // See lib/hooks/useOwnerId.ts.
   ensureOwnerId?: () => Promise<string>;
+  uploadForBlog?: (file: File, postId: string) => Promise<PhotoDTO>;
   pasteTargetRef?: RefObject<HTMLDivElement | null>;
 }
 
@@ -70,6 +71,7 @@ export function PhotoGallery({
   initialPhotos,
   ensureOwnerId,
   pasteTargetRef,
+  uploadForBlog,
 }: PhotoGalleryProps) {
   const t = useTranslations('errors');
   const tShared = useTranslations('shared');
@@ -131,9 +133,16 @@ export function PhotoGallery({
     setError(null);
 
     try {
+      const id = await resolveOwnerId();
+      if (uploadForBlog) {
+        const photo = await uploadForBlog(file, id);
+        setPhotos((current) => [...current, photo]);
+        router.refresh();
+        return;
+      }
       const formData = new FormData();
       formData.append('ownerType', ownerType);
-      formData.append('ownerId', await resolveOwnerId());
+      formData.append('ownerId', id);
       formData.append('file', file);
 
       const response = await fetch('/api/v1/photos', { method: 'POST', body: formData });
@@ -145,7 +154,7 @@ export function PhotoGallery({
       setPhotos((current) => [...current, body as PhotoDTO]);
       router.refresh();
     } catch (err) {
-      setError(err instanceof OwnerCreateError ? err.message : 'Could not reach the server. Please try again.');
+      setError(err instanceof OwnerCreateError || (uploadForBlog && err instanceof Error) ? err.message : 'Could not reach the server. Please try again.');
     } finally {
       setUploading(false);
       uploadInFlight.current = false;

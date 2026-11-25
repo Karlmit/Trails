@@ -25,7 +25,7 @@ import javax.inject.Singleton
 private fun String.toPlainRequestBody() = toRequestBody("text/plain".toMediaTypeOrNull())
 
 internal fun shouldPrefetchPhoto(photo: PhotoEntity): Boolean =
-    !photo.mimeType.startsWith("video/") || photo.sizeBytes <= 25L * 1024 * 1024
+    photo.sizeBytes <= 25L * 1024 * 1024
 
 internal fun isUsablePhotoCache(photo: PhotoEntity): Boolean {
     val path = photo.localPath ?: return false

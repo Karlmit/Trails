@@ -10,6 +10,7 @@ import { OwnerCreateError } from '@/lib/hooks/useOwnerId';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { uploadBlogMedia } from '@/lib/blog-media-upload';
 import { AttachmentList } from '@/components/AttachmentList';
 
 // BlockNote (RichTextEditor.tsx) touches `window` during its own render,
@@ -267,6 +268,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         <TagList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
         <LinkList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
         <PhotoGallery
+          uploadForBlog={uploadBlogMedia}
           tripId={post?.tripId ?? tripId}
           ownerType="TIMELINE_ENTRY"
           ownerId={post?.id ?? ''}

@@ -53,7 +53,7 @@
     <string name="blog_image_unavailable">Bilden är inte tillgänglig</string>
     <string name="blog_error_draft_load">Det gick inte att öppna utkastet.</string>
     <string name="blog_error_publish_retry">Det gick inte att publicera. Utkastet finns kvar på enheten. Försök igen.</string>
-    <string name="blog_error_stage_image">Filen kunde inte sparas. Bilder får vara högst 25 MiB.</string>
+    <string name="blog_error_stage_image">Filen kunde inte sparas.</string>
     <string name="blog_error_stage_image_batch">Filer som inte kunde sparas på enheten: %1$d\n%2$s</string>
     <string name="blog_upload_photo_count">%1$d av %2$d filer klara</string>
     <string name="blog_upload_bytes">%1$s av %2$s skickat</string>

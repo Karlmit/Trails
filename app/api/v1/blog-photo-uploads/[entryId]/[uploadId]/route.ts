@@ -8,7 +8,7 @@ import { revalidatePath } from 'next/cache';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
 import { isForeignKeyViolationError, isUniqueConstraintViolationError } from '@/lib/db-errors';
-import { buildUploadPath, isAllowedMimeType, isBlogVideoMimeType, MAX_UPLOAD_BYTES, UPLOAD_ROOT } from '@/lib/photos';
+import { buildUploadPath, isAllowedMimeType, isBlogVideoMimeType, UPLOAD_ROOT } from '@/lib/photos';
 import { prisma } from '@/lib/prisma';
 import { serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -116,7 +116,7 @@ async function handle(request: NextRequest, params: RouteParams['params']) {
   const digest = request.headers.get('x-photo-sha256') ?? '';
   const size = Number(query.get('size'));
   if (!filename || filename.length > 255 || (!isAllowedMimeType(mime) && !isBlogVideoMimeType(mime)) || !/^[a-f0-9]{64}$/.test(digest) ||
-      !Number.isSafeInteger(size) || size < 1 || (!isBlogVideoMimeType(mime) && size > MAX_UPLOAD_BYTES)) {
+      !Number.isSafeInteger(size) || size < 1) {
     return Errors.validation('Invalid photo upload metadata');
   }
   const owner = await prisma.timelineEntry.findFirst({

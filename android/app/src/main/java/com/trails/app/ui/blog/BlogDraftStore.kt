@@ -30,7 +30,6 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 internal const val LOCAL_BLOG_PREFIX = "local-"
-private const val MAX_DRAFT_PHOTO_BYTES = 25 * 1024 * 1024
 private val supportedMediaTypes = setOf("image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm")
 
 @Serializable
@@ -114,18 +113,8 @@ class BlogDraftStore @Inject constructor(
         file.parentFile?.mkdirs()
         try {
             context.contentResolver.openInputStream(uri)?.use { input ->
-                file.outputStream().use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var total = 0L
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        total += read
-                        if (!mimeType.startsWith("video/") && total > MAX_DRAFT_PHOTO_BYTES) throw IOException("Media file exceeds the upload limit")
-                        output.write(buffer, 0, read)
-                    }
-                }
-            } ?: throw IOException("Could not open image")
+                file.outputStream().use { output -> input.copyTo(output) }
+            } ?: throw IOException("Could not open media file")
             if (file.length() == 0L) throw IOException("Empty media file")
             photo
         } catch (failure: Exception) {
