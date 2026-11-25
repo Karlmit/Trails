@@ -73,4 +73,7 @@
     <string name="blog_play_video">Play video: %1$s</string>
     <string name="blog_video_playback_error">This video could not be played.</string>
     <string name="blog_image_from_url">Image from link</string>
+    <string name="blog_publish_channel">Blog publishing</string>
+    <string name="blog_publish_notification_done">Blog post published</string>
+    <string name="blog_error_start_background_publish">Could not start publishing. Try again when any other publish has finished.</string>
 </resources>

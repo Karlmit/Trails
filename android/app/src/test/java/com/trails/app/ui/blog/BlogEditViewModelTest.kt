@@ -2,6 +2,7 @@ package com.trails.app.ui.blog
 
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.TripRepository
@@ -16,6 +17,8 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -44,9 +47,25 @@ class BlogEditViewModelTest {
     private val store = mockk<BlogDraftStore>()
     private var draft: DeviceBlogDraft? = null
 
+    private val background = mockk<BlogPublishCoordinator>()
+    private var activeTask: BlogPublishTask? = null
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        every { background.active(any()) } answers { activeTask?.takeIf { it.key == firstArg<BlogPublishKey>() } }
+        every { background.start(any()) } answers {
+            val task = firstArg<BlogPublishTask>()
+            activeTask = task
+            CoroutineScope(Dispatchers.Main).launch {
+                try {
+                    BlogPublisher(timeline, documents, store).run(task)
+                } finally {
+                    activeTask = null
+                }
+            }
+            true
+        }
         every { trips.observeTrip("trip") } returns flowOf(null)
         coEvery { store.scopeFor("trip") } returns "scope"
         coEvery { store.load("scope", any()) } answers { draft }
@@ -157,8 +176,35 @@ class BlogEditViewModelTest {
         coVerify(exactly = 1) { timeline.publishBlogPost("post") }
     }
 
+    @Test
+    fun `publishing survives clearing the editor and a new editor observes completion`() = runTest(dispatcher) {
+        val remote = serverEntry()
+        val finish = CompletableDeferred<TimelineEntryEntity>()
+        coEvery { timeline.updateBlogPost("post", any(), false) } returns remote
+        coEvery { timeline.publishBlogPost("post") } coAnswers { finish.await() }
+
+        val original = editor()
+        val owner = ViewModelStore().apply { put("editor", original) }
+        runCurrent()
+        original.onTitleChange("On the road")
+        original.publish()
+        runCurrent()
+        owner.clear()
+
+        val reopened = editor()
+        runCurrent()
+        assertTrue(reopened.state.value.publishing)
+        reopened.publish()
+        finish.complete(remote)
+        runCurrent()
+
+        assertTrue(reopened.state.value.saved)
+        coVerify(exactly = 1) { timeline.publishBlogPost("post") }
+        assertNull(draft)
+    }
+
     private fun editor() = BlogEditViewModel(
-        SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store,
+        SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store, background,
     )
 
     private fun serverEntry(): TimelineEntryEntity = mockk<TimelineEntryEntity> {

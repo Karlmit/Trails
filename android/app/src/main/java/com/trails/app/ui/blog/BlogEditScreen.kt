@@ -1,6 +1,10 @@
 package com.trails.app.ui.blog
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.text.format.Formatter
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -92,6 +96,9 @@ fun BlogEditScreen(
         onDispose { if (state.publishing) view.keepScreenOn = previous }
     }
     val context = LocalContext.current
+    var askedForNotifications by rememberSaveable { mutableStateOf(false) }
+    val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
     var showDiscardConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pickerAfterId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -310,7 +317,16 @@ fun BlogEditScreen(
         } else {
             PillButton(
                 text = stringResource(if (state.isPublished) R.string.blog_publish_changes else R.string.blog_publish_button),
-                onClick = viewModel::publish,
+                onClick = {
+                    viewModel.publish()
+                    if (viewModel.state.value.publishing && !askedForNotifications &&
+                        Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        askedForNotifications = true
+                        requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !state.stagingImages,
             )

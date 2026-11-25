@@ -73,4 +73,7 @@
     <string name="blog_play_video">Spela video: %1$s</string>
     <string name="blog_video_playback_error">Videon kunde inte spelas upp.</string>
     <string name="blog_image_from_url">Bild från länk</string>
+    <string name="blog_publish_channel">Bloggpublicering</string>
+    <string name="blog_publish_notification_done">Inlägget publicerades</string>
+    <string name="blog_error_start_background_publish">Det gick inte att starta publiceringen. Försök igen när ingen annan publicering pågår.</string>
 </resources>

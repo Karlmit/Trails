@@ -69,7 +69,10 @@ class BlogDraftStore @Inject constructor(
             .digest(json.encodeToString(listOf(username, tripId)).toByteArray())
             .joinToString("") { "%02x".format(it) }
 
-    suspend fun scopeFor(tripId: String): String = scopeKey(checkNotNull(tokens.username.first()), tripId)
+    internal fun observeScope(tripId: String): Flow<String?> =
+        tokens.username.map { username -> username?.let { scopeKey(it, tripId) } }
+
+    suspend fun scopeFor(tripId: String): String = checkNotNull(observeScope(tripId).first())
 
     fun observe(tripId: String): Flow<List<DeviceBlogDraft>> = tokens.username.flatMapLatest { username ->
         if (username == null) flowOf(emptyList()) else {
