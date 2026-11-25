@@ -116,12 +116,12 @@ class BlogDraftStore @Inject constructor(
             context.contentResolver.openInputStream(uri)?.use { input ->
                 file.outputStream().use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var total = 0
+                    var total = 0L
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
                         total += read
-                        if (total > MAX_DRAFT_PHOTO_BYTES) throw IOException("Media file exceeds the upload limit")
+                        if (!mimeType.startsWith("video/") && total > MAX_DRAFT_PHOTO_BYTES) throw IOException("Media file exceeds the upload limit")
                         output.write(buffer, 0, read)
                     }
                 }

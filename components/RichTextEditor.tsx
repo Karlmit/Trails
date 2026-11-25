@@ -1,5 +1,6 @@
 'use client';
 
+import { uploadBlogVideo } from '@/lib/blog-video-upload';
 import '@blocknote/mantine/style.css';
 import { useMemo, useRef, useState, type ChangeEvent, type MutableRefObject } from 'react';
 import { BlockNoteSchema, defaultBlockSpecs, type PartialBlock } from '@blocknote/core';
@@ -217,6 +218,7 @@ async function uploadBlogImage(
   t: ReturnType<typeof useTranslations>,
 ): Promise<string> {
   const postId = await ensurePostId();
+  if (file.type.startsWith('video/')) return uploadBlogVideo(file, postId);
   const formData = new FormData();
   formData.append('ownerType', 'TIMELINE_ENTRY');
   formData.append('ownerId', postId);

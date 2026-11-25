@@ -37,8 +37,8 @@ android {
         applicationId = "com.trails.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 55
-        versionName = "0.55.0"
+        versionCode = 56
+        versionName = "0.56.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

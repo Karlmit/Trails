@@ -229,7 +229,7 @@ export function serializePhoto(photo: Photo) {
     ownerType: photo.ownerType,
     ownerId: photo.ownerId,
     mimeType: photo.mimeType,
-    sizeBytes: photo.sizeBytes,
+    sizeBytes: Number(photo.sizeBytes),
     originalFilename: photo.originalFilename,
     isPrimary: photo.isPrimary,
     isPrivate: photo.isPrivate,

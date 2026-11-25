@@ -141,7 +141,7 @@ class DocumentsRepositoryTest {
         mimeType = "image/jpeg", sizeBytes = 2, originalFilename = "cover.jpg", createdAt = "2026-01-01",
     )
 
-    private fun photoEntity(localPath: String?, sizeBytes: Int) = PhotoEntity(
+    private fun photoEntity(localPath: String?, sizeBytes: Long) = PhotoEntity(
         id = "photo", tripId = "trip", ownerType = "IDEA", ownerId = "idea",
         mimeType = "image/jpeg", sizeBytes = sizeBytes, originalFilename = "cover.jpg",
         isPrimary = true, isPrivate = false, createdAt = "2026-01-01", localPath = localPath,

@@ -26,7 +26,7 @@ data class PhotoEntity(
     val ownerType: String,
     val ownerId: String,
     val mimeType: String,
-    val sizeBytes: Int,
+    val sizeBytes: Long,
     val originalFilename: String,
     val isPrimary: Boolean,
     val isPrivate: Boolean,

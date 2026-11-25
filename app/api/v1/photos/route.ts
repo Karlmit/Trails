@@ -177,7 +177,7 @@ async function createPhotoFromBytes(input: {
         ownerId,
         filePath,
         mimeType,
-        sizeBytes: bytes.byteLength,
+        sizeBytes: BigInt(bytes.byteLength),
         originalFilename,
         isPrivate,
       },

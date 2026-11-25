@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.trails.app.data.DocumentsRepository
+import com.trails.app.data.shouldPrefetchPhoto
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.TimelineEntryEntity
@@ -116,7 +117,7 @@ class BlogDetailViewModel @Inject constructor(
                         runCatching { documentsRepository.syncTrip(tripId) }
                     }
                     referencedIds.mapNotNull { state.photosById[it] }
-                        .filter { it.localPath == null }
+                        .filter { it.localPath == null && shouldPrefetchPhoto(it) }
                         .forEach { photo -> runCatching { documentsRepository.ensurePhotoCached(photo) } }
                 }
         }

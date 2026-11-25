@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { link, mkdir, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import { access, link, mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
@@ -64,6 +66,38 @@ async function putPart(directory: string, index: number, bytes: Buffer) {
   }
 }
 
+async function uploadCheckpoint(directory: string, parts: number): Promise<number> {
+  const marker = path.join(directory, 'checkpoint');
+  let next = 0;
+  try {
+    const saved = Number(await readFile(marker, 'utf8'));
+    if (Number.isSafeInteger(saved) && saved >= 0 && saved <= parts) next = saved;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  while (next < parts) {
+    try {
+      await access(path.join(directory, String(next)));
+      next++;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      break;
+    }
+  }
+  if (next < parts) {
+    const temp = path.join(directory, randomUUID() + '.tmp');
+    try {
+      await writeFile(temp, String(next), { flag: 'wx' });
+      await rename(temp, marker);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    } finally {
+      await unlink(temp).catch(() => {});
+    }
+  }
+  return next;
+}
+
 async function handle(request: NextRequest, params: RouteParams['params']) {
   const user = await getUserFromApiRequest(request);
   if (!user) return Errors.unauthorized();
@@ -82,7 +116,7 @@ async function handle(request: NextRequest, params: RouteParams['params']) {
   const digest = request.headers.get('x-photo-sha256') ?? '';
   const size = Number(query.get('size'));
   if (!filename || filename.length > 255 || (!isAllowedMimeType(mime) && !isBlogVideoMimeType(mime)) || !/^[a-f0-9]{64}$/.test(digest) ||
-      !Number.isSafeInteger(size) || size < 1 || size > MAX_UPLOAD_BYTES) {
+      !Number.isSafeInteger(size) || size < 1 || (!isBlogVideoMimeType(mime) && size > MAX_UPLOAD_BYTES)) {
     return Errors.validation('Invalid photo upload metadata');
   }
   const owner = await prisma.timelineEntry.findFirst({
@@ -113,45 +147,54 @@ async function handle(request: NextRequest, params: RouteParams['params']) {
     await putPart(directory, index, bytes);
   }
 
-  const stored = await listParts(directory);
-  let nextPart = 0;
-  while (nextPart < parts && stored.has(String(nextPart))) nextPart++;
+  let nextPart: number;
+  if (request.method === 'PUT') {
+    nextPart = await uploadCheckpoint(directory, parts);
+  } else {
+    const stored = await listParts(directory);
+    nextPart = 0;
+    while (nextPart < parts && stored.has(String(nextPart))) nextPart++;
+  }
   if (nextPart < parts) {
+    // A concurrent finalizer may already have committed and removed the chunks.
     const completed = await prisma.photo.findUnique({ where: { id } });
     return NextResponse.json(completed ? { nextPart: parts, photo: serializePhoto(completed) } : { nextPart });
   }
 
   if (request.method === 'GET') return NextResponse.json({ nextPart: parts - 1 });
 
-  let bytes: Buffer;
-  try {
-    bytes = Buffer.concat(await Promise.all(Array.from({ length: parts }, (_, index) => readFile(path.join(directory, String(index))))));
-  } catch (error) {
-    const completed = await prisma.photo.findUnique({ where: { id } });
-    if (completed) return NextResponse.json({ nextPart: parts, photo: serializePhoto(completed) });
-    throw error;
-  }
-  if (bytes.length !== size || sha256(bytes) !== digest) {
-    await rm(directory, { recursive: true, force: true });
-    return Errors.validation('Photo verification failed. Retry the upload.');
-  }
-
   const filePath = buildUploadPath(owner.tripId, 'TIMELINE_ENTRY', entryId, filename);
   await mkdir(path.dirname(filePath), { recursive: true });
   let photo;
   try {
-    await writeFile(filePath, bytes, { flag: 'wx' });
+    const hash = createHash('sha256');
+    let written = 0;
+    async function* verifiedParts() {
+      for (let index = 0; index < parts; index++) {
+        const chunk = await readFile(path.join(directory, String(index)));
+        written += chunk.length;
+        hash.update(chunk);
+        yield chunk;
+      }
+    }
+    await pipeline(verifiedParts(), createWriteStream(filePath, { flags: 'wx' }));
+    if (written !== size || hash.digest('hex') !== digest) {
+      await rm(directory, { recursive: true, force: true });
+      await unlink(filePath);
+      return Errors.validation('Photo verification failed. Retry the upload.');
+    }
     photo = await prisma.photo.create({
       data: {
         id, tripId: owner.tripId, ownerType: 'TIMELINE_ENTRY', ownerId: entryId, filePath,
-        mimeType: mime, sizeBytes: size, originalFilename: filename,
+        mimeType: mime, sizeBytes: BigInt(size), originalFilename: filename,
       },
     });
   } catch (error) {
     await unlink(filePath).catch(() => {});
     if (isForeignKeyViolationError(error)) return Errors.notFound('Blog post not found');
-    if (!isUniqueConstraintViolationError(error)) throw error;
-    photo = await prisma.photo.findUnique({ where: { id } });
+    if (isUniqueConstraintViolationError(error) || (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      photo = await prisma.photo.findUnique({ where: { id } });
+    }
     if (!photo) throw error;
   }
 

@@ -704,7 +704,7 @@ model Photo {
 
   filePath         String @map("file_path")
   mimeType         String @map("mime_type")
-  sizeBytes        Int    @map("size_bytes")
+  sizeBytes        BigInt    @map("size_bytes")
   originalFilename String @map("original_filename")
 
   // Cover Photo (FR-15) -- at most one true per owner (partial unique index,

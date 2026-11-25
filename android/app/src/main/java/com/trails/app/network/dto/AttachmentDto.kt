@@ -21,7 +21,7 @@ data class PhotoDto(
     val ownerType: String,
     val ownerId: String,
     val mimeType: String,
-    val sizeBytes: Int,
+    val sizeBytes: Long,
     val originalFilename: String,
     val isPrimary: Boolean = false,
     val isPrivate: Boolean = false,

@@ -192,7 +192,7 @@ class IdeasViewModelTest {
         isPrimary: Boolean = false,
         createdAt: String = "2026-10-20T10:00:00Z",
         localPath: String? = null,
-        sizeBytes: Int = 100,
+        sizeBytes: Long = 100,
     ) = PhotoEntity(
         id = id,
         tripId = "trip-1",

@@ -50,6 +50,15 @@ class BlogDraftStoreTest {
         assertEquals(listOf(reopened), store.observe("trip").first())
         assertEquals(emptyList<DeviceBlogDraft>(), store.observe("another-trip").first())
 
+        val videoSize = 26L * 1024 * 1024
+        val videoSource = File(context.cacheDir, "clip.mp4")
+        java.io.RandomAccessFile(videoSource, "rw").use { it.setLength(videoSize) }
+        val video = store.stage(scope, Uri.fromFile(videoSource), "clip.mp4")
+        assertEquals("video/mp4", video.mimeType)
+        assertEquals(videoSize, store.photoFile(scope, video)?.length())
+        store.deletePhoto(scope, video)
+        videoSource.delete()
+
         username.value = "another-user"
         assertEquals(emptyList<DeviceBlogDraft>(), store.observe("trip").first())
         store.delete(scope, draft.id)

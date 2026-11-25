@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
@@ -75,10 +76,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  let bytes: Buffer;
+  let file;
+  let size: number;
   try {
-    bytes = await readFile(photo.filePath);
+    file = await open(photo.filePath, 'r');
+    size = (await file.stat()).size;
   } catch (err) {
+    await file?.close();
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT') {
       console.error(`Failed to read Photo ${photo.id} at ${photo.filePath}:`, err);
@@ -89,26 +93,37 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const headers = new Headers({
     'Content-Type': photo.mimeType,
     'Content-Disposition': contentDisposition(photo.originalFilename),
-    'Content-Length': String(bytes.length),
+    'Content-Length': String(size),
     'X-Content-Type-Options': 'nosniff',
     // A shared cache cannot reuse a response across different viewers.
     'Cache-Control': 'private, max-age=3600',
   });
+  const respond = async (status: number, range?: { start: number; end: number }) => {
+    if (request.method === 'HEAD') {
+      await file.close();
+      return new NextResponse(null, { status, headers });
+    }
+    const stream = Readable.toWeb(file.createReadStream(range), {
+      strategy: { highWaterMark: 128 * 1024, size: (chunk: Uint8Array) => chunk.byteLength },
+    }) as ReadableStream<Uint8Array>;
+    return new NextResponse(stream, { status, headers });
+  };
   if (isBlogVideoMimeType(photo.mimeType)) {
     headers.set('Accept-Ranges', 'bytes');
     const requestedRange = request.headers.get('range');
     if (requestedRange) {
-      const range = videoByteRange(requestedRange, bytes.length);
+      const range = videoByteRange(requestedRange, size);
       if (!range) {
-        headers.set('Content-Range', `bytes */${bytes.length}`);
+        headers.set('Content-Range', `bytes */${size}`);
         headers.set('Content-Length', '0');
+        await file.close();
         return new NextResponse(null, { status: 416, headers });
       }
       const { start, end } = range;
-      headers.set('Content-Range', `bytes ${start}-${end}/${bytes.length}`);
+      headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
       headers.set('Content-Length', String(end - start + 1));
-      return new NextResponse(new Uint8Array(bytes.subarray(start, end + 1)), { status: 206, headers });
+      return respond(206, { start, end });
     }
   }
-  return new NextResponse(new Uint8Array(bytes), { status: 200, headers });
+  return respond(200);
 }

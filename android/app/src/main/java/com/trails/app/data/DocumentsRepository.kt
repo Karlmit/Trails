@@ -24,6 +24,9 @@ import javax.inject.Singleton
 
 private fun String.toPlainRequestBody() = toRequestBody("text/plain".toMediaTypeOrNull())
 
+internal fun shouldPrefetchPhoto(photo: PhotoEntity): Boolean =
+    !photo.mimeType.startsWith("video/") || photo.sizeBytes <= 25L * 1024 * 1024
+
 internal fun isUsablePhotoCache(photo: PhotoEntity): Boolean {
     val path = photo.localPath ?: return false
     val cached = File(path)
@@ -183,6 +186,7 @@ class DocumentsRepository @Inject constructor(
     }
 
     suspend fun cacheStagedPhoto(photo: PhotoEntity, file: File) {
+        if (!shouldPrefetchPhoto(photo)) return
         val localPath = fileCacheManager.cacheUploadedPhoto(photo, file)
         photoDao.upsertAll(listOf(photo.copy(localPath = localPath)))
     }
@@ -303,7 +307,7 @@ class DocumentsRepository @Inject constructor(
             .filterNot(::isUsableAttachmentCache)
             .forEach { attachment -> attempt { cacheAttachment(attachment) } }
         photoDao.getAllForTrip(tripId).forEach { photo ->
-            if (!isUsablePhotoCache(photo)) attempt { cachePhoto(photo) }
+            if (shouldPrefetchPhoto(photo) && !isUsablePhotoCache(photo)) attempt { cachePhoto(photo) }
         }
         if (failures.isNotEmpty()) {
             val first = failures.first()
