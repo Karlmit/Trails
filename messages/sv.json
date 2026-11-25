@@ -362,6 +362,8 @@
     "publishedAt": "Publicerad {time} · syns i tidslinjen",
     "confirmDelete": "Ta bort \"{title}\"? Detta kan inte ångras.",
     "uploading": "Laddar upp…",
+    "addMedia": "Lägg till bild eller video",
+    "mediaUploadError": "Det gick inte att ladda upp filen. Försök igen.",
     "addImage": "🖼️ Lägg till bild",
     "addImageFromUrl": "🔗 Lägg till från URL",
     "imageUrlPlaceholder": "https://exempel.se/foto.jpg",

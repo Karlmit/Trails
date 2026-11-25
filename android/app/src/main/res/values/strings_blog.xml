@@ -14,7 +14,7 @@
     <string name="blog_remove_image_desc">Ta bort bild</string>
     <string name="blog_uploading_image">Laddar upp bild…</string>
     <string name="blog_uploading">Laddar upp…</string>
-    <string name="blog_add_image">+ Lägg till bilder</string>
+    <string name="blog_add_image">+ Lägg till media</string>
 
     <string name="blog_save_button">Spara</string>
     <string name="blog_unpublish_button">Avpublicera</string>
@@ -39,7 +39,7 @@
     <string name="blog_error_publish_failed">Det gick inte att publicera.</string>
     <string name="blog_error_unpublish_failed">Det gick inte att avpublicera.</string>
     <string name="blog_error_delete_failed">Det gick inte att ta bort.</string>
-    <string name="blog_pick_images">Välj bilder</string>
+    <string name="blog_pick_images">Välj bilder eller videor</string>
     <string name="blog_reorder_block">Dra för att flytta blocket</string>
     <string name="blog_move_block_up">Flytta blocket uppåt</string>
     <string name="blog_move_block_down">Flytta blocket nedåt</string>
@@ -47,15 +47,15 @@
     <string name="blog_save_device">Spara utkast på enheten</string>
     <string name="blog_discard_draft">Ta bort utkast</string>
     <string name="blog_publish_changes">Publicera ändringar</string>
-    <string name="blog_publishing">Publicerar inlägg och bilder…</string>
-    <string name="blog_staging_images">Sparar bilder på enheten…</string>
+    <string name="blog_publishing">Publicerar inlägg och media…</string>
+    <string name="blog_staging_images">Sparar media på enheten…</string>
     <string name="blog_image_url_queued">Bilden hämtas när du publicerar.</string>
     <string name="blog_image_unavailable">Bilden är inte tillgänglig</string>
     <string name="blog_error_draft_load">Det gick inte att öppna utkastet.</string>
     <string name="blog_error_publish_retry">Det gick inte att publicera. Utkastet finns kvar på enheten. Försök igen.</string>
-    <string name="blog_error_stage_image">Bilden kunde inte sparas på enheten.</string>
-    <string name="blog_error_stage_image_batch">Bilder som inte kunde sparas på enheten: %1$d\n%2$s</string>
-    <string name="blog_upload_photo_count">%1$d av %2$d bilder klara</string>
+    <string name="blog_error_stage_image">Filen kunde inte sparas. Max 25 MiB per fil.</string>
+    <string name="blog_error_stage_image_batch">Filer som inte kunde sparas på enheten: %1$d\n%2$s</string>
+    <string name="blog_upload_photo_count">%1$d av %2$d filer klara</string>
     <string name="blog_upload_bytes">%1$s av %2$s skickat</string>
     <string name="blog_upload_minutes">Cirka %1$d min kvar</string>
     <string name="blog_upload_seconds">Cirka %1$d sek kvar</string>
@@ -69,5 +69,8 @@
     <string name="blog_publish_interrupted">Anslutningen avbröts eller så gick det inte att läsa filen.</string>
     <string name="blog_publish_unexpected">Ett oväntat fel uppstod under publiceringen.</string>
     <string name="blog_publish_http_error">Servern svarade med HTTP %1$d.</string>
-    <string name="blog_publish_photo_error">Fel vid publicering av bilden %1$s</string>
+    <string name="blog_publish_photo_error">Fel vid publicering av filen %1$s</string>
+    <string name="blog_play_video">Spela video: %1$s</string>
+    <string name="blog_video_playback_error">Videon kunde inte spelas upp.</string>
+    <string name="blog_image_from_url">Bild från länk</string>
 </resources>

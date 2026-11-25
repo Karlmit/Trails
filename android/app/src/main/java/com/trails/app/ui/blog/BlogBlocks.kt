@@ -21,7 +21,7 @@ import kotlinx.serialization.json.intOrNull
  */
 sealed class BlogBlock {
     data class TextBlock(val runs: List<InlineRun>, val kind: TextBlockKind = TextBlockKind.PARAGRAPH) : BlogBlock()
-    data class ImageBlock(val photoId: String) : BlogBlock()
+    data class ImageBlock(val photoId: String, val isVideo: Boolean = false) : BlogBlock()
 }
 
 private val PHOTO_ID_REGEX = Regex("/api/v1/photos/([^/]+)/file")
@@ -36,10 +36,11 @@ fun parseBlogBlocks(raw: String?): List<BlogBlock> {
         for (blockEl in list) {
             val block = blockEl as? JsonObject ?: continue
             val type = (block["type"] as? JsonPrimitive)?.content
-            if (type == "layoutImage") {
+            if (type == "layoutImage" || type == "video") {
                 val url = ((block["props"] as? JsonObject)?.get("url") as? JsonPrimitive)?.content
                 val photoId = url?.let { PHOTO_ID_REGEX.find(it)?.groupValues?.get(1) }
-                if (photoId != null) result.add(BlogBlock.ImageBlock(photoId))
+                val kind = ((block["props"] as? JsonObject)?.get("mediaKind") as? JsonPrimitive)?.content
+                if (photoId != null) result.add(BlogBlock.ImageBlock(photoId, isVideo = type == "video" || kind == "video"))
             } else {
                 val runs = contentToInlineRuns(block["content"])
                 if (runs.any { it.text.isNotBlank() }) {

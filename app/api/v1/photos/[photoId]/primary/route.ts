@@ -46,6 +46,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const target = await prisma.photo.findUnique({ where: { id: photoId } });
   if (!target) return Errors.notFound('Photo not found');
+  if (target.mimeType.startsWith('video/')) return Errors.validation('A video cannot be the cover photo');
 
   try {
     const [, updated] = await prisma.$transaction(

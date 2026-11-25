@@ -37,6 +37,7 @@ const layoutImageBlock = createReactBlockSpec(
     type: 'layoutImage',
     propSchema: {
       url: { default: '' },
+      mediaKind: { default: 'image', values: ['image', 'video'] },
       layout: {
         default: 'block',
         values: ['block', 'float-left', 'float-right'],
@@ -60,10 +61,10 @@ const layoutImageBlock = createReactBlockSpec(
         try {
           const url = await editor.uploadFile(file);
           if (typeof url === 'string') {
-            editor.updateBlock(block, { props: { ...block.props, url } });
+            editor.updateBlock(block, { props: { ...block.props, url, mediaKind: file.type.startsWith('video/') ? 'video' : 'image' } });
           }
         } catch {
-          setUploadError('Could not upload this image. Please try again.');
+          setUploadError(t('mediaUploadError'));
         } finally {
           setUploading(false);
         }
@@ -111,7 +112,7 @@ const layoutImageBlock = createReactBlockSpec(
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                {uploading ? t('uploading') : t('addImage')}
+                {uploading ? t('uploading') : t('addMedia')}
               </button>
               <UrlImportField
                 toggleLabel={t('addImageFromUrl')}
@@ -123,7 +124,7 @@ const layoutImageBlock = createReactBlockSpec(
                 disabled={uploading}
               />
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleFileChange} />
+            <input ref={fileInputRef} type="file" accept="image/*,video/mp4,video/webm" hidden onChange={handleFileChange} />
             {uploadError && <div className="field-error">{uploadError}</div>}
           </div>
         );
@@ -152,7 +153,9 @@ const layoutImageBlock = createReactBlockSpec(
               </button>
             </div>
           )}
-          <img src={block.props.url} alt="" />
+          {block.props.mediaKind === 'video'
+            ? <video src={block.props.url} controls playsInline preload="metadata" />
+            : <img src={block.props.url} alt="" />}
         </div>
       );
     },

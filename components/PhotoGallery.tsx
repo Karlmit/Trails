@@ -331,42 +331,57 @@ export function PhotoGallery({
         <div className="photo-gallery">
           {photos.map((photo) => (
             <div key={photo.id} className="photo-thumb-wrap">
-              <Image
-                src={fileUrl(photo.id)}
-                alt={photo.originalFilename}
-                width={THUMB_SIZE}
-                height={THUMB_SIZE}
-                className="photo-thumb"
-                // DISCLOSED DEVIATION from AD-5's literal "rely on Next.js
-                // <Image> on-the-fly optimization" -- verified live against
-                // the built-in Docker stack: Next's Image Optimization API
-                // fetches the `url` param via its own internal request,
-                // which does not forward the browser's session cookie (a
-                // Next.js platform limitation, not a choice made here). For
-                // a Photo behind auth (any non-Public-Trip, non-Guest-
-                // eligible context), that internal fetch 404s inside our own
-                // Route Handler, and the optimizer then serves a broken
-                // image instead of the original -- confirmed by a live
-                // cookie-attached request to /_next/image for an
-                // authenticated User's own Private-Trip Photo returning 400.
-                // `unoptimized` renders a plain <img src> instead, which the
-                // browser requests directly (carrying its own cookies
-                // normally) -- still no custom server-side thumbnailing
-                // service (AD-5's actual "Prevents"), just no on-the-fly
-                // resize on top of the stored original.
-                unoptimized
-              />
+              {photo.mimeType.startsWith('video/') ? (
+                <video
+                  src={fileUrl(photo.id)}
+                  aria-label={photo.originalFilename}
+                  width={THUMB_SIZE}
+                  height={THUMB_SIZE}
+                  className="photo-thumb"
+                  controls
+                  playsInline
+                  preload="none"
+                />
+              ) : (
+                <Image
+                  src={fileUrl(photo.id)}
+                  alt={photo.originalFilename}
+                  width={THUMB_SIZE}
+                  height={THUMB_SIZE}
+                  className="photo-thumb"
+                  // DISCLOSED DEVIATION from AD-5's literal "rely on Next.js
+                  // <Image> on-the-fly optimization" -- verified live against
+                  // the built-in Docker stack: Next's Image Optimization API
+                  // fetches the `url` param via its own internal request,
+                  // which does not forward the browser's session cookie (a
+                  // Next.js platform limitation, not a choice made here). For
+                  // a Photo behind auth (any non-Public-Trip, non-Guest-
+                  // eligible context), that internal fetch 404s inside our own
+                  // Route Handler, and the optimizer then serves a broken
+                  // image instead of the original -- confirmed by a live
+                  // cookie-attached request to /_next/image for an
+                  // authenticated User's own Private-Trip Photo returning 400.
+                  // `unoptimized` renders a plain <img src> instead, which the
+                  // browser requests directly (carrying its own cookies
+                  // normally) -- still no custom server-side thumbnailing
+                  // service (AD-5's actual "Prevents"), just no on-the-fly
+                  // resize on top of the stored original.
+                  unoptimized
+                />
+              )}
               {photo.isPrimary && <span className="badge photo-thumb-primary-badge">{tShared('photoGalleryCoverBadge')}</span>}
               {!readOnly && (
                 <div className="photo-thumb-controls">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => handleMarkPrimary(photo)}
-                    disabled={photo.isPrimary || busyIds.has(photo.id)}
-                  >
-                    {photo.isPrimary ? tShared('photoGalleryCoverPhoto') : tShared('photoGallerySetAsCover')}
-                  </button>
+                  {!photo.mimeType.startsWith('video/') && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => handleMarkPrimary(photo)}
+                      disabled={photo.isPrimary || busyIds.has(photo.id)}
+                    >
+                      {photo.isPrimary ? tShared('photoGalleryCoverPhoto') : tShared('photoGallerySetAsCover')}
+                    </button>
+                  )}
                   <label className="row" style={{ gap: 'var(--space-1)', alignItems: 'center', margin: 0 }}>
                     <input
                       type="checkbox"

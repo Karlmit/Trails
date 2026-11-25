@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromApiRequest } from '@/lib/auth';
 import { Errors } from '@/lib/api-errors';
 import { isUuid } from '@/lib/uuid';
+import { isBlogVideoMimeType } from '@/lib/photos';
+import { videoByteRange } from '@/lib/video-range';
 import { canViewTrip, filterForViewer, type Viewer } from '@/lib/viewer';
 
 interface RouteParams {
@@ -84,17 +86,29 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return Errors.notFound('File not found on disk');
   }
 
-  return new NextResponse(new Uint8Array(bytes), {
-    status: 200,
-    headers: {
-      'Content-Type': photo.mimeType,
-      'Content-Disposition': contentDisposition(photo.originalFilename),
-      'Content-Length': String(bytes.length),
-      'X-Content-Type-Options': 'nosniff',
-      // `private` (never a shared/CDN cache): this response's visibility
-      // varies per-viewer (the check above), so only the requesting
-      // browser's own cache may keep a copy.
-      'Cache-Control': 'private, max-age=3600',
-    },
+  const headers = new Headers({
+    'Content-Type': photo.mimeType,
+    'Content-Disposition': contentDisposition(photo.originalFilename),
+    'Content-Length': String(bytes.length),
+    'X-Content-Type-Options': 'nosniff',
+    // A shared cache cannot reuse a response across different viewers.
+    'Cache-Control': 'private, max-age=3600',
   });
+  if (isBlogVideoMimeType(photo.mimeType)) {
+    headers.set('Accept-Ranges', 'bytes');
+    const requestedRange = request.headers.get('range');
+    if (requestedRange) {
+      const range = videoByteRange(requestedRange, bytes.length);
+      if (!range) {
+        headers.set('Content-Range', `bytes */${bytes.length}`);
+        headers.set('Content-Length', '0');
+        return new NextResponse(null, { status: 416, headers });
+      }
+      const { start, end } = range;
+      headers.set('Content-Range', `bytes ${start}-${end}/${bytes.length}`);
+      headers.set('Content-Length', String(end - start + 1));
+      return new NextResponse(new Uint8Array(bytes.subarray(start, end + 1)), { status: 206, headers });
+    }
+  }
+  return new NextResponse(new Uint8Array(bytes), { status: 200, headers });
 }

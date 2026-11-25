@@ -66,6 +66,7 @@ export default async function BlogPage({ params }: PageProps) {
       ownerType: 'TIMELINE_ENTRY',
       ownerId: { in: visiblePosts.map((post) => post.id) },
       isPrimary: true,
+      mimeType: { startsWith: 'image/' },
     },
     select: { id: true, ownerId: true, isPrivate: true },
   });

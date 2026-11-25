@@ -48,7 +48,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   // PhotoGallery" shape as entries/[entryId]/page.tsx -- see that page's
   // identical comment for why this is required for a Guest.
   const allPhotos = await prisma.photo.findMany({
-    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
+    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, mimeType: { startsWith: 'image/' } },
     orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
   });
   const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);

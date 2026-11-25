@@ -1,5 +1,10 @@
 package com.trails.app.ui.documents
 
+import android.net.Uri
+import android.widget.MediaController
+import android.widget.VideoView
+import androidx.compose.ui.viewinterop.AndroidView
+
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -61,7 +66,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal enum class DocumentPreviewType { IMAGE, PDF, UNSUPPORTED }
+internal enum class DocumentPreviewType { IMAGE, PDF, VIDEO, UNSUPPORTED }
 
 internal fun documentPreviewType(mimeType: String, filename: String): DocumentPreviewType {
     val normalized = mimeType.substringBefore(';').trim().lowercase()
@@ -70,6 +75,7 @@ internal fun documentPreviewType(mimeType: String, filename: String): DocumentPr
     return when {
         normalized.startsWith("image/") -> DocumentPreviewType.IMAGE
         normalized == "application/pdf" -> DocumentPreviewType.PDF
+        normalized in setOf("video/mp4", "video/webm") -> DocumentPreviewType.VIDEO
         isGeneric && extension in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif") -> DocumentPreviewType.IMAGE
         isGeneric && extension == "pdf" -> DocumentPreviewType.PDF
         else -> DocumentPreviewType.UNSUPPORTED
@@ -182,6 +188,7 @@ internal fun DocumentViewerScreen(
     ) { padding ->
         when (documentPreviewType(mimeType, filename)) {
             DocumentPreviewType.IMAGE -> ImageViewer(localPath, filename, Modifier.padding(padding))
+            DocumentPreviewType.VIDEO -> VideoViewer(localPath, Modifier.padding(padding))
             DocumentPreviewType.PDF -> PdfViewer(File(localPath), pdfRenderer, Modifier.padding(padding))
             DocumentPreviewType.UNSUPPORTED -> UnsupportedViewer(
                 onOpenExternal = onOpenExternal,
@@ -388,6 +395,34 @@ internal fun boundedPdfBitmapSize(sourceWidth: Int, sourceHeight: Int): Pair<Int
     val pixelScale = kotlin.math.sqrt(maxPixels / sourcePixels)
     val scale = minOf(targetScale, dimensionScale, pixelScale)
     return (sourceWidth * scale).toInt().coerceAtLeast(1) to (sourceHeight * scale).toInt().coerceAtLeast(1)
+}
+
+@Composable
+private fun VideoViewer(localPath: String, modifier: Modifier = Modifier) {
+    var playbackFailed by remember(localPath) { mutableStateOf(false) }
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (playbackFailed) {
+            Text(stringResource(R.string.blog_video_playback_error), color = Color.White)
+        } else {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
+                    VideoView(context).apply {
+                        val controls = MediaController(context)
+                        controls.setAnchorView(this)
+                        setMediaController(controls)
+                        setOnPreparedListener { start() }
+                        setOnErrorListener { _, _, _ ->
+                            playbackFailed = true
+                            true
+                        }
+                        setVideoURI(Uri.fromFile(File(localPath)))
+                    }
+                },
+                onRelease = { it.stopPlayback() },
+            )
+        }
+    }
 }
 
 @Composable

@@ -244,7 +244,13 @@ fun BlogEditScreen(
                             val label = staged?.filename ?: remote?.originalFilename
                                 ?: stringResource(R.string.blog_image_unavailable)
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                                if (file != null) {
+                                if (block.isVideo) {
+                                    TextButton(
+                                        onClick = { if (staged != null) localPreviewId = block.id else onOpenPhoto(block.photoId) },
+                                        enabled = file != null || remote != null,
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text(stringResource(R.string.blog_play_video, label)) }
+                                } else if (file != null) {
                                     AsyncImage(
                                         model = file,
                                         contentDescription = label,
@@ -282,7 +288,7 @@ fun BlogEditScreen(
                         onAddParagraph = { viewModel.addTextBlockAfter(block.id) },
                         onPickImages = {
                             pickerAfterId = block.id
-                            pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                         },
                         onImageUrl = { urlAfterId = block.id },
                     )
@@ -588,7 +594,7 @@ private fun BlogBlockInsertion(
                     onClick = { expanded = false; onPickImages() },
                 )
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.url_import_action)) },
+                    text = { Text(stringResource(R.string.blog_image_from_url)) },
                     onClick = { expanded = false; onImageUrl() },
                 )
             }

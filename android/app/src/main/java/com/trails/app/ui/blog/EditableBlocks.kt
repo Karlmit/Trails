@@ -47,7 +47,7 @@ sealed class EditableBlock {
     @Serializable
     data class Text(override val id: String, val kind: TextBlockKind, val runs: List<InlineRun>) : EditableBlock()
     @Serializable
-    data class Image(override val id: String, val photoId: String) : EditableBlock()
+    data class Image(override val id: String, val photoId: String, val isVideo: Boolean = false) : EditableBlock()
 }
 
 data class ParsedEditableContent(val blocks: List<EditableBlock>, val lostFormatting: Boolean)
@@ -97,10 +97,11 @@ fun parseEditableBlocks(raw: String?): ParsedEditableContent {
             val type = (block["type"] as? JsonPrimitive)?.content
             val id = (block["id"] as? JsonPrimitive)?.content ?: UUID.randomUUID().toString()
             when (type) {
-                "layoutImage" -> {
+                "layoutImage", "video" -> {
                     val url = ((block["props"] as? JsonObject)?.get("url") as? JsonPrimitive)?.content
                     val photoId = url?.let { PHOTO_ID_REGEX.find(it)?.groupValues?.get(1) }
-                    if (photoId != null) blocks.add(EditableBlock.Image(id, photoId))
+                    val kind = ((block["props"] as? JsonObject)?.get("mediaKind") as? JsonPrimitive)?.content
+                    if (photoId != null) blocks.add(EditableBlock.Image(id, photoId, isVideo = type == "video" || kind == "video"))
                 }
                 "paragraph" -> blocks.add(EditableBlock.Text(id, TextBlockKind.PARAGRAPH, contentToInlineRuns(block["content"])))
                 "heading" -> {
@@ -185,6 +186,7 @@ fun encodeEditableBlocks(blocks: List<EditableBlock>): String {
                             buildJsonObject {
                                 put("url", "/api/v1/photos/${block.photoId}/file")
                                 put("layout", "block")
+                                if (block.isVideo) put("mediaKind", "video")
                             },
                         )
                         putJsonArray("children") {}

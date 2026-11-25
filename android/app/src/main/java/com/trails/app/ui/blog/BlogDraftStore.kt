@@ -31,7 +31,7 @@ import javax.inject.Singleton
 
 internal const val LOCAL_BLOG_PREFIX = "local-"
 private const val MAX_DRAFT_PHOTO_BYTES = 25 * 1024 * 1024
-private val supportedPhotoTypes = setOf("image/jpeg", "image/png", "image/webp", "image/gif")
+private val supportedMediaTypes = setOf("image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm")
 
 @Serializable
 data class DraftPhoto(
@@ -107,8 +107,8 @@ class BlogDraftStore @Inject constructor(
     suspend fun stage(scope: String, uri: Uri, filename: String): DraftPhoto = withContext(Dispatchers.IO) {
         val mimeType = context.contentResolver.getType(uri)
             ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(filename.substringAfterLast('.', "").lowercase())
-            ?: throw IOException("Unknown image type")
-        if (mimeType !in supportedPhotoTypes) throw IOException("Unsupported image type")
+            ?: throw IOException("Unknown media type")
+        if (mimeType !in supportedMediaTypes) throw IOException("Unsupported media type")
         val photo = DraftPhoto(filename = filename.take(255), fileId = UUID.randomUUID().toString(), mimeType = mimeType)
         val file = checkNotNull(photoFile(scope, photo))
         file.parentFile?.mkdirs()
@@ -121,12 +121,12 @@ class BlogDraftStore @Inject constructor(
                         val read = input.read(buffer)
                         if (read < 0) break
                         total += read
-                        if (total > MAX_DRAFT_PHOTO_BYTES) throw IOException("Image exceeds the upload limit")
+                        if (total > MAX_DRAFT_PHOTO_BYTES) throw IOException("Media file exceeds the upload limit")
                         output.write(buffer, 0, read)
                     }
                 }
             } ?: throw IOException("Could not open image")
-            if (file.length() == 0L) throw IOException("Empty image")
+            if (file.length() == 0L) throw IOException("Empty media file")
             photo
         } catch (failure: Exception) {
             file.delete()

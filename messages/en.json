@@ -362,6 +362,8 @@
     "publishedAt": "Published {time} · visible on the Timeline",
     "confirmDelete": "Delete \"{title}\"? This cannot be undone.",
     "uploading": "Uploading…",
+    "addMedia": "Add photo or video",
+    "mediaUploadError": "Could not upload this file. Please try again.",
     "addImage": "🖼️ Add image",
     "addImageFromUrl": "🔗 Add from URL",
     "imageUrlPlaceholder": "https://example.com/photo.jpg",

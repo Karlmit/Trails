@@ -14,7 +14,7 @@
     <string name="blog_remove_image_desc">Remove image</string>
     <string name="blog_uploading_image">Uploading image…</string>
     <string name="blog_uploading">Uploading…</string>
-    <string name="blog_add_image">+ Add images</string>
+    <string name="blog_add_image">+ Add media</string>
 
     <string name="blog_save_button">Save</string>
     <string name="blog_unpublish_button">Unpublish</string>
@@ -39,7 +39,7 @@
     <string name="blog_error_publish_failed">Failed to publish.</string>
     <string name="blog_error_unpublish_failed">Failed to unpublish.</string>
     <string name="blog_error_delete_failed">Failed to delete.</string>
-    <string name="blog_pick_images">Choose images</string>
+    <string name="blog_pick_images">Choose photos or videos</string>
     <string name="blog_reorder_block">Drag to reorder block</string>
     <string name="blog_move_block_up">Move block up</string>
     <string name="blog_move_block_down">Move block down</string>
@@ -47,15 +47,15 @@
     <string name="blog_save_device">Save draft on device</string>
     <string name="blog_discard_draft">Discard draft</string>
     <string name="blog_publish_changes">Publish changes</string>
-    <string name="blog_publishing">Publishing post and images…</string>
-    <string name="blog_staging_images">Saving images on device…</string>
+    <string name="blog_publishing">Publishing post and media…</string>
+    <string name="blog_staging_images">Saving media on device…</string>
     <string name="blog_image_url_queued">Image will be imported when you publish.</string>
     <string name="blog_image_unavailable">Image unavailable</string>
     <string name="blog_error_draft_load">Could not open the draft.</string>
     <string name="blog_error_publish_retry">Could not publish. Your draft is still on this device. Try again.</string>
-    <string name="blog_error_stage_image">Could not save this image on the device.</string>
-    <string name="blog_error_stage_image_batch">Images that could not be saved on the device: %1$d\n%2$s</string>
-    <string name="blog_upload_photo_count">%1$d of %2$d photos complete</string>
+    <string name="blog_error_stage_image">Could not save this file. The limit is 25 MiB per file.</string>
+    <string name="blog_error_stage_image_batch">Files that could not be saved on the device: %1$d\n%2$s</string>
+    <string name="blog_upload_photo_count">%1$d of %2$d files complete</string>
     <string name="blog_upload_bytes">%1$s of %2$s sent</string>
     <string name="blog_upload_minutes">About %1$d min remaining</string>
     <string name="blog_upload_seconds">About %1$d sec remaining</string>
@@ -69,5 +69,8 @@
     <string name="blog_publish_interrupted">The connection was interrupted or the file could not be read.</string>
     <string name="blog_publish_unexpected">An unexpected error occurred during publishing.</string>
     <string name="blog_publish_http_error">The server returned HTTP %1$d.</string>
-    <string name="blog_publish_photo_error">Error while publishing photo %1$s</string>
+    <string name="blog_publish_photo_error">Error while publishing file %1$s</string>
+    <string name="blog_play_video">Play video: %1$s</string>
+    <string name="blog_video_playback_error">This video could not be played.</string>
+    <string name="blog_image_from_url">Image from link</string>
 </resources>

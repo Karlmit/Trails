@@ -291,7 +291,7 @@ class BlogEditViewModel @Inject constructor(
 
     private fun insertPhotoAfter(afterId: String?, id: String, photo: DraftPhoto) = edit { current ->
         val index = current.blocks.indexOfFirst { it.id == afterId }
-        val image = EditableBlock.Image(id, photo.uploadedId ?: id)
+        val image = EditableBlock.Image(id, photo.uploadedId ?: id, isVideo = photo.mimeType?.startsWith("video/") == true)
         val blocks = current.blocks.toMutableList().apply { add(if (index >= 0) index + 1 else size, image) }
         current.copy(blocks = blocks, pendingPhotos = current.pendingPhotos + (id to photo))
     }

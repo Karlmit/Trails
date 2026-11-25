@@ -1677,7 +1677,8 @@ body.has-notify-bar .page:has(.fab) {
   margin-bottom: var(--space-2);
 }
 
-.rte-layout-image img {
+.rte-layout-image img,
+.rte-layout-image video {
   display: block;
   max-width: 100%;
   height: auto;

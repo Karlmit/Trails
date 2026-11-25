@@ -9,6 +9,7 @@ import {
   ALLOWED_MIME_TYPES,
   buildUploadPath,
   isAllowedMimeType,
+  isBlogVideoMimeType,
   isPhotoOwnerType,
   MAX_MULTIPART_UPLOAD_BYTES,
   MAX_UPLOAD_BYTES,
@@ -159,6 +160,9 @@ async function createPhotoFromBytes(input: {
 
   const owner = await resolveOwnerTripId(ownerType, ownerId);
   if (!owner) return Errors.notFound('Owner not found');
+  if (isBlogVideoMimeType(mimeType) && owner.entryType !== 'BLOG_POST') {
+    return Errors.validation('Videos can only be uploaded to blog posts');
+  }
 
   const filePath = buildUploadPath(owner.tripId, ownerType, ownerId, originalFilename);
 
@@ -294,7 +298,7 @@ export async function POST(request: NextRequest) {
 
   // I/O matrix: "Upload a Photo -- Valid JPEG/PNG -- 201 ... Unsupported
   // format -- Rejected before any write, 400, same as Attachments."
-  if (!isAllowedMimeType(file.type)) {
+  if (!isAllowedMimeType(file.type) && !isBlogVideoMimeType(file.type)) {
     return Errors.validation(
       `Unsupported file type "${file.type || 'unknown'}". Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
     );

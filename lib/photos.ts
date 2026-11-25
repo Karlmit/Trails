@@ -24,6 +24,10 @@ export { MAX_MULTIPART_UPLOAD_BYTES, MAX_UPLOAD_BYTES, buildUploadPath, formatAt
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 export type AllowedPhotoMimeType = (typeof ALLOWED_MIME_TYPES)[number];
 
+export function isBlogVideoMimeType(mimeType: string): boolean {
+  return mimeType === 'video/mp4' || mimeType === 'video/webm';
+}
+
 export function isAllowedMimeType(mimeType: string): mimeType is AllowedPhotoMimeType {
   return (ALLOWED_MIME_TYPES as readonly string[]).includes(mimeType);
 }
