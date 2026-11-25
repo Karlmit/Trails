@@ -43,22 +43,16 @@ internal fun selectIdeaDetailPhotos(photos: List<PhotoEntity>): IdeaDetailPhotos
 fun IdeaDetailScreen(
     padding: PaddingValues,
     onOpenPhoto: (String) -> Unit,
-    onConverted: () -> Unit,
+    onConvert: () -> Unit,
     viewModel: IdeaDetailViewModel = hiltViewModel(),
     sectionsViewModel: SectionsViewModel = hiltViewModel(),
 ) {
     val idea by viewModel.idea.collectAsState()
     val photos by viewModel.photos.collectAsState()
     val links by viewModel.links.collectAsState()
-    val converting by viewModel.converting.collectAsState()
-    val converted by viewModel.converted.collectAsState()
-    val error by viewModel.error.collectAsState()
-    val errorRes by viewModel.errorRes.collectAsState()
     val sections by sectionsViewModel.sections.collectAsState(initial = emptyList())
     val context = LocalContext.current
-    var showConvertConfirm by remember { mutableStateOf(false) }
 
-    LaunchedEffect(converted) { if (converted) onConverted() }
     val currentIdea = idea
     if (currentIdea == null) {
         Text(stringResource(R.string.timeline_loading), modifier = Modifier.padding(padding), color = TrailsColors.TextSoft)
@@ -73,8 +67,6 @@ fun IdeaDetailScreen(
             modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val errorText = error ?: errorRes?.let { stringResource(it) }
-            errorText?.let { ErrorBanner(it) }
 
             IdeaHero(displayPhotos.cover, onOpenPhoto)
 
@@ -124,20 +116,13 @@ fun IdeaDetailScreen(
                 }
             }
 
-            if (converting) CircularProgressIndicator() else PillButton(
+            PillButton(
                 text = stringResource(R.string.idea_edit_convert_button), variant = PillButtonVariant.Outline,
-                onClick = { showConvertConfirm = true }, modifier = Modifier.fillMaxWidth(),
+                onClick = onConvert, modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 
-    if (showConvertConfirm) AlertDialog(
-        onDismissRequest = { showConvertConfirm = false },
-        title = { Text(stringResource(R.string.idea_edit_convert_dialog_title)) },
-        text = { Text(stringResource(R.string.idea_edit_convert_dialog_text)) },
-        confirmButton = { TextButton(onClick = { showConvertConfirm = false; viewModel.convertToEntry() }) { Text(stringResource(R.string.idea_edit_convert_confirm_button)) } },
-        dismissButton = { TextButton(onClick = { showConvertConfirm = false }) { Text(stringResource(R.string.idea_edit_convert_cancel_button)) } },
-    )
 }
 
 @Composable

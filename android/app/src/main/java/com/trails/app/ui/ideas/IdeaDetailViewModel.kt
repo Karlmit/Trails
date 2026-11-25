@@ -1,10 +1,8 @@
 package com.trails.app.ui.ideas
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.trails.app.R
 import com.trails.app.data.DocumentsRepository
 import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
@@ -51,16 +49,6 @@ class IdeaDetailViewModel @Inject constructor(
     private val _links = MutableStateFlow<List<LinkDto>>(emptyList())
     val links: StateFlow<List<LinkDto>> = _links
 
-    private val _converting = MutableStateFlow(false)
-    val converting: StateFlow<Boolean> = _converting
-    private val _converted = MutableStateFlow(false)
-    val converted: StateFlow<Boolean> = _converted
-    // Two fields, same reason as ChecklistDetailViewModel's own error/errorRes split.
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
-    private val _errorRes = MutableStateFlow<Int?>(null)
-    val errorRes: StateFlow<Int?> = _errorRes
-
     init {
         viewModelScope.launch {
             photos.collect { ownerPhotos ->
@@ -73,27 +61,5 @@ class IdeaDetailViewModel @Inject constructor(
             runCatching { linksTagsRepository.listLinks(OWNER_TYPE, ideaId) }
                 .onSuccess { _links.value = it }
         }
-    }
-
-    fun convertToEntry() {
-        _converting.value = true
-        _error.value = null
-        _errorRes.value = null
-        viewModelScope.launch {
-            runCatching { repository.convertToEntry(ideaId) }
-                .onSuccess {
-                    _converting.value = false
-                    _converted.value = true
-                }
-                .onFailure { e ->
-                    _converting.value = false
-                    setError(e, R.string.idea_edit_error_convert_failed)
-                }
-        }
-    }
-
-    private fun setError(e: Throwable, @StringRes fallback: Int) {
-        _error.value = e.message
-        _errorRes.value = if (e.message == null) fallback else null
     }
 }

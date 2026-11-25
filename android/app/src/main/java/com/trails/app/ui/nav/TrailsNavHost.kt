@@ -63,6 +63,7 @@ import com.trails.app.ui.documents.DocumentViewerState
 import com.trails.app.ui.documents.DocumentViewerViewModel
 import com.trails.app.ui.entrydetail.EntryDetailScreen
 import com.trails.app.ui.entrydetail.EntryEditScreen
+import com.trails.app.ui.entrydetail.EntryEditViewModel
 import com.trails.app.ui.ideas.IdeaDetailScreen
 import com.trails.app.ui.ideas.IdeaDetailViewModel
 import com.trails.app.ui.ideas.IdeaEditScreen
@@ -121,6 +122,7 @@ private val IDEAS_LIST_ROUTE_PATTERN = "trip/{$ARG_TRIP_ID}/${TripTab.IDEAS.rout
 private fun infoEditRoute(tripId: String, infoId: String?) = "trip/$tripId/important-info/${infoId ?: NEW_ID}/edit"
 private fun ideaEditRoute(tripId: String, ideaId: String?) = "trip/$tripId/ideas/${ideaId ?: NEW_ID}/edit"
 private fun ideaDetailRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId"
+private fun convertIdeaToEntryRoute(tripId: String, ideaId: String) = "trip/$tripId/ideas/$ideaId/convert"
 private fun convertEntryToIdeaRoute(tripId: String, entryId: String) = "trip/$tripId/entries/$entryId/convert-to-idea"
 internal fun documentViewerRoute(attachmentId: String, isPhoto: Boolean = false): String {
     val route = "document-viewer?$ARG_ATTACHMENT_ID=${Uri.encode(attachmentId)}"
@@ -375,7 +377,7 @@ fun TrailsNavHost(
                 IdeaDetailScreen(
                     padding,
                     onOpenPhoto = ::openPhoto,
-                    onConverted = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
+                    onConvert = { navController.navigate(convertIdeaToEntryRoute(tripId, ideaId)) },
                     viewModel = detailViewModel,
                 )
             }
@@ -405,8 +407,32 @@ fun TrailsNavHost(
                     padding,
                     onOpenPhoto = ::openPhoto,
                     onDone = { navController.popBackStack(IDEAS_LIST_ROUTE_PATTERN, inclusive = false) },
+                    onConvert = { id -> navController.navigate(convertIdeaToEntryRoute(tripId, id)) },
                     viewModel = editViewModel,
                 )
+            }
+        }
+
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/ideas/{$ARG_IDEA_ID}/convert",
+            arguments = listOf(
+                navArgument(ARG_TRIP_ID) { type = NavType.StringType },
+                navArgument(ARG_IDEA_ID) { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val tripId = entry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            val editor: EntryEditViewModel = hiltViewModel()
+            TripDrawerScaffold(
+                tripId, TripTab.IDEAS, stringResource(R.string.idea_edit_convert_button),
+                navController, showBackButton = true,
+            ) { padding ->
+                EntryEditScreen(padding, viewModel = editor, onDone = {
+                    editor.state.value.entryId?.let { id ->
+                        navController.navigate(entryDetailRoute(tripId, id)) {
+                            popUpTo(tripRoute(tripId, TripTab.TIMELINE.route)) { inclusive = false }
+                        }
+                    }
+                })
             }
         }
 

@@ -472,20 +472,4 @@ class IdeaEditViewModel @Inject constructor(
                 }
         }
     }
-
-    fun convertToEntry() {
-        val id = _state.value.ideaId ?: return
-        _state.value = _state.value.copy(saving = true, error = null, errorRes = null)
-        viewModelScope.launch {
-            runCatching { repository.convertToEntry(id) }
-                .onSuccess { _state.value = _state.value.copy(saving = false, converted = true) }
-                .onFailure { e ->
-                    _state.value = _state.value.copy(
-                        saving = false,
-                        error = e.message,
-                        errorRes = if (e.message == null) R.string.idea_edit_error_convert_failed else null,
-                    )
-                }
-        }
-    }
 }

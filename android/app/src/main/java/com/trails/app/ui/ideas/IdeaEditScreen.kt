@@ -58,6 +58,7 @@ fun IdeaEditScreen(
     padding: PaddingValues,
     onOpenPhoto: (String) -> Unit,
     onDone: () -> Unit,
+    onConvert: (String) -> Unit = {},
     viewModel: IdeaEditViewModel = hiltViewModel(),
     ideasViewModel: IdeasViewModel = hiltViewModel(),
     sectionsViewModel: SectionsViewModel = hiltViewModel(),
@@ -69,7 +70,6 @@ fun IdeaEditScreen(
     val categoryOptions by viewModel.categoryOptions.collectAsState()
     val context = LocalContext.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showConvertConfirm by remember { mutableStateOf(false) }
     // User-requested "post an image URL instead of uploading" -- see UrlImportDialog.
     var showPhotoUrlDialog by remember { mutableStateOf(false) }
 
@@ -234,7 +234,8 @@ fun IdeaEditScreen(
             PillButton(
                 text = stringResource(R.string.idea_edit_convert_button),
                 variant = PillButtonVariant.Outline,
-                onClick = { showConvertConfirm = true },
+                onClick = { state.ideaId?.let(onConvert) },
+                enabled = !state.saving,
                 modifier = Modifier.fillMaxWidth(),
             )
             PillButton(
@@ -267,13 +268,5 @@ fun IdeaEditScreen(
         )
     }
 
-    if (showConvertConfirm) {
-        AlertDialog(
-            onDismissRequest = { showConvertConfirm = false },
-            title = { Text(stringResource(R.string.idea_edit_convert_dialog_title)) },
-            text = { Text(stringResource(R.string.idea_edit_convert_dialog_text)) },
-            confirmButton = { TextButton(onClick = { showConvertConfirm = false; viewModel.convertToEntry() }) { Text(stringResource(R.string.idea_edit_convert_confirm_button)) } },
-            dismissButton = { TextButton(onClick = { showConvertConfirm = false }) { Text(stringResource(R.string.idea_edit_convert_cancel_button)) } },
-        )
-    }
+
 }

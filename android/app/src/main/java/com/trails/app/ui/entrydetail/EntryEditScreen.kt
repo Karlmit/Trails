@@ -118,6 +118,10 @@ fun EntryEditScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         state.error?.let { ErrorBanner(errorMessage(it)) }
+        if (!state.ready) {
+            if (state.error == null) Text(stringResource(R.string.timeline_loading))
+            return@Column
+        }
 
         TrailsCard {
         ScreenHeading(
@@ -147,9 +151,11 @@ fun EntryEditScreen(
             )
         }
 
-        if (isNote) {
+        if (state.convertingIdea) Text(stringResource(R.string.idea_edit_convert_dialog_text))
+        if (isNote || state.convertingIdea) {
             LabeledField(label = stringResource(R.string.timeline_field_title), value = state.title, onValueChange = viewModel::onTitleChange)
-        } else {
+        }
+        if (!isNote) {
             LabeledField(label = stringResource(R.string.timeline_field_location_name), value = state.locationName, onValueChange = viewModel::onLocationNameChange)
         }
         MultilineLabeledField(label = stringResource(R.string.timeline_field_description), value = state.description, onValueChange = viewModel::onDescriptionChange)

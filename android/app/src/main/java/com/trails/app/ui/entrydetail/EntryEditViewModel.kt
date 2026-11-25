@@ -4,9 +4,11 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trails.app.data.IdeaRepository
 import com.trails.app.data.LinksTagsRepository
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.network.apiErrorMessage
 import com.trails.app.network.dto.ActivityEntryRequest
 import com.trails.app.network.dto.NoteEntryRequest
 import com.trails.app.network.dto.StayEntryRequest
@@ -71,6 +73,8 @@ sealed class EntryEditError {
 
 data class EntryEditState(
     val entryId: String? = null,
+    val ready: Boolean = true,
+    val convertingIdea: Boolean = false,
     val entryType: String = "ACTIVITY",
     val subtype: String = ACTIVITY_SUBTYPES.first(),
     val title: String = "",
@@ -116,11 +120,14 @@ class EntryEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: TimelineRepository,
     private val linksTagsRepository: LinksTagsRepository,
+    private val ideaRepository: IdeaRepository,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val entryId: String? = savedStateHandle.get<String>("entryId")?.takeUnless { it == "new" }
 
-    private val _state = MutableStateFlow(EntryEditState(entryId = entryId))
+    private val sourceIdeaId: String? = savedStateHandle["ideaId"]
+
+    private val _state = MutableStateFlow(EntryEditState(entryId = entryId, ready = sourceIdeaId == null, convertingIdea = sourceIdeaId != null))
     val state: StateFlow<EntryEditState> = _state.asStateFlow()
 
     // Captured right after `loadFrom` populates the existing Entry's
@@ -140,17 +147,36 @@ class EntryEditViewModel @Inject constructor(
      * things that can actually differ between [originalFields] and a
      * later edit.
      */
-    private fun fieldsOf(current: EntryEditState): Map<String, JsonElement> {
-        val body = when (val request = toRequest(current)) {
+    private fun requestBody(current: EntryEditState): JsonObject = when (val request = toRequest(current)) {
             is TimelineEntryWriteRequest.Note -> Json.encodeToJsonElement(request.body)
             is TimelineEntryWriteRequest.Stay -> Json.encodeToJsonElement(request.body)
             is TimelineEntryWriteRequest.Transport -> Json.encodeToJsonElement(request.body)
             is TimelineEntryWriteRequest.Activity -> Json.encodeToJsonElement(request.body)
         } as JsonObject
-        return body.filterKeys { it != "tripId" && it != "entryType" }
-    }
+
+    private fun fieldsOf(current: EntryEditState): Map<String, JsonElement> =
+        requestBody(current).filterKeys { it != "tripId" && it != "entryType" }
 
     init {
+        sourceIdeaId?.let { id ->
+            viewModelScope.launch {
+                val idea = ideaRepository.observeForTrip(tripId).first().find { it.id == id }
+                _state.value = if (idea == null) {
+                    _state.value.copy(error = EntryEditError.Fixed(R.string.idea_edit_error_convert_failed))
+                } else {
+                    _state.value.copy(
+                        ready = true,
+                        title = idea.title,
+                        description = idea.description.orEmpty(),
+                        locationName = idea.locationName.orEmpty().ifBlank { idea.title },
+                        locationAddress = idea.locationAddress.orEmpty(),
+                        locationMapLink = idea.locationMapLink.orEmpty(),
+                        expenseAmount = idea.estimatedExpenseAmount?.toString().orEmpty(),
+                        expenseCurrency = idea.estimatedExpenseCurrency.orEmpty(),
+                    )
+                }
+            }
+        }
         entryId?.let { ownerId ->
             viewModelScope.launch {
                 runCatching { linksTagsRepository.listLinks(OWNER_TYPE, ownerId) }
@@ -417,8 +443,9 @@ class EntryEditViewModel @Inject constructor(
 
     fun save() {
         val current = _state.value
+        if (!current.ready || current.saving) return
         val effectiveTitle = if (current.entryType == "NOTE") current.title else current.locationName
-        if (effectiveTitle.isBlank()) {
+        if (effectiveTitle.isBlank() || (current.convertingIdea && current.title.isBlank())) {
             _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_title_required))
             return
         }
@@ -443,7 +470,13 @@ class EntryEditViewModel @Inject constructor(
         _state.value = current.copy(saving = true, error = null)
         viewModelScope.launch {
             runCatching {
-                if (current.entryId == null) {
+                if (sourceIdeaId != null) {
+                    val fields = JsonObject(requestBody(current) + mapOf(
+                        "entryType" to JsonPrimitive(current.entryType),
+                        "title" to JsonPrimitive(current.title.trim()),
+                    ))
+                    ideaRepository.convertToEntry(sourceIdeaId, fields)
+                } else if (current.entryId == null) {
                     repository.createTimelineEntry(toRequest(current))
                 } else {
                     repository.updateTimelineEntry(current.entryId, diffFields(originalFields, fieldsOf(current)))
@@ -454,7 +487,7 @@ class EntryEditViewModel @Inject constructor(
                 }
                 _state.value = _state.value.copy(saving = false, saved = true, entryId = result.id)
             }.onFailure { e ->
-                _state.value = _state.value.copy(saving = false, error = e.message?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_save_entry_failed))
+                _state.value = _state.value.copy(saving = false, error = (e.apiErrorMessage() ?: e.message)?.let { EntryEditError.Raw(it) } ?: EntryEditError.Fixed(R.string.timeline_error_save_entry_failed))
             }
         }
     }
