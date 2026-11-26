@@ -4,6 +4,7 @@ import com.trails.app.auth.TokenStore
 import okhttp3.Interceptor
 import okhttp3.Response
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 
 // Reads TokenStore's in-memory cached token synchronously (never blocks the
 // OkHttp dispatcher thread on a DataStore read) -- the cache is primed once
@@ -22,10 +23,19 @@ class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor {
             originalRequest
         }
         val response = chain.proceed(request)
-        if (response.code == 401 && token != null && !isLoginRequest) {
+        if (response.code == 401 && token != null && !isLoginRequest &&
+            response.request.url.scheme == request.url.scheme &&
+            response.request.url.host == request.url.host &&
+            response.request.url.port == request.url.port &&
+            isSessionRejection(runCatching { response.peekBody(8192).string() }.getOrNull())
+        ) {
             // A server-confirmed rejection is the only network outcome that
             // invalidates a session. Room content is intentionally untouched.
-            runBlocking { tokenStore.clearIfCurrent(token) }
+            try {
+                runBlocking { tokenStore.clearIfCurrent(token) }
+            } catch (_: IOException) {
+                // Leave the original HTTP error available to the caller.
+            }
         }
         return response
     }

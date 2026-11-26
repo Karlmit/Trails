@@ -4,12 +4,12 @@ import type { Session, User } from '@prisma/client';
 
 // AD-6: one login endpoint issues an opaque token both a browser (httpOnly
 // cookie) and a future mobile client (JSON body) can use, backed by a
-// single `sessions` table with exactly one invalidation path
-// (`revokeSession`). A session is valid only if
+// single `sessions` table. A session is valid only if
 // `expires_at > now() AND revoked_at IS NULL`.
 
 export const SESSION_COOKIE_NAME = 'trails_session';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_RENEWAL_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Whether the session cookie is marked `Secure`. Deliberately driven by an
 // explicit env var, not `NODE_ENV`: `NODE_ENV=production` only describes the
@@ -68,9 +68,23 @@ export async function validateSession(
 }
 
 /**
- * Ends a session before its natural expiry. This is the only path allowed
- * to mutate a `sessions` row's `revoked_at` -- no feature deletes or
- * otherwise mutates a session row any other way (AD-6). Idempotent: revoking
+ * Gives active bearer sessions approximately 30 days of idle time, with
+ * at most one renewal write per day.
+ * The conditional update preserves concurrent renewals and revocations.
+ */
+export async function renewBearerSession(session: Pick<Session, 'id' | 'expiresAt'>): Promise<void> {
+  const now = new Date();
+  const threshold = new Date(now.getTime() + SESSION_TTL_MS - SESSION_RENEWAL_INTERVAL_MS);
+  if (session.expiresAt > threshold) return;
+
+  await prisma.session.updateMany({
+    where: { id: session.id, revokedAt: null, expiresAt: { gt: now, lte: threshold } },
+    data: { expiresAt: new Date(now.getTime() + SESSION_TTL_MS) },
+  });
+}
+
+/**
+ * Ends a session before its natural expiry. Idempotent: revoking
  * an already-revoked or unknown token is a no-op, not an error.
  */
 export async function revokeSession(token: string): Promise<void> {

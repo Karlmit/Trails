@@ -3,6 +3,9 @@
     <!-- Login -->
     <string name="shell_login_title">Logga in</string>
     <string name="shell_login_subtitle">Välkommen tillbaka till Trails.</string>
+    <string name="shell_login_restore_failed">Det gick inte att läsa den sparade inloggningen.</string>
+    <string name="shell_login_restore_retry">Försök igen</string>
+    <string name="shell_login_restoring_session">Återställer din inloggning…</string>
     <string name="shell_login_username_label">Användarnamn</string>
     <string name="shell_login_password_label">Lösenord</string>
     <string name="shell_login_please_wait">Vänta…</string>

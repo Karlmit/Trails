@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_updates_label">Appuppdateringar</string>
+    <string name="settings_updates_check">Sök efter uppdateringar</string>
+    <string name="settings_updates_checking">Söker efter uppdateringar…</string>
+    <string name="settings_updates_current">Du har den senaste versionen av Trails.</string>
+    <string name="settings_updates_failed">Det gick inte att söka efter uppdateringar. Försök igen.</string>
+</resources>

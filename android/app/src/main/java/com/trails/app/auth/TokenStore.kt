@@ -37,11 +37,11 @@ class TokenStore @Inject constructor(@ApplicationContext context: Context) {
     fun cachedTokenOrNull(): String? = cachedToken
 
     /** Reads the persisted token, refreshing the in-memory cache, and returns it. */
-    suspend fun currentToken(): String? {
+    suspend fun currentToken(): String? = mutationMutex.withLock {
         val stored = dataStore.data.first()[tokenKey]
         cachedToken = stored
         _sessionState.value = if (stored != null) SessionState.Authenticated else SessionState.Unauthenticated
-        return stored
+        stored
     }
 
     suspend fun save(token: String, username: String) = mutationMutex.withLock {

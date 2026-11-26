@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -16,6 +17,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 data class UpdateInfo(val versionName: String, val releaseNotes: String, val apkUrl: String)
+
+sealed interface UpdateCheckResult {
+    data class Available(val info: UpdateInfo) : UpdateCheckResult
+    data object UpToDate : UpdateCheckResult
+    data object Failed : UpdateCheckResult
+}
 
 /**
  * In-app OTA updater -- same pattern as github.com/Karlmit/Boet's updater:
@@ -34,27 +41,30 @@ class UpdateChecker @Inject constructor(@ApplicationContext private val context:
     private val http = OkHttpClient()
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Null if up to date, offline, or the check failed for any reason -- never throws. */
-    suspend fun check(): UpdateInfo? = withContext(Dispatchers.IO) {
-        runCatching {
+    suspend fun check(): UpdateCheckResult = withContext(Dispatchers.IO) {
+        try {
             val request = Request.Builder()
                 .url(RELEASES_API)
                 .header("Accept", "application/vnd.github+json")
                 .build()
             val release = http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
+                if (!response.isSuccessful) return@withContext UpdateCheckResult.Failed
                 json.decodeFromString(GitHubRelease.serializer(), response.body?.string().orEmpty())
             }
             val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-                ?: return@withContext null
-            val remoteVersion = versionFromTag(release.tagName) ?: return@withContext null
-            val installedVersion = currentVersion() ?: return@withContext null
+                ?: return@withContext UpdateCheckResult.Failed
+            val remoteVersion = versionFromTag(release.tagName) ?: return@withContext UpdateCheckResult.Failed
+            val installedVersion = currentVersion() ?: return@withContext UpdateCheckResult.Failed
             if (isNewer(remoteVersion, installedVersion)) {
-                UpdateInfo(remoteVersion, release.body.trim(), apkAsset.browserDownloadUrl)
+                UpdateCheckResult.Available(UpdateInfo(remoteVersion, release.body.trim(), apkAsset.browserDownloadUrl))
             } else {
-                null
+                UpdateCheckResult.UpToDate
             }
-        }.getOrNull()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            UpdateCheckResult.Failed
+        }
     }
 
     /** True if already permitted; otherwise sends the user to the OS "install unknown apps" settings screen and returns false. */

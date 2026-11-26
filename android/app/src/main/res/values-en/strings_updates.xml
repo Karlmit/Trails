@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_updates_label">App updates</string>
+    <string name="settings_updates_check">Check for updates</string>
+    <string name="settings_updates_checking">Checking for updates…</string>
+    <string name="settings_updates_current">You have the latest version of Trails.</string>
+    <string name="settings_updates_failed">Could not check for updates. Try again.</string>
+</resources>

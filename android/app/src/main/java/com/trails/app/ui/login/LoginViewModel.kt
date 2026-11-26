@@ -9,11 +9,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
+    val restoringSession: Boolean = true,
+    val restoreFailed: Boolean = false,
     val isLoading: Boolean = false,
     // Dynamic, server-provided error text (e.g. from a thrown exception) --
     // takes precedence over [errorRes] when non-null.
@@ -33,9 +36,24 @@ class LoginViewModel @Inject constructor(
     val uiState: StateFlow<LoginUiState> = _uiState
 
     init {
+        restoreSession()
+    }
+
+    fun retryRestore() {
+        if (!_uiState.value.restoreFailed || _uiState.value.restoringSession) return
+        _uiState.value = _uiState.value.copy(restoringSession = true, restoreFailed = false)
+        restoreSession()
+    }
+
+    private fun restoreSession() {
         viewModelScope.launch {
-            if (authRepository.hasValidStoredSession()) {
-                _uiState.value = _uiState.value.copy(alreadyLoggedIn = true)
+            try {
+                val restored = authRepository.hasValidStoredSession()
+                _uiState.value = _uiState.value.copy(alreadyLoggedIn = restored)
+            } catch (_: IOException) {
+                _uiState.value = _uiState.value.copy(restoreFailed = true)
+            } finally {
+                _uiState.value = _uiState.value.copy(restoringSession = false)
             }
         }
     }
@@ -50,6 +68,7 @@ class LoginViewModel @Inject constructor(
 
     fun login(onSuccess: () -> Unit) {
         val state = _uiState.value
+        if (state.restoringSession || state.isLoading) return
         if (state.username.isBlank() || state.password.isBlank()) {
             _uiState.value = state.copy(error = null, errorRes = R.string.shell_login_missing_credentials)
             return

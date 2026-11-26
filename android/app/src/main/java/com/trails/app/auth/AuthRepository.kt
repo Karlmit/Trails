@@ -5,6 +5,8 @@ import com.trails.app.network.dto.LoginRequest
 import retrofit2.HttpException
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.SerializationException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,17 +24,18 @@ class AuthRepository @Inject constructor(
      */
     suspend fun hasValidStoredSession(): Boolean {
         if (tokenStore.currentToken() == null) return false
-        return try {
-            api.listTrips()
-            true
-        } catch (failure: HttpException) {
-            if (failure.code() == 401) tokenStore.clear()
-            failure.code() != 401
+        try {
+            withTimeoutOrNull(4_000) { api.listTrips() }
+        } catch (_: HttpException) {
+            // AuthInterceptor handles confirmed session rejections.
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: IOException) {
-            true
+            // A stored session can open the cached trips while offline.
+        } catch (_: SerializationException) {
+            // An unexpected response cannot invalidate a stored session.
         }
+        return tokenStore.cachedTokenOrNull() != null
     }
 
     val username: kotlinx.coroutines.flow.Flow<String?> = tokenStore.username

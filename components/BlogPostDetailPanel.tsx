@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
+import { BlogBodySkeleton } from '@/components/BlogSkeleton';
 import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
@@ -19,7 +20,7 @@ const RichTextView = dynamic(() => import('@/components/RichTextEditor').then((m
   ssr: false,
   loading: () => {
     const t = useTranslations('tripBlog');
-    return <div className="text-soft">{t('loading')}</div>;
+    return <BlogBodySkeleton label={t('loading')} />;
   },
 });
 

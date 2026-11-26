@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import com.trails.app.auth.TokenStore
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -20,7 +21,11 @@ class TrailsApplication : Application(), Configuration.Provider {
         // WorkManager sync (which can run before any UI screen calls
         // TokenStore.currentToken()) always sees the persisted token, without
         // AuthInterceptor itself blocking on a DataStore read per request.
-        runBlocking { tokenStore.currentToken() }
+        try {
+            runBlocking { tokenStore.currentToken() }
+        } catch (_: IOException) {
+            // The session restore screen can retry the read.
+        }
     }
 
     override val workManagerConfiguration: Configuration

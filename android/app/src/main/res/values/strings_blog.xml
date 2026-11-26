@@ -71,6 +71,8 @@
     <string name="blog_publish_http_error">Servern svarade med HTTP %1$d.</string>
     <string name="blog_publish_photo_error">Fel vid publicering av filen %1$s</string>
     <string name="blog_play_video">Spela video: %1$s</string>
+    <string name="blog_play_video_generic">Spela video</string>
+    <string name="blog_video_retry">Försök igen</string>
     <string name="blog_video_playback_error">Videon kunde inte spelas upp.</string>
     <string name="blog_image_from_url">Bild från länk</string>
     <string name="blog_publish_channel">Bloggpublicering</string>

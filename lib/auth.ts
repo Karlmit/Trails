@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import type { User } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { SESSION_COOKIE_NAME, validateSession } from '@/lib/session';
+import { SESSION_COOKIE_NAME, renewBearerSession, validateSession } from '@/lib/session';
 
 // AD-7: exactly three route classes exist. `requireAuth` (everything
 // Trip-owned) and the one-time bootstrap gate were wired up first;
@@ -44,6 +44,11 @@ export function extractToken(request: NextRequest): string | null {
 export async function getUserFromApiRequest(request: NextRequest): Promise<User | null> {
   const token = extractToken(request);
   const result = await validateSession(token);
+  if (result && request.headers.get('authorization')?.toLowerCase().startsWith('bearer ')) {
+    await renewBearerSession(result.session).catch((error: unknown) =>
+      console.error('Could not renew bearer session', error),
+    );
+  }
   return result?.user ?? null;
 }
 

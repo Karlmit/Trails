@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,14 +14,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.viewinterop.AndroidView
-import android.widget.MediaController
-import android.widget.VideoView
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,6 +113,7 @@ fun BlogListScreen(
 fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, viewModel: BlogDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
+    var activeVideoIndex by remember(entry?.id, state.blocks) { mutableStateOf<Int?>(null) }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -172,33 +170,14 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                         }
                         is BlogBlock.ImageBlock -> {
                             val photo = state.photosById[block.photoId]
-                            if (block.isVideo) {
-                                val path = photo?.localPath
-                                if (path != null) {
-                                    AndroidView(
-                                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                                            .padding(bottom = 12.dp).clip(RoundedCornerShape(8.dp)),
-                                        factory = { context ->
-                                            VideoView(context).apply {
-                                                val controller = MediaController(context)
-                                                controller.setAnchorView(this)
-                                                setMediaController(controller)
-                                                setVideoURI(Uri.fromFile(File(path)))
-                                            }
-                                        },
-                                        update = { view ->
-                                            if (view.tag != path) {
-                                                view.tag = path
-                                                view.setVideoURI(Uri.fromFile(File(path)))
-                                            }
-                                        },
-                                        onRelease = { it.stopPlayback() },
-                                    )
-                                } else if (photo != null) {
-                                    TextButton(onClick = { onOpenPhoto(block.photoId) }) {
-                                        Text(stringResource(R.string.blog_play_video, photo.originalFilename))
-                                    }
-                                }
+                            if (block.isVideo || photo?.mimeType?.startsWith("video/") == true) {
+                                BlogVideo(
+                                    photoId = block.photoId,
+                                    photo = photo,
+                                    selected = activeVideoIndex == index,
+                                    onPlay = { activeVideoIndex = index },
+                                    playback = viewModel.playback,
+                                )
                             } else if (photo?.localPath != null) {
                                 AsyncImage(
                                     model = File(photo.localPath),

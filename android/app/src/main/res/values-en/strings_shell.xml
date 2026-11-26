@@ -3,6 +3,9 @@
     <!-- Login -->
     <string name="shell_login_title">Log in</string>
     <string name="shell_login_subtitle">Welcome back to Trails.</string>
+    <string name="shell_login_restore_failed">Could not read your saved sign-in.</string>
+    <string name="shell_login_restore_retry">Try again</string>
+    <string name="shell_login_restoring_session">Restoring your session…</string>
     <string name="shell_login_username_label">Username</string>
     <string name="shell_login_password_label">Password</string>
     <string name="shell_login_please_wait">Please wait…</string>

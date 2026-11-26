@@ -71,6 +71,8 @@
     <string name="blog_publish_http_error">The server returned HTTP %1$d.</string>
     <string name="blog_publish_photo_error">Error while publishing file %1$s</string>
     <string name="blog_play_video">Play video: %1$s</string>
+    <string name="blog_play_video_generic">Play video</string>
+    <string name="blog_video_retry">Try again</string>
     <string name="blog_video_playback_error">This video could not be played.</string>
     <string name="blog_image_from_url">Image from link</string>
     <string name="blog_publish_channel">Blog publishing</string>

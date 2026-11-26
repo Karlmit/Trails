@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +39,28 @@ fun LoginScreen(
 
     LaunchedEffect(state.alreadyLoggedIn) {
         if (state.alreadyLoggedIn) onLoggedIn()
+    }
+
+    if (state.restoringSession || state.alreadyLoggedIn || state.restoreFailed) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("🧭", style = MaterialTheme.typography.displayMedium)
+            if (state.restoreFailed) {
+                ErrorBanner(stringResource(R.string.shell_login_restore_failed))
+                PillButton(text = stringResource(R.string.shell_login_restore_retry), onClick = viewModel::retryRestore)
+            } else {
+                CircularProgressIndicator(color = TrailsColors.Brand)
+                Text(
+                    stringResource(R.string.shell_login_restoring_session),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TrailsColors.TextSoft,
+                )
+            }
+        }
+        return
     }
 
     Column(

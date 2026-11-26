@@ -71,6 +71,7 @@ class BlogDetailViewModel @Inject constructor(
     private val timelineRepository: TimelineRepository,
     private val documentsRepository: DocumentsRepository,
     private val syncScheduler: SyncScheduler,
+    internal val playback: BlogVideoPlayback,
 ) : ViewModel() {
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
     private val tripId: String? = savedStateHandle["tripId"]

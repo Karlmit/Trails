@@ -7,6 +7,14 @@ import retrofit2.HttpException
 
 private val lenientJson = Json { ignoreUnknownKeys = true }
 
+internal fun isSessionRejection(body: String?): Boolean =
+    body?.let { apiErrorField(it, "code") } == "UNAUTHORIZED"
+
+private fun apiErrorField(body: String, field: String): String? = runCatching {
+    lenientJson.parseToJsonElement(body).jsonObject["error"]?.jsonObject
+        ?.get(field)?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+}.getOrNull()
+
 /**
  * Pulls the server's own `{ "error": { "code", "message" } }` message out of a
  * failed Retrofit call.
@@ -29,13 +37,5 @@ fun Throwable.apiErrorMessage(): String? {
     val http = this as? HttpException ?: return null
     val body = runCatching { http.response()?.errorBody()?.source()?.peek()?.readUtf8() }.getOrNull()
     if (body.isNullOrBlank()) return null
-    return runCatching {
-        lenientJson.parseToJsonElement(body)
-            .jsonObject["error"]
-            ?.jsonObject
-            ?.get("message")
-            ?.jsonPrimitive
-            ?.content
-            ?.takeIf { it.isNotBlank() }
-    }.getOrNull()
+    return apiErrorField(body, "message")
 }
