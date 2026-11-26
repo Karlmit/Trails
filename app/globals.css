@@ -21,6 +21,9 @@
   --color-brand-deep: #1e3932; /* dark bands, nav-on-dark */
   --color-brand-uplift: #2b5148; /* decorative / secondary dark accent */
   --color-brand-mint: #d4e9e2; /* valid-state tint, light wash */
+  --color-blog-surface: #f1e5fb;
+  --color-blog-ink: #4d2867;
+  --color-blog-border: #936ab0;
 
   /* Reserved ceremonial accent -- Active Trip / current-position marker only */
   --color-gold: #cba258;
@@ -1027,12 +1030,23 @@ body.has-notify-bar .page:has(.fab) {
   opacity: 0.75;
 }
 
-/* User-reported: "it should be a fancy link to the blog post" -- a Blog
-   Post has no subtype badge (unlike every other Entry Type), so without
-   this it was a plain text link indistinguishable from a Note. */
 .entry-chip-blog {
-  color: var(--color-brand-deep);
+  border-radius: 8px;
+  background: var(--color-blog-surface);
+  box-shadow: inset 0 0 0 1px var(--color-blog-border);
+  color: var(--color-blog-ink);
   font-weight: 600;
+  padding-inline: 8px;
+}
+
+.entry-chip-blog:hover {
+  text-decoration: underline;
+  opacity: 1;
+}
+
+.entry-chip-blog:focus-visible {
+  outline: 2px solid var(--color-blog-ink);
+  outline-offset: 2px;
 }
 
 /* User-requested: every Entry Type/Subtype on the Timeline gets its own
@@ -1061,7 +1075,6 @@ body.has-notify-bar .page:has(.fab) {
 .entry-chip-blog-cta {
   font-weight: 500;
   font-size: 0.82rem;
-  opacity: 0.8;
 }
 
 .section-legend {

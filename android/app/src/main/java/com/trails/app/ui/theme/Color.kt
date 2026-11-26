@@ -17,6 +17,10 @@ object TrailsColors {
     val BrandUplift = Color(0xFF2B5148) // decorative / secondary dark accent
     val BrandMint = Color(0xFFD4E9E2) // valid-state tint, light wash
 
+    val BlogSurface = Color(0xFFF1E5FB)
+    val BlogInk = Color(0xFF4D2867)
+    val BlogBorder = Color(0xFF936AB0)
+
     // Reserved ceremonial accent -- Active Trip / current-position marker only
     val Gold = Color(0xFFCBA258)
     val GoldLight = Color(0xFFDFC49D)

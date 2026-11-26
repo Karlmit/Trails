@@ -13,7 +13,7 @@ const ENTRY_TYPE_COLORS: Record<string, string> = {
   // never reaches this function, since it never reaches the Timeline.
   // Gold is deliberately not used (DESIGN.md reserves it for the Trip
   // Active-status badge's own ceremony moment, not a general accent).
-  BLOG_POST: 'var(--color-brand-deep)',
+  BLOG_POST: 'var(--color-blog-ink)',
 };
 
 export function entryTypeColor(entryType: string): string {

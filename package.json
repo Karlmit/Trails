@@ -33,6 +33,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "web-push": "^3.6.7",
+    "yet-another-react-lightbox": "3.33.1",
     "zod": "3.25.76"
   },
   "devDependencies": {

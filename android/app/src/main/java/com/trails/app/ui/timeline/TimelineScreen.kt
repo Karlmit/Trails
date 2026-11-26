@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
@@ -224,8 +225,9 @@ private fun DayRow(
                         if (label.hidden) return@forEach
                         val isBlog = line.entryType == "BLOG_POST"
                         Surface(
-                            color = TrailsColors.Surface.copy(alpha = 0.94f),
-                            contentColor = TrailsColors.Text,
+                            color = if (isBlog) TrailsColors.BlogSurface else TrailsColors.Surface.copy(alpha = 0.94f),
+                            contentColor = if (isBlog) TrailsColors.BlogInk else TrailsColors.Text,
+                            border = if (isBlog) BorderStroke(1.dp, TrailsColors.BlogBorder) else null,
                             shape = RoundedCornerShape(16.dp),
                             shadowElevation = 1.dp,
                             modifier = Modifier
@@ -248,7 +250,7 @@ private fun DayRow(
                                         if (isBlog) append(" " + stringResource(R.string.timeline_read_post))
                                     },
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isBlog) TrailsColors.BrandDeep else TrailsColors.Text,
+                                    fontWeight = if (isBlog) FontWeight.SemiBold else null,
                                 )
                             }
                             // User-requested: a Stay's check-in/check-out time as its

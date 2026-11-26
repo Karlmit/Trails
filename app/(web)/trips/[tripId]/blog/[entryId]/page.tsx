@@ -9,6 +9,7 @@ import { BlogPostDetailPanel } from '@/components/BlogPostDetailPanel';
 import { NotificationOptInCard } from '@/components/NotificationOptInCard';
 import { getPushPublicKey } from '@/lib/push-config';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
+import styles from './post-navigation.module.css';
 
 interface PageProps {
   params: Promise<{ tripId: string; entryId: string }>;
@@ -47,10 +48,34 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   // spec-tags-links-photos: same "query Photos, filterForViewer, pass to
   // PhotoGallery" shape as entries/[entryId]/page.tsx -- see that page's
   // identical comment for why this is required for a Guest.
-  const allPhotos = await prisma.photo.findMany({
-    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, mimeType: { startsWith: 'image/' } },
-    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
-  });
+  const visibleBlogPosts = {
+    tripId,
+    entryType: 'BLOG_POST',
+    ...(viewer.type === 'guest' && { publishedAt: { not: null }, isPrivate: false }),
+  } as const;
+  // The ID breaks ties when several posts share a date.
+  const [allPhotos, older, newer] = await Promise.all([
+    prisma.photo.findMany({
+      where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, mimeType: { startsWith: 'image/' } },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+    }),
+    prisma.timelineEntry.findFirst({
+      where: {
+        ...visibleBlogPosts,
+        OR: [{ startAt: { lt: entry.startAt } }, { startAt: entry.startAt, id: { lt: entry.id } }],
+      },
+      orderBy: [{ startAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, title: true },
+    }),
+    prisma.timelineEntry.findFirst({
+      where: {
+        ...visibleBlogPosts,
+        OR: [{ startAt: { gt: entry.startAt } }, { startAt: entry.startAt, id: { gt: entry.id } }],
+      },
+      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, title: true },
+    }),
+  ]);
   const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);
 
   return (
@@ -65,6 +90,25 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
           on either surface silences both. */}
       <NotificationOptInCard publicKey={getPushPublicKey()} />
       <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
+      {(older || newer) && (
+        <nav className={styles.navigation} aria-labelledby="more-blog-posts">
+          <h2 className={styles.heading} id="more-blog-posts">{t('morePosts')}</h2>
+          <div className={styles.links}>
+            {older && (
+              <Link className={styles.link} href={`/trips/${tripId}/blog/${older.id}`}>
+                <span className={styles.direction}>{t('olderPost')}</span>
+                <strong>{older.title}</strong>
+              </Link>
+            )}
+            {newer && (
+              <Link className={styles.link} href={`/trips/${tripId}/blog/${newer.id}`}>
+                <span className={styles.direction}>{t('newerPost')}</span>
+                <strong>{newer.title}</strong>
+              </Link>
+            )}
+          </div>
+        </nav>
+      )}
     </main>
   );
 }

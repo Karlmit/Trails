@@ -86,18 +86,17 @@ function isPublicPath(pathname: string): boolean {
 // test a single already-extracted param string. Case-insensitive on its own
 // (mixed-case hex is a valid UUID textual form) -- but composed into
 // GUEST_ELIGIBLE_PATH below WITHOUT a whole-pattern `i` flag, so the literal
-// path segments (overview/timeline/blog/entries) stay strictly
+// path segments (overview/timeline/blog/photos/entries) stay strictly
 // case-sensitive, matching Next.js's own case-sensitive routing exactly
 // (an `i` flag on the whole pattern would make e.g. "/Trips/.../Overview"
 // match here even though no such literal route exists).
 const UUID_RE = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
-// Exactly the five URL shapes named in the spec's Intent -- the same routes
-// an authenticated User already uses, not a separate /guest/... prefix.
+// Guest pages use the same routes as signed-in readers.
 // Deliberately precise: must NOT match /trips/{uuid}/entries/new (entry
 // creation) or any other Trip subpath (Budget, Sections, Ideas, ...).
 const GUEST_ELIGIBLE_PATH = new RegExp(
-  `^/trips/${UUID_RE}/(overview|timeline|blog|entries/${UUID_RE}|blog/${UUID_RE})$`,
+  `^/trips/${UUID_RE}/(overview|timeline|blog|photos|entries/${UUID_RE}|blog/${UUID_RE})$`,
 );
 
 function isGuestEligiblePath(pathname: string): boolean {

@@ -63,7 +63,7 @@ fun entryTypeColor(entryType: String): Color = when (entryType) {
     "STAY" -> TrailsColors.BrandAccent
     "TRANSPORT" -> TrailsColors.BrandUplift
     "ACTIVITY" -> TrailsColors.Brand
-    "BLOG_POST" -> TrailsColors.BrandDeep
+    "BLOG_POST" -> TrailsColors.BlogInk
     else -> TrailsColors.TextSoft // NOTE
 }
 
