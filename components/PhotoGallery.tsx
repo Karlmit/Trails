@@ -5,6 +5,7 @@ import { translateApiError } from '@/lib/api-error-messages';
 import { useEffect, useRef, useState, type ChangeEvent, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { WebVideoPlayer } from '@/components/WebVideoPlayer';
 import { UrlImportField } from '@/components/UrlImportField';
 import { OwnerCreateError, useOwnerIdResolver } from '@/lib/hooks/useOwnerId';
 
@@ -341,16 +342,7 @@ export function PhotoGallery({
           {photos.map((photo) => (
             <div key={photo.id} className="photo-thumb-wrap">
               {photo.mimeType.startsWith('video/') ? (
-                <video
-                  src={fileUrl(photo.id)}
-                  aria-label={photo.originalFilename}
-                  width={THUMB_SIZE}
-                  height={THUMB_SIZE}
-                  className="photo-thumb"
-                  controls
-                  playsInline
-                  preload="none"
-                />
+                <WebVideoPlayer src={fileUrl(photo.id)} label={photo.originalFilename} />
               ) : (
                 <Image
                   src={fileUrl(photo.id)}

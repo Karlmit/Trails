@@ -16,6 +16,7 @@ import {
 import { BlockNoteView } from '@blocknote/mantine';
 import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
+import { WebVideoPlayer } from '@/components/WebVideoPlayer';
 import { UrlImportField } from '@/components/UrlImportField';
 
 // User-reported: "look online for an easy way to integrate a ready made
@@ -132,7 +133,7 @@ const layoutImageBlock = createReactBlockSpec(
       }
 
       return (
-        <div className={`rte-layout-image rte-layout-image-${block.props.layout}`}>
+        <div className={`rte-layout-image rte-layout-image-${block.props.layout}${block.props.mediaKind === 'video' ? ' rte-layout-video' : ''}`}>
           {editor.isEditable && (
             <div className="rte-layout-image-toolbar" contentEditable={false}>
               <button
@@ -155,7 +156,7 @@ const layoutImageBlock = createReactBlockSpec(
             </div>
           )}
           {block.props.mediaKind === 'video'
-            ? <video src={block.props.url} controls playsInline preload="metadata" />
+            ? <WebVideoPlayer src={block.props.url} />
             : <img src={block.props.url} alt="" />}
         </div>
       );
