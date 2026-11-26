@@ -54,7 +54,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);
 
   return (
-    <main className="page">
+    <main className="page blog-reader-page">
       <Link href={`/trips/${tripId}/blog`} className="text-soft">
         {t('backToBlog')}
       </Link>

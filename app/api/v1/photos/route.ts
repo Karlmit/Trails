@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
   if (!isUuid(ownerId)) return Errors.validation('ownerId query parameter must be a valid UUID');
 
   const photos = await prisma.photo.findMany({
-    where: { ownerType, ownerId },
+    where: { ownerId, ownerType: ownerType === 'TIMELINE_ENTRY' ? { in: ['TIMELINE_ENTRY', 'IDEA'] } : ownerType },
     orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
   });
   return NextResponse.json(photos.map(serializePhoto));

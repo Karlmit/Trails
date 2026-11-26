@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
 import com.trails.app.ui.components.CheckboxRow
+import com.trails.app.ui.components.DatePickerField
 import com.trails.app.ui.components.DateTimePickerField
 import com.trails.app.ui.components.DropdownField
 import com.trails.app.ui.components.ErrorBanner
@@ -123,6 +124,30 @@ fun EntryEditScreen(
             return@Column
         }
 
+        if (state.convertingIdea) {
+            TrailsCard {
+                ScreenHeading(emoji = entryTypeEmoji("ACTIVITY"), title = state.title)
+                Text(stringResource(R.string.idea_edit_convert_dialog_text))
+                DatePickerField(
+                    label = stringResource(R.string.timeline_field_start),
+                    isoDate = state.startAt.take(10),
+                    onDateChange = viewModel::onStartAtChange,
+                )
+                CheckboxRow(
+                    label = stringResource(R.string.timeline_field_private),
+                    checked = state.isPrivate,
+                    onCheckedChange = viewModel::onIsPrivateChange,
+                )
+                PillButton(
+                    text = stringResource(R.string.idea_edit_convert_button),
+                    onClick = viewModel::save,
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            return@Column
+        }
+
         TrailsCard {
         ScreenHeading(
             emoji = entryTypeEmoji(state.entryType),
@@ -151,8 +176,7 @@ fun EntryEditScreen(
             )
         }
 
-        if (state.convertingIdea) Text(stringResource(R.string.idea_edit_convert_dialog_text))
-        if (isNote || state.convertingIdea) {
+        if (isNote) {
             LabeledField(label = stringResource(R.string.timeline_field_title), value = state.title, onValueChange = viewModel::onTitleChange)
         }
         if (!isNote) {

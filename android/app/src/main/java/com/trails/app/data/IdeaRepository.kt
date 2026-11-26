@@ -56,12 +56,11 @@ class IdeaRepository @Inject constructor(
         dao.deleteById(ideaId)
     }
 
-    /** Converts an Idea into a real TimelineEntry server-side, removing the Idea locally and caching the new entry. */
+    /** Publishes an Idea and caches its dated timeline entry. */
     suspend fun convertToEntry(ideaId: String, fields: JsonObject): TimelineEntryEntity {
         val created = api.convertIdea(ideaId, fields)
         val entity = created.toEntity()
         timelineEntryDao.upsertAll(listOf(entity))
-        dao.deleteById(ideaId)
         return entity
     }
 

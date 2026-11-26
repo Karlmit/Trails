@@ -25,10 +25,6 @@ function ideaParams(ideaId: string) {
 
 const UNKNOWN_ID = '11111111-1111-4111-8111-111111111111';
 
-// FR-17, spec-ideas: converting an Idea creates a TimelineEntry and deletes
-// the Idea, atomically -- and a validation failure on the Entry side must
-// leave the Idea untouched (Acceptance Criteria). Requires a live Postgres
-// via DATABASE_URL.
 describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
   let token: string;
   let tripId: string;
@@ -68,10 +64,7 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
     await testPrisma().$disconnect();
   });
 
-  // Acceptance Criteria: converting an Idea with an estimated expense
-  // carries it onto the new Entry's own Expense fields, and the Idea is
-  // gone afterward.
-  it('creates the Entry with title/expense carried over, deletes the Idea, and returns the new Entry', async () => {
+  it('creates the Entry with title/expense carried over, retains the Idea, and returns the new Entry', async () => {
     const res = await convertIdea(
       jsonRequest(
         `http://localhost/api/v1/ideas/${ideaId}/convert`,
@@ -100,7 +93,7 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
     expect(body.tripId).toBe(tripId);
 
     const remainingIdeas = await testPrisma().idea.count();
-    expect(remainingIdeas).toBe(0);
+    expect(remainingIdeas).toBe(1);
 
     const entries = await testPrisma().timelineEntry.count();
     expect(entries).toBe(1);
@@ -218,11 +211,7 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
     expect(res.status).toBe(404);
   });
 
-  // AD-4's literal rule, spec-tags-links-photos: "reassigns (not
-  // duplicates) its Tag/Link/Photo rows' ownerType/ownerId to the new
-  // Entry." Acceptance Criteria: "all three appear unchanged on the new
-  // Entry and the Idea itself is gone (not duplicated rows)."
-  it('reassigns Tag/Link/Photo ownership to the new Entry, never duplicating them', async () => {
+  it('retains the original tag, link and photo ownership when publishing', async () => {
     const tagRes = await createTag(
       jsonRequest('http://localhost/api/v1/tags', 'POST', { ownerType: 'IDEA', ownerId: ideaId, text: 'Foodie' }, token),
     );
@@ -259,15 +248,15 @@ describe.skipIf(!hasTestDatabase)('ideas convert route', () => {
     const entry = await res.json();
 
     const storedTag = await testPrisma().tag.findUnique({ where: { id: tag.id } });
-    expect(storedTag?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedTag?.ownerType).toBe('IDEA');
     expect(storedTag?.ownerId).toBe(entry.id);
 
     const storedLink = await testPrisma().link.findUnique({ where: { id: link.id } });
-    expect(storedLink?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedLink?.ownerType).toBe('IDEA');
     expect(storedLink?.ownerId).toBe(entry.id);
 
     const storedPhoto = await testPrisma().photo.findUnique({ where: { id: photo.id } });
-    expect(storedPhoto?.ownerType).toBe('TIMELINE_ENTRY');
+    expect(storedPhoto?.ownerType).toBe('IDEA');
     expect(storedPhoto?.ownerId).toBe(entry.id);
 
     // Never duplicated -- exactly one row each, still pointing at the same ids.

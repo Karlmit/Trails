@@ -2189,3 +2189,31 @@ body.has-notify-bar .page:has(.fab) {
     aspect-ratio: 3 / 2;
   }
 }
+
+
+@media (max-width: 640px) {
+  .blog-reader-page {
+    padding-inline: 8px;
+  }
+
+  .blog-reader-card {
+    padding-inline: 10px;
+    min-width: 0;
+  }
+
+  .rich-text-view .bn-editor {
+    padding-inline: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .rich-text-view .rte-layout-image {
+    float: none;
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+  }
+
+  .rich-text-view .rte-layout-image :is(img, video) {
+    width: 100%;
+  }
+}

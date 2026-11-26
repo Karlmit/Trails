@@ -105,7 +105,7 @@ export function BlogPostDetailPanel({
   return (
     <div className="stack">
       {error && <div className="form-error-banner">{error}</div>}
-      <div className="card stack">
+      <div className="card stack blog-reader-card">
         <div className="row-between">
           <span className={`badge ${isPublished ? 'badge-published' : 'badge-draft'}`}>
             {isPublished ? tBlog('published') : tBlog('draft')}

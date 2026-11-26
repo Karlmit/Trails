@@ -57,7 +57,7 @@ export default async function EntryDetailPage({ params }: PageProps) {
   // browser has no session to self-fetch GET /api/v1/photos with, so the
   // already-filtered list must come from this Server Component instead.
   const allPhotos = await prisma.photo.findMany({
-    where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
+    where: { tripId, ownerType: { in: ['TIMELINE_ENTRY', 'IDEA'] }, ownerId: entryId },
     orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
   });
   const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);

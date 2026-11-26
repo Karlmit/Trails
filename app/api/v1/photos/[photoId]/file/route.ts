@@ -48,11 +48,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!user) {
     const viewer: Viewer = { type: 'guest' };
 
-    // Idea/ImportantInfo are structurally excluded from the Guest surface
-    // entirely (AD-3) -- no page exists for a Guest to view either, so a
-    // Photo owned by one is never Guest-visible regardless of Trip
-    // visibility or the Photo's own isPrivate flag.
-    if (photo.ownerType !== 'TIMELINE_ENTRY') {
+    // A published idea shares its ID with its timeline entry.
+    if (photo.ownerType === 'IMPORTANT_INFO') {
       return Errors.notFound('Photo not found');
     }
 
@@ -60,7 +57,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       prisma.trip.findUnique({ where: { id: photo.tripId } }),
       prisma.timelineEntry.findUnique({ where: { id: photo.ownerId } }),
     ]);
-    if (!trip || !entry || !canViewTrip(trip, viewer)) {
+    if (!trip || !entry || entry.tripId !== photo.tripId || !canViewTrip(trip, viewer)) {
       return Errors.notFound('Photo not found');
     }
     // AD-10: Draft Blog Posts are unconditionally excluded from Guest

@@ -42,7 +42,7 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE tripId = :tripId ORDER BY createdAt DESC")
     fun observeForTrip(tripId: String): Flow<List<PhotoEntity>>
 
-    @Query("SELECT * FROM photos WHERE ownerType = :ownerType AND ownerId = :ownerId ORDER BY isPrimary DESC, createdAt DESC")
+    @Query("SELECT * FROM photos WHERE ownerId = :ownerId AND (ownerType = :ownerType OR (:ownerType = 'TIMELINE_ENTRY' AND ownerType = 'IDEA')) ORDER BY isPrimary DESC, createdAt DESC")
     fun observeForOwner(ownerType: String, ownerId: String): Flow<List<PhotoEntity>>
 
     @Query("SELECT * FROM photos WHERE tripId = :tripId")

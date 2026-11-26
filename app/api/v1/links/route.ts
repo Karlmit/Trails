@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
   if (!isUuid(ownerId)) return Errors.validation('ownerId query parameter must be a valid UUID');
 
   const links = await prisma.link.findMany({
-    where: { ownerType, ownerId },
+    where: { ownerId, ownerType: ownerType === 'TIMELINE_ENTRY' ? { in: ['TIMELINE_ENTRY', 'IDEA'] } : ownerType },
     orderBy: { createdAt: 'asc' },
   });
   return NextResponse.json(links.map(serializeLink));

@@ -182,7 +182,7 @@ interface TrailsApiService {
     @DELETE("api/v1/ideas/{id}")
     suspend fun deleteIdea(@Path("id") id: String): Response<ResponseBody>
 
-    @POST("api/v1/ideas/{id}/convert")
+    @POST("api/v1/ideas/{id}/publish")
     suspend fun convertIdea(@Path("id") id: String, @Body body: JsonObject): TimelineEntryDto
 
     // The reverse: converts an ACTIVITY Entry into an Idea server-side. body

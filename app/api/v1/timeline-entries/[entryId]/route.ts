@@ -150,12 +150,30 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   clearOrphanedExpenseDependents(parsed, { expenseAmount: mergedAmount, expenseCurrency: mergedCurrency });
 
   try {
-    const entry = await prisma.timelineEntry.update({
-      where: { id: entryId },
-      data: toEntryUpdateData(parsed),
+    const entry = await prisma.$transaction(async (tx) => {
+      // Match the idea-first write order used by publication and idea edits.
+      await tx.idea.updateMany({
+        where: { id: entryId, tripId: existing.tripId },
+        data: {
+          title: parsed.title,
+          description: parsed.description,
+          locationName: parsed.locationName,
+          locationAddress: parsed.locationAddress,
+          locationLat: parsed.locationLat,
+          locationLng: parsed.locationLng,
+          locationMapLink: parsed.locationMapLink,
+          estimatedExpenseAmount: parsed.expenseAmount,
+          estimatedExpenseCurrency: parsed.expenseCurrency,
+        },
+      });
+      return tx.timelineEntry.update({
+        where: { id: entryId },
+        data: toEntryUpdateData(parsed),
+      });
     });
 
     revalidateEntry(existing.tripId, entryId, entryType);
+    revalidatePath(`/trips/${existing.tripId}/ideas`);
 
     return NextResponse.json(serializeTimelineEntry(entry));
   } catch (err) {

@@ -261,8 +261,7 @@ model Idea {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  // Converting an Idea deletes it (FR-17) -- no stored link survives to a
-  // TimelineEntry it became; Cascade here only covers Trip deletion.
+  // A published idea shares its ID with its timeline entry.
   trip    Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
   section Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 

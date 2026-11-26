@@ -9,3 +9,6 @@ dist
 .git
 .gitignore
 android
+
+_bmad
+_bmad-output

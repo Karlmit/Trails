@@ -445,7 +445,7 @@ class EntryEditViewModel @Inject constructor(
         val current = _state.value
         if (!current.ready || current.saving) return
         val effectiveTitle = if (current.entryType == "NOTE") current.title else current.locationName
-        if (effectiveTitle.isBlank() || (current.convertingIdea && current.title.isBlank())) {
+        if (!current.convertingIdea && effectiveTitle.isBlank()) {
             _state.value = current.copy(error = EntryEditError.Fixed(R.string.timeline_error_title_required))
             return
         }
@@ -471,9 +471,9 @@ class EntryEditViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 if (sourceIdeaId != null) {
-                    val fields = JsonObject(requestBody(current) + mapOf(
-                        "entryType" to JsonPrimitive(current.entryType),
-                        "title" to JsonPrimitive(current.title.trim()),
+                    val fields = JsonObject(mapOf(
+                        "startAt" to JsonPrimitive(current.startAt),
+                        "isPrivate" to JsonPrimitive(current.isPrivate),
                     ))
                     ideaRepository.convertToEntry(sourceIdeaId, fields)
                 } else if (current.entryId == null) {

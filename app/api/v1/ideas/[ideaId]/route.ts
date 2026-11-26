@@ -67,30 +67,51 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const idea = await prisma.idea.update({
-      where: { id: ideaId },
-      data: {
-        ...(parsed.sectionId !== undefined && { sectionId: parsed.sectionId }),
-        ...(parsed.title !== undefined && { title: parsed.title }),
-        ...(parsed.category !== undefined && { category: parsed.category }),
-        ...(parsed.description !== undefined && { description: parsed.description }),
-        ...(parsed.priority !== undefined && { priority: parsed.priority }),
-        ...(parsed.weatherSuitability !== undefined && { weatherSuitability: parsed.weatherSuitability }),
-        ...(parsed.locationName !== undefined && { locationName: parsed.locationName }),
-        ...(parsed.locationAddress !== undefined && { locationAddress: parsed.locationAddress }),
-        ...(parsed.locationLat !== undefined && { locationLat: parsed.locationLat }),
-        ...(parsed.locationLng !== undefined && { locationLng: parsed.locationLng }),
-        ...(parsed.locationMapLink !== undefined && { locationMapLink: parsed.locationMapLink }),
-        ...(parsed.estimatedExpenseAmount !== undefined && {
-          estimatedExpenseAmount: parsed.estimatedExpenseAmount,
-        }),
-        ...(parsed.estimatedExpenseCurrency !== undefined && {
-          estimatedExpenseCurrency: parsed.estimatedExpenseCurrency,
-        }),
-      },
+    const idea = await prisma.$transaction(async (tx) => {
+      const updated = await tx.idea.update({
+        where: { id: ideaId },
+        data: {
+          ...(parsed.sectionId !== undefined && { sectionId: parsed.sectionId }),
+          ...(parsed.title !== undefined && { title: parsed.title }),
+          ...(parsed.category !== undefined && { category: parsed.category }),
+          ...(parsed.description !== undefined && { description: parsed.description }),
+          ...(parsed.priority !== undefined && { priority: parsed.priority }),
+          ...(parsed.weatherSuitability !== undefined && { weatherSuitability: parsed.weatherSuitability }),
+          ...(parsed.locationName !== undefined && { locationName: parsed.locationName }),
+          ...(parsed.locationAddress !== undefined && { locationAddress: parsed.locationAddress }),
+          ...(parsed.locationLat !== undefined && { locationLat: parsed.locationLat }),
+          ...(parsed.locationLng !== undefined && { locationLng: parsed.locationLng }),
+          ...(parsed.locationMapLink !== undefined && { locationMapLink: parsed.locationMapLink }),
+          ...(parsed.estimatedExpenseAmount !== undefined && {
+            estimatedExpenseAmount: parsed.estimatedExpenseAmount,
+          }),
+          ...(parsed.estimatedExpenseCurrency !== undefined && {
+            estimatedExpenseCurrency: parsed.estimatedExpenseCurrency,
+          }),
+        },
+      });
+      await tx.timelineEntry.updateMany({
+        where: { id: ideaId, tripId: updated.tripId },
+        data: {
+          title: parsed.title,
+          description: parsed.description,
+          locationName: parsed.locationName,
+          locationAddress: parsed.locationAddress,
+          locationLat: parsed.locationLat,
+          locationLng: parsed.locationLng,
+          locationMapLink: parsed.locationMapLink,
+          expenseAmount: parsed.estimatedExpenseAmount,
+          expenseCurrency: parsed.estimatedExpenseCurrency,
+          ...(mergedAmount === null && { expensePaymentStatus: null, expensePaymentNote: null }),
+        },
+      });
+      return updated;
     });
 
     revalidatePath(`/trips/${existing.tripId}/ideas`);
+
+    revalidatePath(`/trips/${existing.tripId}/timeline`);
+    revalidatePath(`/trips/${existing.tripId}/entries/${ideaId}`);
 
     return NextResponse.json(serializeIdea(idea));
   } catch (err) {

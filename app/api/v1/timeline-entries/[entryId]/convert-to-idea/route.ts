@@ -71,7 +71,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const idea = await prisma.$transaction(async (tx) => {
-      const created = await tx.idea.create({
+      const original = await tx.idea.findUnique({ where: { id: entryId, tripId: entry.tripId } });
+      const created = original ?? await tx.idea.create({
         data: {
           tripId: entry.tripId,
           sectionId: parsed.sectionId ?? null,
@@ -89,13 +90,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           estimatedExpenseCurrency: parsed.estimatedExpenseCurrency ?? null,
         },
       });
-      // AD-4's reassignment rule, mirrored in reverse (see the Idea→Entry
-      // convert route's identical block): move the Entry's existing
-      // Tag/Link/Photo rows onto the new Idea rather than duplicating or
-      // dropping them. Same disclosed drift as that route -- a Photo's
-      // filePath was baked at upload time from the old owner and is never
-      // rewritten here; the DB's ownerType/ownerId stays authoritative for
-      // serving/deletion regardless.
+      if (original && await tx.photo.count({ where: { ownerId: original.id, ownerType: 'IDEA', isPrimary: true } })) {
+        await tx.photo.updateMany({
+          where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, isPrimary: true },
+          data: { isPrimary: false },
+        });
+      }
       await tx.tag.updateMany({
         where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId },
         data: { ownerType: 'IDEA', ownerId: created.id },

@@ -60,9 +60,8 @@ class IdeaConversionTest {
         editor.save()
         runCurrent()
         assertEquals("2026-11-25T10:30:00.000Z", body.captured.getValue("startAt").jsonPrimitive.content)
-        assertEquals("ACTIVITY", body.captured.getValue("entryType").jsonPrimitive.content)
-        assertEquals("Visit museum", body.captured.getValue("title").jsonPrimitive.content)
-        assertEquals("City Museum", body.captured.getValue("locationName").jsonPrimitive.content)
+        assertEquals(setOf("startAt", "isPrivate"), body.captured.keys)
+        assertEquals("false", body.captured.getValue("isPrivate").jsonPrimitive.content)
         assertEquals("event", editor.state.value.entryId)
         coVerify(exactly = 0) { timeline.createTimelineEntry(any()) }
     }
