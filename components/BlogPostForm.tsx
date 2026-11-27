@@ -95,6 +95,19 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
   const [isPrivate, setIsPrivate] = useState(post?.isPrivate ?? false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const collageUploads = useRef(0);
+  const [collageUploading, setCollageUploading] = useState(false);
+
+  function beginCollageUpload() {
+    if (submittingRef.current) return null;
+    collageUploads.current += 1;
+    setCollageUploading(true);
+    return () => {
+      collageUploads.current -= 1;
+      setCollageUploading(collageUploads.current > 0);
+    };
+  }
 
   // User-reported: "Would it be possible to allow uploading images to a
   // blog post before its actually saved? ... feels unnesseary" to require
@@ -155,6 +168,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submittingRef.current || collageUploads.current > 0) return;
     setError(null);
 
     if (!startAt) {
@@ -181,6 +195,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       body.entryType = 'BLOG_POST';
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const url = id ? `/api/v1/timeline-entries/${id}` : '/api/v1/timeline-entries';
@@ -203,6 +218,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
     } catch {
       setError('Could not reach the server. Please try again.');
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -240,7 +256,13 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         required
       />
 
-      <RichTextEditor initialContent={descriptionRef.current} contentRef={descriptionRef} ensurePostId={ensurePostId} />
+      <RichTextEditor
+        initialContent={descriptionRef.current}
+        contentRef={descriptionRef}
+        ensurePostId={ensurePostId}
+        beginCollageUpload={beginCollageUpload}
+        disabled={submitting}
+      />
 
       <div className="blog-editor-footer">
         <label className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -254,8 +276,8 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
         </label>
 
         <div className="row">
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? tBlog('saving') : mode === 'create' ? tBlog('saveDraft') : tBlog('saveChanges')}
+          <button type="submit" className="btn btn-primary" disabled={submitting || collageUploading}>
+            {submitting ? tBlog('saving') : collageUploading ? tBlog('uploading') : mode === 'create' ? tBlog('saveDraft') : tBlog('saveChanges')}
           </button>
           <Link href={cancelHref} className="btn btn-dark-outline">
             {tBlog('cancel')}

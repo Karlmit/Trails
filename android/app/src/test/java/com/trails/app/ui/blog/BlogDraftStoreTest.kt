@@ -30,14 +30,19 @@ class BlogDraftStoreTest {
         val picked = File(context.cacheDir, "picked.jpg").apply { writeBytes(bytes) }
         val photo = store.stage(scope, Uri.fromFile(picked), "picked.jpg")
         picked.delete()
+        val secondBytes = byteArrayOf(4, 5, 6)
+        val secondPicked = File(context.cacheDir, "second.jpg").apply { writeBytes(secondBytes) }
+        val secondPhoto = store.stage(scope, Uri.fromFile(secondPicked), "second.jpg")
+        secondPicked.delete()
 
         val draft = DeviceBlogDraft(
             id = "local-draft", entryId = null, title = "Trip", startAt = "2026-11-23",
             blocks = listOf(
                 EditableBlock.Text("text", TextBlockKind.PARAGRAPH, listOf(InlineRun("Offline"))),
-                EditableBlock.Image("image", "image"),
+                EditableBlock.Image("image", "remote-photo"),
+                EditableBlock.Collage("wall", listOf(EditableBlock.Image("tile-1", "tile-1"), EditableBlock.Image("tile-2", "tile-2"))),
             ),
-            pendingPhotos = mapOf("image" to photo),
+            pendingPhotos = mapOf("tile-1" to photo, "tile-2" to secondPhoto),
             isPrivate = true, isPublished = false,
         )
         val first = store.save(scope, draft)
@@ -46,7 +51,8 @@ class BlogDraftStoreTest {
         last.await().getOrThrow()
         val reopened = checkNotNull(store.load(scope, draft.id))
         assertEquals(draft.copy(title = "Trip diary"), reopened)
-        assertArrayEquals(bytes, checkNotNull(store.photoFile(scope, reopened.pendingPhotos.getValue("image"))).readBytes())
+        assertArrayEquals(bytes, checkNotNull(store.photoFile(scope, reopened.pendingPhotos.getValue("tile-1"))).readBytes())
+        assertArrayEquals(secondBytes, checkNotNull(store.photoFile(scope, reopened.pendingPhotos.getValue("tile-2"))).readBytes())
         assertEquals(listOf(reopened), store.observe("trip").first())
         assertEquals(emptyList<DeviceBlogDraft>(), store.observe("another-trip").first())
 
@@ -65,6 +71,7 @@ class BlogDraftStoreTest {
         assertEquals(emptyList<DeviceBlogDraft>(), store.observe("trip").first())
         store.delete(scope, draft.id)
         store.deletePhoto(scope, photo)
+        store.deletePhoto(scope, secondPhoto)
         assertNull(store.load(scope, draft.id))
     }
 }

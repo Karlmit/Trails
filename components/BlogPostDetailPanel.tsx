@@ -5,7 +5,7 @@ import { translateApiError } from '@/lib/api-error-messages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
 import { BlogBodySkeleton } from '@/components/BlogSkeleton';
 import { AttachmentList } from '@/components/AttachmentList';
@@ -59,6 +59,10 @@ export function BlogPostDetailPanel({
   const [post, setPost] = useState(initialPost);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const visibleCollagePhotoIds = useMemo(
+    () => readOnly ? new Set(photos?.map((photo) => photo.id)) : undefined,
+    [readOnly, photos],
+  );
 
   const isPublished = post.publishedAt !== null;
 
@@ -139,7 +143,7 @@ export function BlogPostDetailPanel({
           <dd style={{ margin: 0 }}>{formatEntryEndpointDateOnly(new Date(post.startAt), null, locale)}</dd>
         </dl>
 
-        {post.description && <RichTextView content={post.description} />}
+        {post.description && <RichTextView content={post.description} visibleCollagePhotoIds={visibleCollagePhotoIds} />}
 
         {isPublished && (
           <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>

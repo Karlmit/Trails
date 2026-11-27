@@ -15,6 +15,14 @@
     <string name="blog_uploading_image">Uploading image…</string>
     <string name="blog_uploading">Uploading…</string>
     <string name="blog_add_image">+ Add media</string>
+    <string name="blog_collage_insert">Insert photo collage</string>
+    <string name="blog_collage_title">Photo collage</string>
+    <string name="blog_collage_capacity">%1$d of %2$d photos</string>
+    <string name="blog_collage_capacity_skipped">The collage is full. Selections skipped: %1$d.</string>
+    <string name="blog_collage_add_photos">Add photos</string>
+    <string name="blog_collage_remove">Remove collage</string>
+    <string name="blog_collage_remove_photo">Remove %1$s</string>
+    <string name="blog_collage_photo">Photo %1$d</string>
 
     <string name="blog_save_button">Save</string>
     <string name="blog_unpublish_button">Unpublish</string>

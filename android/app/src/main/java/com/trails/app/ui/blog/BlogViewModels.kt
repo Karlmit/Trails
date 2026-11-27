@@ -13,6 +13,7 @@ import com.trails.app.sync.SyncScheduler
 import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class BlogListItem(val entry: TimelineEntryEntity, val excerpt: String)
@@ -144,6 +146,9 @@ class BlogDetailViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BlogDetailUiState())
 
+    private val _collagePhotoPaths = MutableStateFlow<Map<String, String>>(emptyMap())
+    internal val collagePhotoPaths: StateFlow<Map<String, String>> = _collagePhotoPaths
+
     init {
         // A blog image's Photo can be missing here for two different reasons --
         // its metadata was never synced at all (this trip's last full sync
@@ -158,14 +163,22 @@ class BlogDetailViewModel @Inject constructor(
             var resyncedMetadata = false
             uiState.distinctUntilChanged { old, new -> old.blocks == new.blocks && old.photosById.keys == new.photosById.keys }
                 .collect { state ->
-                    val referencedIds = state.blocks.filterIsInstance<BlogBlock.ImageBlock>().map { it.photoId }.toSet()
+                    val ordinaryIds = state.blocks.filterIsInstance<BlogBlock.ImageBlock>().map { it.photoId }.toSet()
+                    val collageIds = state.blocks.filterIsInstance<BlogBlock.CollageBlock>().flatMap { it.photoIds }.toSet()
+                    val referencedIds = ordinaryIds + collageIds
+                    _collagePhotoPaths.value = _collagePhotoPaths.value.filterKeys { it in collageIds && it in state.photosById }
                     if (referencedIds.isEmpty()) return@collect
                     val knownIds = state.photosById.keys
                     if (!resyncedMetadata && (referencedIds - knownIds).isNotEmpty() && tripId != null) {
                         resyncedMetadata = true
                         runCatching { documentsRepository.syncTrip(tripId) }
                     }
-                    referencedIds.mapNotNull { state.photosById[it] }
+                    collageIds.mapNotNull(state.photosById::get).forEach { photo ->
+                        val path = withContext(Dispatchers.IO) { documentsRepository.ensurePhotoCached(photo) }
+                        _collagePhotoPaths.value = if (path == null) _collagePhotoPaths.value - photo.id
+                        else _collagePhotoPaths.value + (photo.id to path)
+                    }
+                    (ordinaryIds - collageIds).mapNotNull { state.photosById[it] }
                         .filter { it.localPath == null && shouldPrefetchPhoto(it) }
                         .forEach { photo -> runCatching { documentsRepository.ensurePhotoCached(photo) } }
                 }

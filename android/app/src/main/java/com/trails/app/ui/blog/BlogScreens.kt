@@ -113,6 +113,7 @@ fun BlogListScreen(
 @Composable
 fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, viewModel: BlogDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
+    val collagePaths by viewModel.collagePhotoPaths.collectAsState()
     val entry = state.entry
     val stats by viewModel.stats.collectAsState()
     val isPublished = entry?.publishedAt != null
@@ -197,6 +198,26 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                                 )
                             } else if (photo != null) {
                                 Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
+                            }
+                        }
+                        is BlogBlock.CollageBlock -> {
+                            val preview: @Composable (Int, Modifier, ContentScale) -> Unit = { photoIndex, modifier, scale ->
+                                val photoId = block.photoIds[photoIndex]
+                                val photo = state.photosById[photoId]
+                                CollagePhotoPreview(
+                                    file = photo?.let { collagePaths[it.id]?.let(::File) },
+                                    label = photo?.originalFilename ?: stringResource(R.string.blog_collage_photo, photoIndex + 1),
+                                    onOpen = photo?.let { { onOpenPhoto(photoId) } },
+                                    modifier = modifier,
+                                    contentScale = scale,
+                                )
+                            }
+                            if (block.photoIds.size == 1) {
+                                preview(0, Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(4.dp)), ContentScale.FillWidth)
+                            } else {
+                                PhotoCollageGrid(block.photoIds.size, Modifier.padding(bottom = 12.dp)) { photoIndex ->
+                                    preview(photoIndex, Modifier.fillMaxSize(), ContentScale.Crop)
+                                }
                             }
                         }
                     }

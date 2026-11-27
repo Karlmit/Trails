@@ -1638,8 +1638,80 @@ body.has-notify-bar .page:has(.fab) {
    classes plus the pseudo-element) is more specific than this alone
    would be. Scoped to this read view; the editing experience (where the
    highlight is legitimate) is untouched. */
-.rich-text-view .rte-layout-image::after {
+.rich-text-view .rte-layout-image::after,
+.rich-text-view .blog-collage::after {
   display: none !important;
+}
+
+.blog-collage-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+}
+
+.blog-collage-grid {
+  display: grid;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 4px;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  margin-block: 0.5rem;
+}
+
+.blog-collage-row {
+  display: flex;
+  min-block-size: 0;
+  gap: 4px;
+}
+
+.blog-collage-slot {
+  position: relative;
+  flex: 1;
+  min-inline-size: 0;
+  border-radius: 4px;
+}
+
+.blog-collage-tile {
+  display: block;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  max-inline-size: 100%;
+}
+
+.blog-collage-grid .blog-collage-tile {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.blog-collage-grid .blog-collage-tile img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.blog-collage-remove-photo {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  padding: 0;
+  border: 1px solid #d6dbde;
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.25rem;
+  cursor: pointer;
 }
 
 /* User-reported: "I would like the blog content editor to be a full page
@@ -1850,6 +1922,12 @@ body.has-notify-bar .page:has(.fab) {
 }
 
 .bn-block:has(> .react-renderer.node-layoutImage) {
+  display: block;
+}
+
+.bn-block-content[data-content-type='photoCollage'],
+.react-renderer.node-photoCollage,
+.bn-block:has(> .react-renderer.node-photoCollage) {
   display: block;
 }
 

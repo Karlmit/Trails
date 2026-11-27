@@ -177,6 +177,106 @@ class BlogEditViewModelTest {
     }
 
     @Test
+    fun `collage survives offline reopening and retries each photo by its own stable id`() = runTest(dispatcher) {
+        val entry = serverEntry()
+        val first = stageImage("collage-first.jpg")
+        val last = stageImage("collage-last.jpg")
+        val saved = slot<BlogPostRequest>()
+        coEvery { timeline.updateBlogPost("post", capture(saved), false) } returns entry
+        coEvery {
+            documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", first, "collage-first.jpg", "image/jpeg", false, any())
+        } returns mockk { every { id } returns "first-photo" }
+        coEvery {
+            documents.uploadStagedPhoto("TIMELINE_ENTRY", "post", last, "collage-last.jpg", "image/jpeg", false, any())
+        } throws SocketTimeoutException("slow connection") andThen mockk<PhotoEntity> { every { id } returns "last-photo" }
+
+        val original = editor()
+        runCurrent()
+        original.onTitleChange("Photo wall")
+        val text = original.state.value.blocks.single().id
+        original.addCollageAfter(text)
+        val collageId = original.state.value.blocks.last().id
+        original.insertCollagePhotos(collageId, listOf(pickedImage("collage-first.jpg"), pickedImage("collage-last.jpg"))) {
+            checkNotNull(it.lastPathSegment)
+        }
+        val beforeSave = original.state.first { !it.stagingImages }.blocks.last() as EditableBlock.Collage
+        original.moveBlockBefore(collageId, text)
+        original.save()
+        assertTrue(original.state.first { !it.saving }.saved)
+        assertEquals(listOf(collageId, text), draft?.blocks?.map { it.id })
+        coVerify(exactly = 0) { timeline.createBlogPost(any()) }
+
+        val reopened = editor()
+        runCurrent()
+        assertEquals(beforeSave, reopened.state.value.blocks.first())
+        reopened.publish()
+        val failure = reopened.state.first { !it.saving }.error as BlogEditError.PublishFailure
+        assertEquals("collage-last.jpg", failure.photoName)
+        val firstId = beforeSave.photos.first().id
+        val lastId = beforeSave.photos.last().id
+        assertEquals("first-photo", draft?.pendingPhotos?.get(firstId)?.uploadedId)
+        assertNull(draft?.pendingPhotos?.get(lastId)?.uploadedId)
+
+        val retry = editor()
+        runCurrent()
+        retry.publish()
+        assertTrue(retry.state.first { !it.saving }.saved)
+        assertEquals(
+            beforeSave.copy(photos = listOf(beforeSave.photos[0].copy(photoId = "first-photo"), beforeSave.photos[1].copy(photoId = "last-photo"))),
+            parseEditableBlocks(saved.captured.description).blocks.first(),
+        )
+        coVerify(exactly = 1) { documents.resumeBlogPhoto("post", firstId, first, any(), any(), any()) }
+        coVerify(exactly = 2) { documents.resumeBlogPhoto("post", lastId, last, any(), any(), any()) }
+        coVerify(exactly = 1) { documents.uploadStagedPhoto(any(), any(), first, any(), any(), any(), any()) }
+        coVerify(exactly = 2) { documents.uploadStagedPhoto(any(), any(), last, any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `collage caps picker additions and removes pending photos individually or with the block`() = runTest(dispatcher) {
+        val editor = editor()
+        runCurrent()
+        editor.addCollageAfter(editor.state.value.blocks.single().id)
+        val collageId = editor.state.value.blocks.last().id
+        val names = (0..MAX_COLLAGE_PHOTOS + 1).map { "tile-$it.jpg" }
+        names.take(MAX_COLLAGE_PHOTOS).forEach(::stageImage)
+        editor.insertCollagePhotos(collageId, names.map(::pickedImage)) { checkNotNull(it.lastPathSegment) }
+        val full = editor.state.first { !it.stagingImages }
+        val collage = full.blocks.last() as EditableBlock.Collage
+        assertEquals(names.take(MAX_COLLAGE_PHOTOS), collage.photos.map { full.pendingPhotos[it.id]?.filename })
+        assertEquals(names.size - MAX_COLLAGE_PHOTOS, (full.error as BlogEditError.ImageBatch).skippedForCapacity)
+        coVerify(exactly = MAX_COLLAGE_PHOTOS) { store.stage("scope", any(), any()) }
+
+        editor.removeCollagePhoto(collageId, collage.photos.first().id)
+        assertEquals(collage.photos.drop(1), (editor.state.value.blocks.last() as EditableBlock.Collage).photos)
+        editor.removeBlock(collageId)
+        runCurrent()
+        assertTrue(editor.state.value.pendingPhotos.isEmpty())
+        assertTrue(draft?.pendingPhotos?.isEmpty() == true)
+        coVerify(exactly = MAX_COLLAGE_PHOTOS) { store.deletePhoto("scope", any()) }
+    }
+
+    @Test
+    fun `invalid picker results leave room for later valid collage photos`() = runTest(dispatcher) {
+        val editor = editor()
+        runCurrent()
+        editor.addCollageAfter(editor.state.value.blocks.single().id)
+        val collageId = editor.state.value.blocks.last().id
+        val names = (1..MAX_COLLAGE_PHOTOS).map { "valid-$it.jpg" }
+        names.forEach(::stageImage)
+        val video = DraftPhoto("clip.mp4", fileId = "clip", mimeType = "video/mp4")
+        coEvery { store.stage("scope", any(), "clip.mp4") } returns video
+        val selections = listOf("clip.mp4") + names + "excess.jpg"
+
+        editor.insertCollagePhotos(collageId, selections.map(::pickedImage)) { checkNotNull(it.lastPathSegment) }
+        val result = editor.state.first { !it.stagingImages }
+        val collage = result.blocks.last() as EditableBlock.Collage
+        assertEquals(names, collage.photos.map { result.pendingPhotos.getValue(it.id).filename })
+        assertEquals(BlogEditError.ImageBatch(listOf(ImageUploadFailure("clip.mp4", null)), 1), result.error)
+        coVerify(exactly = 1) { store.deletePhoto("scope", video) }
+        coVerify(exactly = 0) { store.stage("scope", any(), "excess.jpg") }
+    }
+
+    @Test
     fun `publishing survives clearing the editor and a new editor observes completion`() = runTest(dispatcher) {
         val remote = serverEntry()
         val finish = CompletableDeferred<TimelineEntryEntity>()

@@ -52,7 +52,7 @@ private const val OWNER_TYPE = "TIMELINE_ENTRY"
 sealed class BlogEditError {
     data class Message(val text: String) : BlogEditError()
     data class Resource(@StringRes val resId: Int) : BlogEditError()
-    data class ImageBatch(val failures: List<ImageUploadFailure>) : BlogEditError()
+    data class ImageBatch(val failures: List<ImageUploadFailure>, val skippedForCapacity: Int = 0) : BlogEditError()
     data class PublishFailure(
         val reason: String?,
         @StringRes val reasonRes: Int?,
@@ -265,18 +265,41 @@ class BlogEditViewModel @Inject constructor(
         edit { it.copy(blocks = updated) }
     }
 
+    fun addCollageAfter(id: String) {
+        if (_state.value.stagingImages) return
+        edit { current ->
+            val index = current.blocks.indexOfFirst { it.id == id }
+            val collage = EditableBlock.Collage(UUID.randomUUID().toString(), emptyList())
+            val blocks = current.blocks.toMutableList().apply { add(if (index >= 0) index + 1 else size, collage) }
+            current.copy(blocks = blocks)
+        }
+    }
+
     fun removeBlock(id: String) {
         val current = _state.value
         if (!current.ready || current.saving || current.stagingImages) return
-        val removed = current.pendingPhotos[id]
+        val block = current.blocks.firstOrNull { it.id == id } ?: return
         val remaining = current.blocks.filterNot { it.id == id }
-        val updated = current.copy(
-            blocks = remaining.ifEmpty { BlogEditState().blocks },
-            pendingPhotos = current.pendingPhotos - id,
-        )
-        edit(
-            afterWrite = if (removed != null) ({ draftStore.deletePhoto(draftScope, removed) }) else null,
-        ) { updated }
+        removePendingPhotos(block.photoItems().map { it.id }, remaining.ifEmpty { BlogEditState().blocks })
+    }
+
+    fun removeCollagePhoto(collageId: String, photoId: String) {
+        val current = _state.value
+        if (!current.ready || current.saving || current.stagingImages) return
+        val blocks = current.blocks.map { block ->
+            if (block is EditableBlock.Collage && block.id == collageId) {
+                if (block.photos.none { it.id == photoId }) return
+                block.copy(photos = block.photos.filterNot { it.id == photoId })
+            } else block
+        }
+        if (blocks != current.blocks) removePendingPhotos(listOf(photoId), blocks)
+    }
+
+    private fun removePendingPhotos(ids: List<String>, blocks: List<EditableBlock>) {
+        val removed = ids.mapNotNull(_state.value.pendingPhotos::get)
+        edit(afterWrite = { removed.forEach { draftStore.deletePhoto(draftScope, it) } }) { current ->
+            current.copy(blocks = blocks, pendingPhotos = current.pendingPhotos - ids.toSet())
+        }
     }
 
     fun moveBlockBefore(id: String, beforeId: String?) {
@@ -298,14 +321,36 @@ class BlogEditViewModel @Inject constructor(
     }
 
     fun insertImages(uris: List<Uri>, displayName: (Uri) -> String, afterId: String? = null) {
+        stageImages(uris, displayName, afterId = afterId)
+    }
+
+    fun insertCollagePhotos(collageId: String, uris: List<Uri>, displayName: (Uri) -> String) {
+        stageImages(uris, displayName, collageId = collageId)
+    }
+
+    private fun stageImages(
+        uris: List<Uri>,
+        displayName: (Uri) -> String,
+        afterId: String? = null,
+        collageId: String? = null,
+    ) {
         val current = _state.value
         if (uris.isEmpty() || !current.ready || current.stagingImages || current.saving) return
+        var slots = if (collageId == null) null else {
+            val collage = current.blocks.filterIsInstance<EditableBlock.Collage>().firstOrNull { it.id == collageId } ?: return
+            MAX_COLLAGE_PHOTOS - collage.photos.size
+        }
         _state.value = current.copy(stagingImages = true, error = null)
         viewModelScope.launch {
             try {
                 var insertionId = afterId
                 val failures = mutableListOf<ImageUploadFailure>()
-                for (uri in uris) {
+                var skippedForCapacity = 0
+                for ((index, uri) in uris.withIndex()) {
+                    if ((slots ?: Int.MAX_VALUE) <= 0) {
+                        skippedForCapacity = uris.size - index
+                        break
+                    }
                     var filename = uri.lastPathSegment ?: "file"
                     try {
                         filename = withContext(Dispatchers.IO) { displayName(uri) }
@@ -313,8 +358,24 @@ class BlogEditViewModel @Inject constructor(
                         withContext(NonCancellable) {
                             val photo = draftStore.stage(draftScope, uri, filename)
                             val id = UUID.randomUUID().toString()
-                            insertPhotoAfter(insertionId, id, photo)
-                            insertionId = id
+                            if (collageId == null) {
+                                insertPhotoAfter(insertionId, id, photo)
+                                insertionId = id
+                            } else {
+                                if (photo.mimeType?.startsWith("image/") != true) {
+                                    draftStore.deletePhoto(draftScope, photo)
+                                    throw IOException("Collages only accept photos")
+                                }
+                                edit { state ->
+                                    val blocks = state.blocks.map { block ->
+                                        if (block is EditableBlock.Collage && block.id == collageId) {
+                                            block.copy(photos = block.photos + EditableBlock.Image(id, id))
+                                        } else block
+                                    }
+                                    state.copy(blocks = blocks, pendingPhotos = state.pendingPhotos + (id to photo))
+                                }
+                                slots = checkNotNull(slots) - 1
+                            }
                         }
                     } catch (failure: CancellationException) {
                         throw failure
@@ -322,7 +383,9 @@ class BlogEditViewModel @Inject constructor(
                         failures += ImageUploadFailure(filename, null)
                     }
                 }
-                if (failures.isNotEmpty()) _state.value = _state.value.copy(error = BlogEditError.ImageBatch(failures))
+                if (failures.isNotEmpty() || skippedForCapacity > 0) {
+                    _state.value = _state.value.copy(error = BlogEditError.ImageBatch(failures, skippedForCapacity))
+                }
             } finally {
                 _state.value = _state.value.copy(stagingImages = false)
             }

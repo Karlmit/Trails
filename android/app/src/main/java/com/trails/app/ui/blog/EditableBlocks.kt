@@ -48,14 +48,20 @@ sealed class EditableBlock {
     data class Text(override val id: String, val kind: TextBlockKind, val runs: List<InlineRun>) : EditableBlock()
     @Serializable
     data class Image(override val id: String, val photoId: String, val isVideo: Boolean = false) : EditableBlock()
+    @Serializable
+    data class Collage(override val id: String, val photos: List<Image>) : EditableBlock()
+}
+
+internal fun EditableBlock.photoItems(): List<EditableBlock.Image> = when (this) {
+    is EditableBlock.Text -> emptyList()
+    is EditableBlock.Image -> listOf(this)
+    is EditableBlock.Collage -> photos
 }
 
 data class ParsedEditableContent(val blocks: List<EditableBlock>, val lostFormatting: Boolean)
 
 @Serializable
 data class InlineRun(val text: String, val bold: Boolean = false, val italic: Boolean = false, val underline: Boolean = false)
-
-private val PHOTO_ID_REGEX = Regex("/api/v1/photos/([^/]+)/file")
 
 /** Splits BlockNote's real inline `content` (an array of `{type:"text",text,styles}` runs) into [InlineRun]s. */
 fun contentToInlineRuns(content: JsonElement?): List<InlineRun> {
@@ -96,10 +102,17 @@ fun parseEditableBlocks(raw: String?): ParsedEditableContent {
             val block = blockEl as? JsonObject ?: continue
             val type = (block["type"] as? JsonPrimitive)?.content
             val id = (block["id"] as? JsonPrimitive)?.content ?: UUID.randomUUID().toString()
+            val collagePhotos = storedCollagePhotos(block)
+            if (collagePhotos != null) {
+                blocks.add(EditableBlock.Collage(id, collagePhotos.map { photo ->
+                    EditableBlock.Image(photo.id ?: UUID.randomUUID().toString(), photo.photoId)
+                }))
+                continue
+            }
             when (type) {
                 "layoutImage", "video" -> {
                     val url = ((block["props"] as? JsonObject)?.get("url") as? JsonPrimitive)?.content
-                    val photoId = url?.let { PHOTO_ID_REGEX.find(it)?.groupValues?.get(1) }
+                    val photoId = url?.let { BLOG_PHOTO_URL.find(it)?.groupValues?.get(1) }
                     val kind = ((block["props"] as? JsonObject)?.get("mediaKind") as? JsonPrimitive)?.content
                     if (photoId != null) blocks.add(EditableBlock.Image(id, photoId, isVideo = type == "video" || kind == "video"))
                 }
@@ -177,23 +190,29 @@ fun encodeEditableBlocks(blocks: List<EditableBlock>): String {
                         putJsonArray("children") {}
                     },
                 )
-                is EditableBlock.Image -> add(
-                    buildJsonObject {
-                        put("id", block.id)
-                        put("type", "layoutImage")
-                        put(
-                            "props",
-                            buildJsonObject {
-                                put("url", "/api/v1/photos/${block.photoId}/file")
-                                put("layout", "block")
-                                if (block.isVideo) put("mediaKind", "video")
-                            },
-                        )
-                        putJsonArray("children") {}
-                    },
-                )
+                is EditableBlock.Image -> add(block.toStoredImage())
+                is EditableBlock.Collage -> add(buildJsonObject {
+                    put("id", block.id)
+                    put("type", "layoutImage")
+                    put("props", buildJsonObject {
+                        put("url", "")
+                        put("collage", true)
+                    })
+                    putJsonArray("children") { block.photos.forEach { add(it.toStoredImage()) } }
+                })
             }
         }
     }
     return Json.encodeToString(JsonArray.serializer(), array)
+}
+
+private fun EditableBlock.Image.toStoredImage() = buildJsonObject {
+    put("id", id)
+    put("type", "layoutImage")
+    put("props", buildJsonObject {
+        put("url", "/api/v1/photos/$photoId/file")
+        put("layout", "block")
+        if (isVideo) put("mediaKind", "video")
+    })
+    putJsonArray("children") {}
 }

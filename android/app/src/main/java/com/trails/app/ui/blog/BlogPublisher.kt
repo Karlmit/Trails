@@ -54,7 +54,7 @@ internal class BlogPublisher @Inject constructor(
                     _state.value = _state.value.copy(entryId = createdId)
                     persist()
                 }
-                val pending = current.blocks.mapNotNull { block ->
+                val pending = current.blocks.flatMap { it.photoItems() }.mapNotNull { block ->
                     current.pendingPhotos[block.id]?.takeIf { it.uploadedId == null }?.let { block.id to it }
                 }
                 val sizes = withContext(Dispatchers.IO) {
@@ -64,63 +64,68 @@ internal class BlogPublisher @Inject constructor(
                 var confirmedBytes = 0L
                 var completed = 0
                 var remainingImports = pending.count { (_, photo) -> photo.sourceUrl != null }
-                val remoteBlocks = current.blocks.map { block ->
-                    val photo = current.pendingPhotos[block.id]
-                    if (block is EditableBlock.Image && photo != null) {
-                        val uploadedId = photo.uploadedId ?: run {
-                            activePhoto = photo.filename
-                            var photoBytes = sizes.getValue(block.id)
-                            var initial = BlogUploadProgress(
-                                totalPhotos = pending.size,
-                                completedPhotos = completed,
-                                totalBytes = totalBytes,
-                                sentBytes = confirmedBytes,
-                                importingUrl = photo.sourceUrl != null,
-                            )
-                            _state.update { it.copy(uploadProgress = initial) }
-                            val hasPendingImports = remainingImports > 0
-                            val result = uploadPhoto(id, block.id, photo) { bytesInAttempt ->
-                                if (bytesInAttempt != photoBytes) {
-                                    totalBytes += bytesInAttempt - photoBytes
-                                    photoBytes = bytesInAttempt
-                                    initial = initial.copy(totalBytes = totalBytes, retryingSmaller = true)
-                                    _state.update { it.copy(uploadProgress = initial) }
+                suspend fun resolvePhoto(block: EditableBlock.Image): EditableBlock.Image {
+                    val photo = current.pendingPhotos[block.id] ?: return block
+                    val uploadedId = photo.uploadedId ?: run {
+                        activePhoto = photo.filename
+                        var photoBytes = sizes.getValue(block.id)
+                        var initial = BlogUploadProgress(
+                            totalPhotos = pending.size,
+                            completedPhotos = completed,
+                            totalBytes = totalBytes,
+                            sentBytes = confirmedBytes,
+                            importingUrl = photo.sourceUrl != null,
+                        )
+                        _state.update { it.copy(uploadProgress = initial) }
+                        val hasPendingImports = remainingImports > 0
+                        val result = uploadPhoto(id, block.id, photo) { bytesInAttempt ->
+                            if (bytesInAttempt != photoBytes) {
+                                totalBytes += bytesInAttempt - photoBytes
+                                photoBytes = bytesInAttempt
+                                initial = initial.copy(totalBytes = totalBytes, retryingSmaller = true)
+                                _state.update { it.copy(uploadProgress = initial) }
+                            }
+                            val attempt = initial
+                            val attemptBytes = photoBytes
+                            var started = TimeSource.Monotonic.markNow()
+                            var resumedBytes = 0L
+                            var lastUpdateMillis = -250L
+                            val onBytesSent: (Long) -> Unit = { bytes ->
+                                if (lastUpdateMillis < 0) {
+                                    resumedBytes = bytes
+                                    started = TimeSource.Monotonic.markNow()
                                 }
-                                val attempt = initial
-                                val attemptBytes = photoBytes
-                                var started = TimeSource.Monotonic.markNow()
-                                var resumedBytes = 0L
-                                var lastUpdateMillis = -250L
-                                val onBytesSent: (Long) -> Unit = { bytes ->
-                                    if (lastUpdateMillis < 0) {
-                                        resumedBytes = bytes
-                                        started = TimeSource.Monotonic.markNow()
-                                    }
-                                    val elapsedMillis = started.elapsedNow().inWholeMilliseconds
-                                    if (bytes == 0L || bytes >= attemptBytes || elapsedMillis - lastUpdateMillis >= 250) {
-                                        lastUpdateMillis = elapsedMillis
-                                        _state.update {
-                                            if (publishContext.isActive && it.publishing) {
-                                                it.copy(uploadProgress = attempt.sending(attemptBytes, bytes, elapsedMillis, hasPendingImports, resumedBytes))
-                                            } else it
-                                        }
+                                val elapsedMillis = started.elapsedNow().inWholeMilliseconds
+                                if (bytes == 0L || bytes >= attemptBytes || elapsedMillis - lastUpdateMillis >= 250) {
+                                    lastUpdateMillis = elapsedMillis
+                                    _state.update {
+                                        if (publishContext.isActive && it.publishing) {
+                                            it.copy(uploadProgress = attempt.sending(attemptBytes, bytes, elapsedMillis, hasPendingImports, resumedBytes))
+                                        } else it
                                     }
                                 }
-                                onBytesSent
                             }
-                            activePhoto = null
-                            confirmedBytes += photoBytes
-                            completed++
-                            if (photo.sourceUrl != null) remainingImports--
-                            _state.update {
-                                it.copy(uploadProgress = initial.copy(
-                                    completedPhotos = completed, sentBytes = confirmedBytes, importingUrl = false, retryingSmaller = false,
-                                ))
-                            }
-                            result
+                            onBytesSent
                         }
-                        block.copy(photoId = uploadedId)
-                    } else block
+                        activePhoto = null
+                        confirmedBytes += photoBytes
+                        completed++
+                        if (photo.sourceUrl != null) remainingImports--
+                        _state.update {
+                            it.copy(uploadProgress = initial.copy(
+                                completedPhotos = completed, sentBytes = confirmedBytes, importingUrl = false, retryingSmaller = false,
+                            ))
+                        }
+                        result
+                    }
+                    return block.copy(photoId = uploadedId)
+                }
+                val remoteBlocks = current.blocks.map { block ->
+                    when (block) {
+                        is EditableBlock.Image -> resolvePhoto(block)
+                        is EditableBlock.Collage -> block.copy(photos = block.photos.map { resolvePhoto(it) })
+                        is EditableBlock.Text -> block
+                    }
                 }
                 repository.updateBlogPost(id, request.copy(description = encodeEditableBlocks(remoteBlocks)), cacheLocally = current.isPublished)
                 if (!current.isPublished) repository.publishBlogPost(id)

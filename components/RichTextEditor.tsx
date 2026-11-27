@@ -18,6 +18,8 @@ import { useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import { WebVideoPlayer } from '@/components/WebVideoPlayer';
 import { UrlImportField } from '@/components/UrlImportField';
+import { CollageUploadContext, photoCollageBlock, type BeginCollageUpload } from '@/components/PhotoCollageBlock';
+import { persistPhotoCollages, projectPhotoCollages } from '@/lib/blog-photo-collage';
 
 // User-reported: "look online for an easy way to integrate a ready made
 // WYSIWYG editor for blog posts ... a way to even choose if text is next to
@@ -39,6 +41,7 @@ const layoutImageBlock = createReactBlockSpec(
     type: 'layoutImage',
     propSchema: {
       url: { default: '' },
+      collage: { default: false },
       mediaKind: { default: 'image', values: ['image', 'video'] },
       layout: {
         default: 'block',
@@ -98,7 +101,7 @@ const layoutImageBlock = createReactBlockSpec(
         // placeholder would be misleading there, since editing isn't
         // possible at all. Render nothing instead, the same way a Guest
         // sees no upload affordance anywhere else in the app.
-        if (!editor.isEditable) return null;
+        if (!editor.isEditable || block.props.collage) return null;
         // User-reported: "Would it be possible to allow uploading images to
         // a blog post before its actually saved?" -- the upload button is
         // always available now; `editor.uploadFile` (see uploadBlogImage's
@@ -171,6 +174,7 @@ export const blogPostSchema = BlockNoteSchema.create({
   blockSpecs: {
     ...blockSpecsWithoutDefaultImage,
     layoutImage: layoutImageBlock(),
+    photoCollage: photoCollageBlock(),
   },
 });
 
@@ -185,11 +189,11 @@ const EMPTY_DOCUMENT: PartialBlock[] = [{ type: 'paragraph', content: '' }];
  * expected shape is used as-is, anything else (including `null`/empty) is
  * treated as a single legacy paragraph.
  */
-export function parseBlogContent(raw: string | null | undefined): PartialBlock[] {
+export function parseBlogContent(raw: string | null | undefined, visibleCollagePhotoIds?: ReadonlySet<string>): PartialBlock[] {
   if (!raw) return EMPTY_DOCUMENT;
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) return projectPhotoCollages(parsed, visibleCollagePhotoIds) as PartialBlock[];
   } catch {
     // Not JSON -- a legacy plain-text post, fall through.
   }
@@ -305,20 +309,24 @@ type BlogEditor = ReturnType<typeof useBlogEditor>;
 // live that slash commands work fine on a touch screen -- so nothing is
 // lost by hiding the broken side menu there (see `.bn-side-menu`'s own
 // mobile media query in globals.css).
-function BlogToolbar({ editor }: { editor: BlogEditor }) {
+function BlogToolbar({ editor, disabled }: { editor: BlogEditor; disabled: boolean }) {
   const t = useTranslations('tripBlog');
   const activeStyles = useActiveStyles(editor);
-  const currentBlock = useEditorState({
+  const selectedBlocks = useEditorState({
     editor,
-    selector: ({ editor }) => (editor.getSelection()?.blocks ?? [editor.getTextCursorPosition().block])[0],
+    selector: ({ editor }) => editor.getSelection()?.blocks ?? [editor.getTextCursorPosition().block],
   });
+  const currentBlock = selectedBlocks[0];
+  const formattingDisabled = disabled || selectedBlocks.some((block) => block.type === 'photoCollage');
 
   function toggleStyle(style: 'bold' | 'italic') {
+    if (formattingDisabled) return;
     editor.focus();
     editor.toggleStyles({ [style]: true });
   }
 
   function toggleBlockType(type: string, props?: Record<string, unknown>) {
+    if (formattingDisabled) return;
     editor.focus();
     const props_ = (currentBlock.props ?? {}) as Record<string, unknown>;
     const isActive =
@@ -326,9 +334,15 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
     editor.updateBlock(currentBlock, isActive ? { type: 'paragraph', props: {} } : ({ type, props } as never));
   }
 
-  function insertImage() {
+  function insertMedia(type: 'layoutImage' | 'photoCollage') {
+    if (disabled) return;
     editor.focus();
-    insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' } as never);
+    const { block } = editor.getTextCursorPosition();
+    if (block.content === undefined) {
+      editor.insertBlocks([{ type }], block, 'after');
+    } else {
+      insertOrUpdateBlockForSlashMenu(editor, { type });
+    }
   }
 
   const blockProps = (currentBlock.props ?? {}) as Record<string, unknown>;
@@ -339,6 +353,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('bold')}
+        disabled={formattingDisabled}
         aria-pressed={!!activeStyles.bold}
         onClick={() => toggleStyle('bold')}
       >
@@ -347,6 +362,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('italic')}
+        disabled={formattingDisabled}
         aria-pressed={!!activeStyles.italic}
         onClick={() => toggleStyle('italic')}
       >
@@ -356,6 +372,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('headingButton')}
+        disabled={formattingDisabled}
         aria-pressed={isHeading(2)}
         onClick={() => toggleBlockType('heading', { level: 2 })}
       >
@@ -364,6 +381,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('subheadingButton')}
+        disabled={formattingDisabled}
         aria-pressed={isHeading(3)}
         onClick={() => toggleBlockType('heading', { level: 3 })}
       >
@@ -373,6 +391,7 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('bulletList')}
+        disabled={formattingDisabled}
         aria-pressed={currentBlock.type === 'bulletListItem'}
         onClick={() => toggleBlockType('bulletListItem')}
       >
@@ -381,14 +400,18 @@ function BlogToolbar({ editor }: { editor: BlogEditor }) {
       <button
         type="button"
         aria-label={t('numberedList')}
+        disabled={formattingDisabled}
         aria-pressed={currentBlock.type === 'numberedListItem'}
         onClick={() => toggleBlockType('numberedListItem')}
       >
         1.
       </button>
       <span className="blog-toolbar-divider" aria-hidden="true" />
-      <button type="button" aria-label={t('insertImage')} onClick={insertImage}>
+      <button type="button" disabled={disabled} aria-label={t('insertImage')} onClick={() => insertMedia('layoutImage')}>
         🖼️
+      </button>
+      <button type="button" disabled={disabled} aria-label={t('collageInsert')} title={t('collageInsert')} onClick={() => insertMedia('photoCollage')}>
+        <span aria-hidden="true">▦</span>
       </button>
     </div>
   );
@@ -398,6 +421,8 @@ export function RichTextEditor({
   initialContent,
   contentRef,
   ensurePostId,
+  beginCollageUpload,
+  disabled,
 }: {
   initialContent: string | null | undefined;
   // Deliberately a ref, not React state fed back in as a `value` prop --
@@ -415,50 +440,67 @@ export function RichTextEditor({
   // see uploadBlogImage's comment. In edit mode this just returns the
   // existing id immediately, no network call.
   ensurePostId: () => Promise<string>;
+  beginCollageUpload: BeginCollageUpload;
+  disabled: boolean;
 }) {
   const editor = useBlogEditor(initialContent, ensurePostId);
   const t = useTranslations('tripBlog');
 
   return (
-    <div className="rich-text-editor">
-      <BlogToolbar editor={editor} />
-      <BlockNoteView
-        editor={editor}
-        theme="light"
-        slashMenu={false}
-        onChange={() => {
-          contentRef.current = JSON.stringify(editor.document);
-        }}
-      >
-        <SuggestionMenuController
-          triggerCharacter="/"
-          getItems={async (query) =>
-            filterSuggestionItems(
-              [
-                ...getDefaultReactSlashMenuItems(editor),
-                {
-                  title: t('slashImageTitle'),
-                  subtext: t('slashImageSubtext'),
-                  aliases: ['image', 'photo', 'picture', 'upload', 'float'],
-                  group: t('slashImageGroup'),
-                  icon: <span aria-hidden="true">🖼️</span>,
-                  onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' }),
-                },
-              ],
-              query,
-            )
-          }
-        />
-      </BlockNoteView>
-    </div>
+    <CollageUploadContext.Provider value={beginCollageUpload}>
+      <div className="rich-text-editor" inert={disabled}>
+        <BlogToolbar editor={editor} disabled={disabled} />
+        <BlockNoteView
+          editor={editor}
+          theme="light"
+          editable={!disabled}
+          slashMenu={false}
+          onChange={() => {
+            contentRef.current = JSON.stringify(persistPhotoCollages(editor.document));
+          }}
+        >
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={async (query) =>
+              filterSuggestionItems(
+                [
+                  ...getDefaultReactSlashMenuItems(editor),
+                  {
+                    title: t('slashImageTitle'),
+                    subtext: t('slashImageSubtext'),
+                    aliases: ['image', 'photo', 'picture', 'upload', 'float'],
+                    group: t('slashImageGroup'),
+                    icon: <span aria-hidden="true">🖼️</span>,
+                    onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: 'layoutImage' }),
+                  },
+                  {
+                    title: t('collageTitle'),
+                    subtext: t('collageSlashDescription'),
+                    aliases: ['collage', 'kollage', 'photos', 'grid'],
+                    group: t('slashImageGroup'),
+                    icon: <span aria-hidden="true">▦</span>,
+                    onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: 'photoCollage' }),
+                  },
+                ],
+                query,
+              )
+            }
+          />
+        </BlockNoteView>
+      </div>
+    </CollageUploadContext.Provider>
   );
 }
 
-export function RichTextView({ content }: { content: string | null | undefined }) {
+export function RichTextView({ content, visibleCollagePhotoIds }: {
+  content: string | null | undefined;
+  visibleCollagePhotoIds?: ReadonlySet<string>;
+}) {
+  const initialContent = useMemo(() => parseBlogContent(content, visibleCollagePhotoIds), [content, visibleCollagePhotoIds]);
   const editor = useCreateBlockNote({
     schema: blogPostSchema,
-    initialContent: useMemo(() => parseBlogContent(content), [content]),
-  });
+    initialContent,
+  }, [initialContent]);
 
   return (
     <div className="rich-text-view">

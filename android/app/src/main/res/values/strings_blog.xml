@@ -15,6 +15,14 @@
     <string name="blog_uploading_image">Laddar upp bild…</string>
     <string name="blog_uploading">Laddar upp…</string>
     <string name="blog_add_image">+ Lägg till media</string>
+    <string name="blog_collage_insert">Infoga fotokollage</string>
+    <string name="blog_collage_title">Fotokollage</string>
+    <string name="blog_collage_capacity">%1$d av %2$d foton</string>
+    <string name="blog_collage_capacity_skipped">Kollaget är fullt. Överhoppade val: %1$d.</string>
+    <string name="blog_collage_add_photos">Lägg till foton</string>
+    <string name="blog_collage_remove">Ta bort kollage</string>
+    <string name="blog_collage_remove_photo">Ta bort %1$s</string>
+    <string name="blog_collage_photo">Foto %1$d</string>
 
     <string name="blog_save_button">Spara</string>
     <string name="blog_unpublish_button">Avpublicera</string>

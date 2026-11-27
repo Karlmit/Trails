@@ -2,6 +2,7 @@ package com.trails.app.ui.blog
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.text.format.Formatter
 import androidx.core.content.ContextCompat
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -102,12 +104,33 @@ fun BlogEditScreen(
     var showDiscardConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pickerAfterId by rememberSaveable { mutableStateOf<String?>(null) }
+    var targetCollageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingCollageUris by rememberSaveable { mutableStateOf<ArrayList<String>?>(null) }
     var urlAfterId by rememberSaveable { mutableStateOf<String?>(null) }
     var localPreviewId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, pickerAfterId)
         pickerAfterId = null
+    }
+    fun queuePickedCollagePhotos(uris: List<Uri>) {
+        if (uris.isEmpty()) targetCollageId = null
+        else pendingCollageUris = ArrayList(uris.map(Uri::toString))
+    }
+    val pickCollagePhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(MAX_COLLAGE_PHOTOS)) {
+        queuePickedCollagePhotos(it)
+    }
+    val pickCollagePhoto = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {
+        queuePickedCollagePhotos(listOfNotNull(it))
+    }
+    LaunchedEffect(state.ready, pendingCollageUris) {
+        val uris = pendingCollageUris ?: return@LaunchedEffect
+        if (!state.ready) return@LaunchedEffect
+        targetCollageId?.let { id ->
+            viewModel.insertCollagePhotos(id, uris.map(Uri::parse)) { uri -> queryDisplayName(context, uri) }
+        }
+        pendingCollageUris = null
+        targetCollageId = null
     }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
@@ -152,7 +175,10 @@ fun BlogEditScreen(
                 is BlogEditError.ImageBatch -> {
                     val fallback = stringResource(R.string.blog_error_stage_image)
                     val details = error.failures.joinToString("\n") { "${it.filename} — ${it.reason ?: fallback}" }
-                    stringResource(R.string.blog_error_stage_image_batch, error.failures.size, details)
+                    listOfNotNull(
+                        if (error.failures.isNotEmpty()) stringResource(R.string.blog_error_stage_image_batch, error.failures.size, details) else null,
+                        if (error.skippedForCapacity > 0) stringResource(R.string.blog_collage_capacity_skipped, error.skippedForCapacity) else null,
+                    ).joinToString("\n")
                 }
             }
             ErrorBanner(message)
@@ -287,6 +313,60 @@ fun BlogEditScreen(
                                 }
                             }
                         }
+                        is EditableBlock.Collage -> {
+                            val canEditCollage = !state.saving && !state.stagingImages
+                            val remaining = MAX_COLLAGE_PHOTOS - block.photos.size
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(stringResource(R.string.blog_collage_title), style = MaterialTheme.typography.titleSmall)
+                                    Text(
+                                        stringResource(R.string.blog_collage_capacity, block.photos.size, MAX_COLLAGE_PHOTOS),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                IconButton(onClick = { viewModel.removeBlock(block.id) }, enabled = canEditCollage) {
+                                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_collage_remove))
+                                }
+                            }
+                            PhotoCollageGrid(block.photos.size) { photoIndex ->
+                                val photo = block.photos[photoIndex]
+                                val staged = state.pendingPhotos[photo.id]
+                                val remote = photosById[photo.photoId]
+                                val file = staged?.let(viewModel::localPhoto) ?: remote?.localPath?.let(::File)
+                                val label = staged?.filename ?: remote?.originalFilename
+                                    ?: stringResource(R.string.blog_collage_photo, photoIndex + 1)
+                                val openPhoto: (() -> Unit)? = when {
+                                    staged != null && file != null -> ({ localPreviewId = photo.id })
+                                    staged == null -> ({ onOpenPhoto(photo.photoId) })
+                                    else -> null
+                                }
+                                CollagePhotoPreview(file, label, openPhoto)
+                                Surface(
+                                    modifier = Modifier.align(Alignment.TopEnd),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surface,
+                                ) {
+                                    IconButton(
+                                        onClick = { viewModel.removeCollagePhoto(block.id, photo.id) },
+                                        enabled = canEditCollage,
+                                    ) {
+                                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.blog_collage_remove_photo, label))
+                                    }
+                                }
+                            }
+                            TextButton(
+                                enabled = canEditCollage && remaining > 0,
+                                onClick = {
+                                    targetCollageId = block.id
+                                    val imageOnly = ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    if (remaining == 1) pickCollagePhoto.launch(PickVisualMediaRequest(imageOnly))
+                                    else pickCollagePhotos.launch(
+                                        PickVisualMediaRequest.Builder().setMediaType(imageOnly)
+                                            .setMaxItems(remaining).setOrderedSelection(true).build(),
+                                    )
+                                },
+                            ) { Text(stringResource(R.string.blog_collage_add_photos)) }
+                        }
                     }
                     BlogBlockInsertion(
                         kind = (block as? EditableBlock.Text)?.kind,
@@ -298,6 +378,7 @@ fun BlogEditScreen(
                             pickImages.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                         },
                         onImageUrl = { urlAfterId = block.id },
+                        onAddCollage = { viewModel.addCollageAfter(block.id) },
                     )
                 }
             }
@@ -591,6 +672,7 @@ private fun BlogBlockInsertion(
     onAddParagraph: () -> Unit,
     onPickImages: () -> Unit,
     onImageUrl: () -> Unit,
+    onAddCollage: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val addLabel = when (kind) {
@@ -612,6 +694,10 @@ private fun BlogBlockInsertion(
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.blog_image_from_url)) },
                     onClick = { expanded = false; onImageUrl() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.blog_collage_insert)) },
+                    onClick = { expanded = false; onAddCollage() },
                 )
             }
         }
