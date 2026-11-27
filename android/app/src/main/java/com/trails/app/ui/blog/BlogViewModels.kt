@@ -8,9 +8,12 @@ import com.trails.app.data.shouldPrefetchPhoto
 import com.trails.app.data.TimelineRepository
 import com.trails.app.data.entity.PhotoEntity
 import com.trails.app.data.entity.TimelineEntryEntity
+import com.trails.app.network.dto.BlogViewStatsDto
 import com.trails.app.sync.SyncScheduler
 import com.trails.app.sync.TripRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -64,6 +67,12 @@ data class BlogDetailUiState(
     val photosById: Map<String, PhotoEntity> = emptyMap(),
 )
 
+internal sealed interface BlogStatsState {
+    data object Loading : BlogStatsState
+    data object Unavailable : BlogStatsState
+    data class Ready(val stats: BlogViewStatsDto) : BlogStatsState
+}
+
 /** Mirrors app/(web)/trips/[tripId]/blog/[entryId]/page.tsx -- text + inline images (BlogBlocks.kt), still no full BlockNote-equivalent formatting. */
 @HiltViewModel
 class BlogDetailViewModel @Inject constructor(
@@ -76,6 +85,44 @@ class BlogDetailViewModel @Inject constructor(
     private val entryId: String = checkNotNull(savedStateHandle["entryId"])
     private val tripId: String? = savedStateHandle["tripId"]
 
+    private val _stats = MutableStateFlow<BlogStatsState>(BlogStatsState.Loading)
+    internal val stats: StateFlow<BlogStatsState> = _stats
+    private var startedVisit = false
+    private var statsJob: Job? = null
+
+    internal fun loadStatsForVisit() {
+        if (startedVisit) return
+        startedVisit = true
+        loadStats(recordView = true)
+    }
+
+    internal fun refreshStats() {
+        if (startedVisit) loadStats()
+    }
+
+    private fun loadStats(recordView: Boolean = false) {
+        if (statsJob?.isActive == true) return
+        statsJob = viewModelScope.launch {
+            if (_stats.value !is BlogStatsState.Ready) _stats.value = BlogStatsState.Loading
+            if (recordView) {
+                try {
+                    timelineRepository.recordBlogView(entryId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed count must not prevent reading the post or its totals.
+                }
+            }
+            try {
+                _stats.value = BlogStatsState.Ready(timelineRepository.getBlogViewStats(entryId))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (_stats.value !is BlogStatsState.Ready) _stats.value = BlogStatsState.Unavailable
+            }
+        }
+    }
+
     // Pull-to-refresh (user-requested) -- tripId is nullable here (see
     // comment above), so this is a no-op if it's somehow missing rather
     // than crashing a detail screen over a gesture.
@@ -83,6 +130,7 @@ class BlogDetailViewModel @Inject constructor(
     val isRefreshing: StateFlow<Boolean> = refresher?.isRefreshing ?: MutableStateFlow(false)
     fun refresh() {
         refresher?.refresh()
+        refreshStats()
     }
 
     val uiState: StateFlow<BlogDetailUiState> = combine(

@@ -126,6 +126,8 @@ function isGuestEligiblePushMutation(pathname: string, method: string): boolean 
   return pathname === GUEST_ELIGIBLE_PUSH_PATH && (method === 'POST' || method === 'DELETE');
 }
 
+const GUEST_BLOG_VIEW_PATH = new RegExp(`^/api/v1/timeline-entries/${UUID_RE}/views$`);
+
 function bearerToken(request: NextRequest): string | undefined {
   const header = request.headers.get('authorization');
   if (header?.toLowerCase().startsWith('bearer ')) {
@@ -155,7 +157,8 @@ export async function proxy(request: NextRequest) {
       // spec-push-notifications' one disclosed exception (see above) -- an
       // anonymous Blog reader subscribing to / unsubscribing from new-post
       // notifications.
-      if (isGuestEligiblePushMutation(pathname, request.method)) {
+      if (isGuestEligiblePushMutation(pathname, request.method) ||
+        (request.method === 'POST' && GUEST_BLOG_VIEW_PATH.test(pathname))) {
         return NextResponse.next();
       }
       return NextResponse.json(

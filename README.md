@@ -250,3 +250,17 @@ Next.js 16 (App Router) monolith — Server Components for reads, versioned
 Route Handlers under `/api/v1` for mutations and for the future Android
 client — backed by PostgreSQL 18 via Prisma ORM 7. See the project's
 architecture and product docs for the full set of decisions this is built on.
+
+### Blog view statistics
+
+Android shows totals and country counts on published posts to signed-in users.
+Counts start with this server version. They represent online post opens, including
+signed-in readers, and do not estimate unique people.
+
+To get country counts, set `BLOG_VIEW_COUNTRY_HEADER` on the app container to the
+name of the header your reverse proxy supplies with the reader's ISO country code.
+For Cloudflare this is `CF-IPCountry` after enabling IP geolocation or the visitor
+location transform. Route traffic through the trusted proxy and configure it to
+overwrite that header. If the header is unset or the location is unavailable, the
+view is counted under Unknown. Trails stores aggregate counts and country codes
+without storing reader IP addresses.

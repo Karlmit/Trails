@@ -101,6 +101,10 @@ class TimelineRepository @Inject constructor(
         timelineEntryDao.deleteById(entryId)
     }
 
+    suspend fun recordBlogView(entryId: String) = api.recordBlogView(entryId)
+
+    suspend fun getBlogViewStats(entryId: String) = api.getBlogViewStats(entryId)
+
     suspend fun createBlogPost(request: BlogPostRequest): TimelineEntryEntity =
         api.createBlogPost(request).toEntity()
 

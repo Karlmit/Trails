@@ -433,10 +433,22 @@ model TimelineEntry {
   // derived from `startAt` at render time, never a foreign key here.
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
+  blogViewCounts BlogViewCount[]
+
   // AD-1: "Index (trip_id, start_at) on timeline_entries; this is the
   // index the Timeline's ~1s performance NFR depends on."
   @@index([tripId, startAt])
   @@map("timeline_entries")
+}
+
+model BlogViewCount {
+  entryId     String @map("entry_id") @db.Uuid
+  countryCode String @map("country_code") @db.VarChar(2)
+  views       Int    @default(0)
+  entry       TimelineEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, countryCode])
+  @@map("blog_view_counts")
 }
 
 // FR-21, spec-checklists: a Trip may have multiple Checklists (packing

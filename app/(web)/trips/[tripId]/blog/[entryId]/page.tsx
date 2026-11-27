@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
 import { canViewTrip, filterForViewer, getViewer } from '@/lib/viewer';
+import { BlogViewTracker } from '@/components/BlogViewTracker';
 import { BlogPostDetailPanel } from '@/components/BlogPostDetailPanel';
 import { NotificationOptInCard } from '@/components/NotificationOptInCard';
 import { getPushPublicKey } from '@/lib/push-config';
@@ -89,6 +90,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
           Same component, same localStorage dismissal, so saying "Not now"
           on either surface silences both. */}
       <NotificationOptInCard publicKey={getPushPublicKey()} />
+      {entry.publishedAt !== null && <BlogViewTracker entryId={entry.id} />}
       <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
       {(older || newer) && (
         <nav className={styles.navigation} aria-labelledby="more-blog-posts">

@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -113,6 +114,11 @@ fun BlogListScreen(
 fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, viewModel: BlogDetailViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
     val entry = state.entry
+    val stats by viewModel.stats.collectAsState()
+    val isPublished = entry?.publishedAt != null
+    LaunchedEffect(isPublished) {
+        if (isPublished) viewModel.loadStatsForVisit()
+    }
     var activeVideoIndex by remember(entry?.id, state.blocks) { mutableStateOf<Int?>(null) }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
@@ -129,6 +135,9 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                         color = TrailsColors.TextSoft,
                         modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                     )
+                }
+                if (isPublished) {
+                    item { BlogViewStats(stats, onRefresh = viewModel::refreshStats) }
                 }
                 // Numbering restarts at 1 whenever a non-numbered block breaks a
                 // run of consecutive NUMBERED_LIST blocks -- same as an HTML <ol>.
