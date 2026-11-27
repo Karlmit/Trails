@@ -85,4 +85,16 @@
     <string name="blog_views_hide_countries">Dölj länder</string>
     <string name="blog_views_show_countries">Visningar per land</string>
     <string name="blog_views_unknown_country">Okänt land</string>
+    <string name="blog_statistics_title">Bloggstatistik</string>
+    <string name="blog_statistics_all_time">Totala visningar · Hela perioden</string>
+    <string name="blog_statistics_trends">Visningar per dag</string>
+    <string name="blog_statistics_range">%1$d dagar</string>
+    <string name="blog_statistics_no_trend">Inga dagliga visningar har registrerats ännu.</string>
+    <string name="blog_statistics_history">Trenden börjar med den här serveruppdateringen. Tidigare visningar ingår i totalsummorna. Dagar anges i UTC.</string>
+    <string name="blog_statistics_by_post">Totala visningar per inlägg</string>
+    <string name="blog_statistics_no_posts">Det finns inga inlägg med statistik ännu.</string>
+    <string name="blog_statistics_all_posts">Alla inlägg</string>
+    <string name="blog_statistics_selected">Inlägg: %1$s</string>
+    <string name="blog_statistics_peak">Topp: %1$s · %2$s visningar</string>
+    <string name="blog_statistics_refresh_failed">Uppdateringen misslyckades. Försök igen.</string>
 </resources>

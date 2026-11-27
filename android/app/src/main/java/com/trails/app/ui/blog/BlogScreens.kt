@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +61,7 @@ fun BlogListScreen(
     padding: PaddingValues,
     onOpenPost: (String) -> Unit,
     onOpenDraft: (String) -> Unit,
+    onOpenStatistics: () -> Unit,
     viewModel: BlogListViewModel = hiltViewModel(),
 ) {
     val posts by viewModel.posts.collectAsState()
@@ -69,40 +71,38 @@ fun BlogListScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     PullToRefreshScreen(isRefreshing = isRefreshing, onRefresh = viewModel::refresh, modifier = Modifier.padding(padding).fillMaxSize()) {
-        if (visiblePosts.isEmpty() && drafts.isEmpty()) {
-            EmptyState(
-                emoji = "📖",
-                message = stringResource(R.string.blog_empty_state),
-                modifier = Modifier.align(Alignment.Center),
-            )
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-                items(drafts, key = { "draft-${it.id}" }) { draft ->
-                    TrailsCard(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenDraft(draft.id) },
-                        variant = TrailsCardVariant.Standard,
-                    ) {
-                        Text(
-                            draft.title.ifBlank { stringResource(R.string.blog_untitled_default) },
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TrailsColors.BrandDeep,
-                        )
-                        Text(stringResource(R.string.blog_device_draft), color = TrailsColors.TextSoft)
-                    }
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+            item {
+                TextButton(onClick = onOpenStatistics) { Text(stringResource(R.string.blog_statistics_title)) }
+            }
+            if (visiblePosts.isEmpty() && drafts.isEmpty()) {
+                item { EmptyState(emoji = "📖", message = stringResource(R.string.blog_empty_state)) }
+            }
+            items(drafts, key = { "draft-${it.id}" }) { draft ->
+                TrailsCard(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenDraft(draft.id) },
+                    variant = TrailsCardVariant.Standard,
+                ) {
+                    Text(
+                        draft.title.ifBlank { stringResource(R.string.blog_untitled_default) },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TrailsColors.BrandDeep,
+                    )
+                    Text(stringResource(R.string.blog_device_draft), color = TrailsColors.TextSoft)
                 }
-                items(visiblePosts, key = { it.entry.id }) { item ->
-                    TrailsCard(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
-                        variant = TrailsCardVariant.Standard,
-                        contentPadding = PaddingValues(0.dp),
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("📖 ${item.entry.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.BrandDeep)
-                            if (item.excerpt.isNotBlank()) {
-                                Text(item.excerpt, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
-                            }
-                            Text(item.entry.startAt.take(10), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
+            }
+            items(visiblePosts, key = { it.entry.id }) { item ->
+                TrailsCard(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onOpenPost(item.entry.id) },
+                    variant = TrailsCardVariant.Standard,
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("📖 ${item.entry.title}", style = MaterialTheme.typography.titleMedium, color = TrailsColors.BrandDeep)
+                        if (item.excerpt.isNotBlank()) {
+                            Text(item.excerpt, style = MaterialTheme.typography.bodyMedium, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
                         }
+                        Text(item.entry.startAt.take(10), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
             }

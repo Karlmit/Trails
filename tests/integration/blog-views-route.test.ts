@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET, POST } from '@/app/api/v1/timeline-entries/[entryId]/views/route';
+import { GET as getTripStatistics } from '@/app/api/v1/trips/[tripId]/blog-statistics/route';
 import { issueSession } from '@/lib/session';
 import { hasTestDatabase, resetDb, testPrisma } from '../helpers/db';
 
@@ -57,6 +58,8 @@ describe.skipIf(!hasTestDatabase)('blog view statistics', () => {
       POST(request('POST', { 'x-test-country': 'SE, US' }), params()),
     ]);
     expect(posts.map((response) => response.status)).toEqual([204, 204, 204, 204]);
+    expect(await testPrisma().blogDailyViewCount.aggregate({ _sum: { views: true } }))
+      .toEqual({ _sum: { views: 4 } });
     expect((await GET(request('GET'), params())).status).toBe(401);
 
     const stats = await GET(request('GET', auth), params());
@@ -68,6 +71,29 @@ describe.skipIf(!hasTestDatabase)('blog view statistics', () => {
         { countryCode: 'US', views: 1 },
         { countryCode: 'ZZ', views: 1 },
       ],
+    });
+  });
+
+  it('keeps older totals and limits trends to the latest 90 days', async () => {
+    await testPrisma().blogViewCount.create({ data: { entryId, countryCode: 'SE', views: 23 } });
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const expired = new Date(today);
+    expired.setUTCDate(expired.getUTCDate() - 90);
+    await testPrisma().blogDailyViewCount.createMany({ data: [
+      { entryId, day: today, views: 3 },
+      { entryId, day: expired, views: 2 },
+    ] });
+    const tripParams = { params: Promise.resolve({ tripId }) };
+    expect((await getTripStatistics(request('GET'), tripParams)).status).toBe(401);
+    const response = await getTripStatistics(request('GET', { authorization: `Bearer ${token}` }), tripParams);
+    const day = today.toISOString().slice(0, 10);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.json()).toEqual({
+      today: day,
+      totalViews: 23,
+      countries: [{ countryCode: 'SE', views: 23 }],
+      posts: [{ id: entryId, title: 'Test post', date: '2026-11-20', totalViews: 23, daily: [{ date: day, views: 3 }] }],
     });
   });
 

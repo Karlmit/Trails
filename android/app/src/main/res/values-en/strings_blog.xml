@@ -85,4 +85,16 @@
     <string name="blog_views_hide_countries">Hide countries</string>
     <string name="blog_views_show_countries">Views by country</string>
     <string name="blog_views_unknown_country">Unknown country</string>
+    <string name="blog_statistics_title">Blog statistics</string>
+    <string name="blog_statistics_all_time">Total views · All time</string>
+    <string name="blog_statistics_trends">Daily views</string>
+    <string name="blog_statistics_range">%1$d days</string>
+    <string name="blog_statistics_no_trend">No daily views recorded yet.</string>
+    <string name="blog_statistics_history">Trend data starts with this server update. Earlier views are included in the all-time totals. Days use UTC.</string>
+    <string name="blog_statistics_by_post">All-time views by post</string>
+    <string name="blog_statistics_no_posts">No posts with statistics yet.</string>
+    <string name="blog_statistics_all_posts">All posts</string>
+    <string name="blog_statistics_selected">Post: %1$s</string>
+    <string name="blog_statistics_peak">Peak: %1$s · %2$s views</string>
+    <string name="blog_statistics_refresh_failed">Refresh failed. Try again.</string>
 </resources>

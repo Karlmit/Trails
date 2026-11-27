@@ -434,6 +434,7 @@ model TimelineEntry {
   trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
   blogViewCounts BlogViewCount[]
+  blogDailyViewCounts BlogDailyViewCount[]
 
   // AD-1: "Index (trip_id, start_at) on timeline_entries; this is the
   // index the Timeline's ~1s performance NFR depends on."
@@ -449,6 +450,16 @@ model BlogViewCount {
 
   @@id([entryId, countryCode])
   @@map("blog_view_counts")
+}
+
+model BlogDailyViewCount {
+  entryId String   @map("entry_id") @db.Uuid
+  day     DateTime @db.Date
+  views   Int      @default(0)
+  entry   TimelineEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, day])
+  @@map("blog_daily_view_counts")
 }
 
 // FR-21, spec-checklists: a Trip may have multiple Checklists (packing

@@ -101,6 +101,8 @@ class TimelineRepository @Inject constructor(
         timelineEntryDao.deleteById(entryId)
     }
 
+    suspend fun getTripBlogStatistics(tripId: String) = api.getTripBlogStatistics(tripId)
+
     suspend fun recordBlogView(entryId: String) = api.recordBlogView(entryId)
 
     suspend fun getBlogViewStats(entryId: String) = api.getBlogViewStats(entryId)

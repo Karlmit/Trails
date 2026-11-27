@@ -26,17 +26,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Check publication and guest visibility in the same statement as the
   // atomic counter increment. Only the country and aggregate are stored.
   const updated = await prisma.$executeRaw`
-    INSERT INTO "blog_view_counts" ("entry_id", "country_code", "views")
-    SELECT entry."id", ${country}, 1
-    FROM "timeline_entries" AS entry
-    JOIN "trips" AS trip ON trip."id" = entry."trip_id"
-    WHERE entry."id" = ${entryId}::uuid
-      AND entry."entry_type" = 'BLOG_POST'
-      AND entry."published_at" IS NOT NULL
-      AND (${signedIn} OR (trip."visibility" = 'PUBLIC' AND NOT entry."is_private"))
-    FOR SHARE OF entry, trip
-    ON CONFLICT ("entry_id", "country_code")
-    DO UPDATE SET "views" = "blog_view_counts"."views" + 1
+    WITH counted AS (
+      INSERT INTO "blog_view_counts" ("entry_id", "country_code", "views")
+      SELECT entry."id", ${country}, 1
+      FROM "timeline_entries" AS entry
+      JOIN "trips" AS trip ON trip."id" = entry."trip_id"
+      WHERE entry."id" = ${entryId}::uuid
+        AND entry."entry_type" = 'BLOG_POST'
+        AND entry."published_at" IS NOT NULL
+        AND (${signedIn} OR (trip."visibility" = 'PUBLIC' AND NOT entry."is_private"))
+      FOR SHARE OF entry, trip
+      ON CONFLICT ("entry_id", "country_code")
+      DO UPDATE SET "views" = "blog_view_counts"."views" + 1
+      RETURNING "entry_id"
+    )
+    INSERT INTO "blog_daily_view_counts" ("entry_id", "day", "views")
+    SELECT "entry_id", (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date, 1
+    FROM counted
+    ON CONFLICT ("entry_id", "day")
+    DO UPDATE SET "views" = "blog_daily_view_counts"."views" + 1
   `;
 
   if (!updated) return Errors.notFound('Blog post not found');

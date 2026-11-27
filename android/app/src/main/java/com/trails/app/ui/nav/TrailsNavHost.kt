@@ -48,6 +48,7 @@ import com.trails.app.ui.settings.SettingsScreen
 import com.trails.app.ui.blog.BlogDetailScreen
 import com.trails.app.ui.blog.BlogEditScreen
 import com.trails.app.ui.blog.BlogListScreen
+import com.trails.app.ui.blog.BlogStatisticsScreen
 import com.trails.app.ui.blog.LOCAL_BLOG_PREFIX
 import java.util.UUID
 import com.trails.app.ui.budget.BudgetScreen
@@ -581,8 +582,22 @@ fun TrailsNavHost(
                 BlogListScreen(
                     padding,
                     onOpenPost = { entryId -> navController.navigate(blogDetailRoute(tripId, entryId)) },
+                    onOpenStatistics = { navController.navigate("trip/$tripId/blog-statistics") },
                     onOpenDraft = { id -> navController.navigate(blogEditRoute(tripId, id)) },
                 )
+            }
+        }
+
+        composable(
+            route = "trip/{$ARG_TRIP_ID}/blog-statistics",
+            arguments = listOf(navArgument(ARG_TRIP_ID) { type = NavType.StringType }),
+        ) { backStackEntry ->
+            val tripId = backStackEntry.arguments?.getString(ARG_TRIP_ID).orEmpty()
+            TripDrawerScaffold(
+                tripId, TripTab.BLOG, stringResource(R.string.blog_statistics_title), navController,
+                showBackButton = true,
+            ) { padding ->
+                BlogStatisticsScreen(padding)
             }
         }
 

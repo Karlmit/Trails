@@ -5,6 +5,7 @@ import com.trails.app.network.dto.AttachmentDto
 import com.trails.app.network.dto.AttachmentUrlRequest
 import com.trails.app.network.dto.BlogPostRequest
 import com.trails.app.network.dto.BlogViewStatsDto
+import com.trails.app.network.dto.TripBlogStatisticsDto
 import com.trails.app.network.dto.ChecklistDto
 import com.trails.app.network.dto.ChecklistItemDto
 import com.trails.app.network.dto.ChecklistItemPatchRequest
@@ -121,6 +122,9 @@ interface TrailsApiService {
 
     @PATCH("api/v1/timeline-entries/{id}")
     suspend fun updateBlogPost(@Path("id") id: String, @Body body: BlogPostRequest): TimelineEntryDto
+
+    @GET("api/v1/trips/{id}/blog-statistics")
+    suspend fun getTripBlogStatistics(@Path("id") id: String): TripBlogStatisticsDto
 
     @POST("api/v1/timeline-entries/{id}/views")
     suspend fun recordBlogView(@Path("id") id: String)

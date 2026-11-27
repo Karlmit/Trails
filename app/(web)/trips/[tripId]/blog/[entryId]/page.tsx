@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { serializeTimelineEntry, serializePhoto } from '@/lib/serializers';
 import { isUuid } from '@/lib/uuid';
@@ -10,6 +10,7 @@ import { BlogPostDetailPanel } from '@/components/BlogPostDetailPanel';
 import { NotificationOptInCard } from '@/components/NotificationOptInCard';
 import { getPushPublicKey } from '@/lib/push-config';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
+import { formatEntryEndpointDateOnly } from '@/lib/trip-status';
 import styles from './post-navigation.module.css';
 
 interface PageProps {
@@ -31,7 +32,7 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
   const { tripId, entryId } = await params;
   if (!isUuid(tripId) || !isUuid(entryId)) notFound();
 
-  const t = await getTranslations('tripBlog');
+  const [t, locale] = await Promise.all([getTranslations('tripBlog'), getLocale()]);
   const viewer = await getViewer();
 
   const trip = await prisma.trip.findUnique({ where: { id: tripId } });
@@ -54,27 +55,15 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
     entryType: 'BLOG_POST',
     ...(viewer.type === 'guest' && { publishedAt: { not: null }, isPrivate: false }),
   } as const;
-  // The ID breaks ties when several posts share a date.
-  const [allPhotos, older, newer] = await Promise.all([
+  const [allPhotos, posts] = await Promise.all([
     prisma.photo.findMany({
       where: { ownerType: 'TIMELINE_ENTRY', ownerId: entryId, mimeType: { startsWith: 'image/' } },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
     }),
-    prisma.timelineEntry.findFirst({
-      where: {
-        ...visibleBlogPosts,
-        OR: [{ startAt: { lt: entry.startAt } }, { startAt: entry.startAt, id: { lt: entry.id } }],
-      },
+    prisma.timelineEntry.findMany({
+      where: visibleBlogPosts,
       orderBy: [{ startAt: 'desc' }, { id: 'desc' }],
-      select: { id: true, title: true },
-    }),
-    prisma.timelineEntry.findFirst({
-      where: {
-        ...visibleBlogPosts,
-        OR: [{ startAt: { gt: entry.startAt } }, { startAt: entry.startAt, id: { gt: entry.id } }],
-      },
-      orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
-      select: { id: true, title: true },
+      select: { id: true, title: true, startAt: true },
     }),
   ]);
   const photos = filterForViewer(allPhotos, viewer).map(serializePhoto);
@@ -92,25 +81,25 @@ export default async function BlogPostDetailPage({ params }: PageProps) {
       <NotificationOptInCard publicKey={getPushPublicKey()} />
       {entry.publishedAt !== null && <BlogViewTracker entryId={entry.id} />}
       <BlogPostDetailPanel tripId={tripId} post={post} readOnly={viewer.type === 'guest'} photos={photos} />
-      {(older || newer) && (
-        <nav className={styles.navigation} aria-labelledby="more-blog-posts">
-          <h2 className={styles.heading} id="more-blog-posts">{t('morePosts')}</h2>
-          <div className={styles.links}>
-            {older && (
-              <Link className={styles.link} href={`/trips/${tripId}/blog/${older.id}`}>
-                <span className={styles.direction}>{t('olderPost')}</span>
-                <strong>{older.title}</strong>
+      <nav className={styles.navigation} aria-labelledby="more-blog-posts">
+        <h2 className={styles.heading} id="more-blog-posts">{t('morePosts')}</h2>
+        <ul className={styles.links}>
+          {posts.map((item) => (
+            <li key={item.id}>
+              <Link
+                className={styles.link}
+                href={`/trips/${tripId}/blog/${item.id}`}
+                aria-current={item.id === entryId ? 'page' : undefined}
+              >
+                <time dateTime={item.startAt.toISOString().slice(0, 10)}>
+                  {formatEntryEndpointDateOnly(item.startAt, null, locale)}
+                </time>
+                {item.id === entryId ? <strong>{item.title}</strong> : <span>{item.title}</span>}
               </Link>
-            )}
-            {newer && (
-              <Link className={styles.link} href={`/trips/${tripId}/blog/${newer.id}`}>
-                <span className={styles.direction}>{t('newerPost')}</span>
-                <strong>{newer.title}</strong>
-              </Link>
-            )}
-          </div>
-        </nav>
-      )}
+            </li>
+          ))}
+        </ul>
+      </nav>
     </main>
   );
 }
