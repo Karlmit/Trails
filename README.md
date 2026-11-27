@@ -257,10 +257,18 @@ Android shows totals and country counts on published posts to signed-in users.
 Counts start with this server version. They represent online post opens, including
 signed-in readers, and do not estimate unique people.
 
-To get country counts, set `BLOG_VIEW_COUNTRY_HEADER` on the app container to the
-name of the header your reverse proxy supplies with the reader's ISO country code.
-For Cloudflare this is `CF-IPCountry` after enabling IP geolocation or the visitor
-location transform. Route traffic through the trusted proxy and configure it to
-overwrite that header. If the header is unset or the location is unavailable, the
-view is counted under Unknown. Trails stores aggregate counts and country codes
-without storing reader IP addresses.
+The Docker image looks up the reader's approximate country locally using the
+`X-Real-IP` header that proxies such as Nginx Proxy Manager set. The last proxy
+must overwrite the header, and clients should reach Trails through that proxy.
+Set `BLOG_VIEW_IP_HEADER` to use a different header containing a single IP, or
+set it to `off` to disable IP lookup if clients can reach the app port directly.
+
+A valid country code from `BLOG_VIEW_COUNTRY_HEADER` takes precedence. For
+Cloudflare this can be `CF-IPCountry` after enabling IP geolocation or the
+visitor location transform. Configure the trusted proxy to supply that header.
+Private addresses and views without a country match are counted under Unknown.
+Trails stores aggregate counts and country codes without storing reader IP
+addresses. The Docker image includes the
+[IP Location DB user-country database](https://github.com/sapics/ip-location-db).
+For a non-Docker install, point `BLOG_VIEW_COUNTRY_DB` at a local copy of
+`user-country.mmdb`.

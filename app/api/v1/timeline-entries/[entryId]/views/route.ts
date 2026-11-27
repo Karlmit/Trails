@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { Errors } from '@/lib/api-errors';
 import { getUserFromApiRequest } from '@/lib/auth';
+import { readerCountry } from '@/lib/blog-view-country';
 import { prisma } from '@/lib/prisma';
 import { isUuid } from '@/lib/uuid';
 
@@ -8,20 +9,12 @@ interface RouteParams {
   params: Promise<{ entryId: string }>;
 }
 
-const countryNames = new Intl.DisplayNames(['en'], { type: 'region', fallback: 'none' });
-
-function readerCountry(headers: Headers): string {
-  const header = process.env.BLOG_VIEW_COUNTRY_HEADER?.trim();
-  const code = header && /^[\w-]+$/.test(header) ? headers.get(header)?.trim().toUpperCase() : null;
-  return code && /^[A-Z]{2}$/.test(code) && countryNames.of(code) ? code : 'ZZ';
-}
-
 export async function POST(request: NextRequest, { params }: RouteParams) {
   if (request.headers.get('sec-fetch-site') === 'cross-site') return Errors.forbidden();
   const { entryId } = await params;
   if (!isUuid(entryId)) return Errors.notFound('Blog post not found');
   const signedIn = (await getUserFromApiRequest(request)) !== null;
-  const country = readerCountry(request.headers);
+  const country = await readerCountry(request.headers);
 
   // Check publication and guest visibility in the same statement as the
   // atomic counter increment. Only the country and aggregate are stored.

@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgresql://trails:trails@db:5432/trails?schema=public
       NODE_ENV: production
       BLOG_VIEW_COUNTRY_HEADER: ${BLOG_VIEW_COUNTRY_HEADER:-}
+      BLOG_VIEW_IP_HEADER: ${BLOG_VIEW_IP_HEADER:-}
       # spec-push-notifications: the VAPID keypair for Web Push, read from
       # the repo-root .env (gitignored) so the private key never lands in
       # this file. Unset = the notification opt-in never appears at all.

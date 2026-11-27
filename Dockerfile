@@ -40,6 +40,8 @@ COPY --from=builder /app/lib/attachments.ts ./lib/attachments.ts
 # `.prisma/client` is the only generated output; `@prisma/client`'s static
 # package contents already came from this stage's own `npm ci`.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Country-only GeoIP data, bundled so lookups never send visitor IPs off-server.
+ADD --chmod=644 https://github.com/sapics/ip-location-db/releases/download/latest/user-country.mmdb /app/user-country.mmdb
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 

@@ -74,6 +74,35 @@ describe.skipIf(!hasTestDatabase)('blog view statistics', () => {
     });
   });
 
+  it.runIf(Boolean(process.env.BLOG_VIEW_COUNTRY_DB))(
+    'looks up proxy IPs while preferring an explicitly supplied country',
+    async () => {
+      await POST(request('POST', { 'x-real-ip': '194.71.109.1' }), params());
+      await POST(request('POST', { 'x-real-ip': '::ffff:194.71.109.1' }), params());
+      await POST(request('POST', { 'x-test-country': 'XX', 'x-real-ip': '2001:4860:4860::8888' }), params());
+      await POST(request('POST', { 'x-test-country': 'NO', 'x-real-ip': '194.71.109.1' }), params());
+      await POST(request('POST', { 'x-real-ip': '192.168.1.20', 'x-forwarded-for': '194.71.109.1' }), params());
+      await POST(request('POST', { 'x-real-ip': '192.168.1.20, 194.71.109.1' }), params());
+      vi.stubEnv('BLOG_VIEW_IP_HEADER', 'x-reader-ip');
+      await POST(request('POST', { 'x-test-country': 'EU', 'x-reader-ip': '194.71.109.1' }), params());
+      await POST(request('POST', { 'x-test-country': 'UK', 'x-reader-ip': '194.71.109.1' }), params());
+      vi.stubEnv('BLOG_VIEW_IP_HEADER', 'off');
+      await POST(request('POST', { 'x-real-ip': '194.71.109.1' }), params());
+
+      const stats = await GET(request('GET', { authorization: `Bearer ${token}` }), params());
+      expect(await stats.json()).toEqual({
+        totalViews: 9,
+        countries: [
+          { countryCode: 'SE', views: 3 },
+          { countryCode: 'ZZ', views: 3 },
+          { countryCode: 'GB', views: 1 },
+          { countryCode: 'NO', views: 1 },
+          { countryCode: 'US', views: 1 },
+        ],
+      });
+    },
+  );
+
   it('keeps older totals and limits trends to the latest 90 days', async () => {
     await testPrisma().blogViewCount.create({ data: { entryId, countryCode: 'SE', views: 23 } });
     const today = new Date();
