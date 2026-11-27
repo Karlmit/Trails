@@ -54,11 +54,12 @@ const laneX = (laneIndex: number) => LANE_UNIT * (laneIndex + 1) + LANE_UNIT / 2
 // long that day. Always split into exactly two lines instead -- "Dec 1"
 // then "Tuesday" -- so every row's date cell is the same shape regardless
 // of which day it is.
-function formatDayLabel(dateKey: string, locale: string): { monthDay: string; weekday: string } {
+function formatDayLabel(dateKey: string, locale: string) {
   const date = new Date(`${dateKey}T00:00:00.000Z`);
   const monthDay = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(date);
   const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(date);
-  return { monthDay, weekday };
+  const shortWeekday = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(date);
+  return { monthDay, weekday, shortWeekday };
 }
 
 // An entry's own recorded startAt/endAt is its literal wall-clock digits
@@ -322,10 +323,15 @@ export default async function TimelinePage({ params }: PageProps) {
   const { days: laidOutDays, laneCount } = layoutTimelineEntries(days, entriesForLayout);
 
   const graphWidth = LANE_UNIT * (laneCount + 1);
-  const gridTemplateColumns = `${graphWidth}px 84px 1fr`;
+  const mobileGraphWidth = Math.min(graphWidth, 32);
+  const graphDimensions = {
+    '--timeline-graph-width': `${graphWidth}px`,
+    '--timeline-mobile-graph-width': `${mobileGraphWidth}px`,
+    '--timeline-mobile-trunk-x': `${TRUNK_X * mobileGraphWidth / graphWidth}px`,
+  } as React.CSSProperties;
 
   return (
-    <main className="page">
+    <main className="page timeline-page">
       {todayKey && <TimelineAutoScroll targetId={`day-${todayKey}`} />}
 
       {/* spec-push-notifications, user-requested ("can we just make it so
@@ -346,7 +352,7 @@ export default async function TimelinePage({ params }: PageProps) {
         </p>
       )}
 
-      <div className="timeline-grid" style={{ gridTemplateColumns }}>
+      <div className="timeline-grid" style={graphDimensions}>
         {laidOutDays.map((day, index) => {
           const bandColorFor = (sectionIndex: number | null) => {
             const s = sectionIndex !== null ? trip.sections[sectionIndex] : null;
@@ -383,7 +389,7 @@ export default async function TimelinePage({ params }: PageProps) {
                 }}
               />
 
-              <div className="timeline-graph-cell" style={{ gridRow: rowLine, gridColumn: 1, width: graphWidth }}>
+              <div className="timeline-graph-cell" style={{ gridRow: rowLine, gridColumn: 1 }}>
                 <svg
                   className="timeline-graph-svg"
                   viewBox={`0 0 ${graphWidth} 100`}
@@ -439,7 +445,10 @@ export default async function TimelinePage({ params }: PageProps) {
                 style={{ gridRow: rowLine, gridColumn: 2 }}
               >
                 <div className="timeline-date-primary">{dayLabel.monthDay}</div>
-                <div className="timeline-date-weekday">{dayLabel.weekday}</div>
+                <div className="timeline-date-weekday">
+                  <span className="timeline-weekday-full">{dayLabel.weekday}</span>
+                  <abbr className="timeline-weekday-short" title={dayLabel.weekday}>{dayLabel.shortWeekday}</abbr>
+                </div>
               </div>
 
               <div className="timeline-content-cell" style={{ gridRow: rowLine, gridColumn: 3 }}>
@@ -484,14 +493,23 @@ export default async function TimelinePage({ params }: PageProps) {
                           <span className="entry-chip-icon" aria-hidden="true">
                             {entryIcon(line.entryType, line.subtype)}
                           </span>
-                          <span>{label.title}</span>
-                          {label.subtitle && (
-                            <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
+                          <span className="entry-chip-copy">
+                            <span>{label.title}</span>
+                            {label.subtitle && (
+                              <span className="entry-chip-subtitle text-soft">{label.subtitle}</span>
+                            )}
+                            {label.showSubtype && line.subtype && (
+                              <span className="text-soft"> · {tShared(`entrySubtype.${line.subtype}`)}</span>
+                            )}
+                            {isBlogPost && <span className="entry-chip-blog-cta"> {t('readPost')}</span>}
+                          </span>
+                          {line.isStart && line.isEnd && (
+                            <span
+                              aria-hidden="true"
+                              className="timeline-dot timeline-dot-mobile"
+                              style={{ '--dot-color': entryTypeColor(line.entryType) } as React.CSSProperties}
+                            />
                           )}
-                          {label.showSubtype && line.subtype && (
-                            <span className="text-soft"> · {tShared(`entrySubtype.${line.subtype}`)}</span>
-                          )}
-                          {isBlogPost && <span className="entry-chip-blog-cta"> {t('readPost')}</span>}
                         </Link>
                       );
                     })}

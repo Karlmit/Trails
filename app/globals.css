@@ -784,6 +784,7 @@ body.has-notify-bar .page:has(.fab) {
    rhythm, with no special-casing. */
 .timeline-grid {
   display: grid;
+  grid-template-columns: var(--timeline-graph-width) 84px minmax(0, 1fr);
   column-gap: var(--space-3);
   row-gap: 0;
 }
@@ -932,6 +933,11 @@ body.has-notify-bar .page:has(.fab) {
    day's date cell is the same shape regardless of which day it is. */
 .timeline-date-primary {
   font-weight: 600;
+}
+
+.timeline-dot-mobile,
+.timeline-weekday-short {
+  display: none;
 }
 
 .timeline-date-weekday {
@@ -1414,36 +1420,101 @@ body.has-notify-bar .page:has(.fab) {
     padding: var(--space-3) var(--space-2) var(--space-6);
   }
 
-  /* User-reported: "the section label currently overlaps the
-     information" -- on a narrow content column there simply isn't room
-     for an absolutely-positioned pill in the corner without it landing on
-     top of that day's own text. Stack it as a normal block above the
-     content instead ("we should easily be able to solve this by
-     stacking") -- it already renders first in the content cell's own DOM
-     order, so removing the absolute positioning alone is enough to put it
-     there in normal document flow. */
-  .timeline-section-label {
-    position: static;
-    display: inline-flex;
-    max-width: 100%;
-    margin-bottom: var(--space-2);
+  .timeline-page {
+    padding-inline: 8px;
+    padding-top: 12px;
   }
 
-  /* User-reported: "Some content are overlapping" -- the "+" FAB is
-     `position: fixed`, so it stays in the same bottom-right spot of the
-     viewport regardless of scroll position. On a narrow phone the content
-     column runs almost edge-to-edge, so any entry title that happens to
-     wrap onto a line landing in that same viewport-relative zone gets its
-     tail hidden behind the button -- confirmed live, at rest (not mid-
-     scroll), with a long Stay name. `.page:has(.fab)`'s own bottom padding
-     (globals.css, near `.fab`) only guarantees the *very end* of the page
-     is reachable past the FAB; it doesn't stop a wrapped line further up
-     from passing behind it. Reserving this gutter for the FAB's own
-     footprint the whole column's height, not just at the bottom, is the
-     only way to guarantee no line ever lands under it at any scroll
-     position. */
+  .timeline-grid {
+    --timeline-mobile-date-width: 61px;
+    --timeline-mobile-column-gap: 4px;
+    grid-template-columns: var(--timeline-mobile-graph-width) var(--timeline-mobile-date-width) minmax(0, 1fr);
+    column-gap: var(--timeline-mobile-column-gap);
+    border-radius: var(--radius-card);
+    overflow: clip;
+  }
+
+  .timeline-row-bg {
+    border-bottom: 0;
+  }
+
+  .timeline-date-cell,
   .timeline-content-cell {
-    padding-right: calc(56px + var(--space-2));
+    padding-block: 7px;
+  }
+
+  .timeline-date-primary {
+    font-size: 0.9rem;
+    color: var(--color-text);
+  }
+
+  .timeline-date-cell.is-today .timeline-date-primary {
+    color: inherit;
+  }
+
+  .timeline-weekday-full,
+  .timeline-dots-column {
+    display: none;
+  }
+
+  .timeline-date-weekday .timeline-weekday-short {
+    display: inline;
+    text-decoration: none;
+  }
+
+  .timeline-content-cell {
+    padding-inline-end: 5px;
+  }
+
+  .timeline-section-label {
+    position: static;
+    max-width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .entry-dot-list {
+    gap: 4px;
+  }
+
+  .entry-chip {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 16px;
+    background: var(--color-surface);
+    line-height: 1.25rem;
+  }
+
+  .entry-chip-blog {
+    background: var(--color-blog-surface);
+  }
+
+  .entry-chip-icon {
+    flex: 0 0 auto;
+    margin-right: 0;
+  }
+
+  .entry-chip-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .entry-chip-subtitle {
+    line-height: 1.15rem;
+  }
+
+  .entry-chip .timeline-dot-mobile {
+    display: block;
+    position: absolute;
+    inset-inline-start: calc(
+      var(--timeline-mobile-trunk-x) - var(--timeline-mobile-graph-width)
+      - var(--timeline-mobile-date-width) - 2 * var(--timeline-mobile-column-gap)
+    );
+    top: 16px;
+    transform: translateX(-50%);
   }
 }
 
