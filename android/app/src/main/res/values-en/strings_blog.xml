@@ -5,6 +5,8 @@
 
     <string name="blog_new_post_title">New blog post</string>
     <string name="blog_edit_post_title">Edit blog post</string>
+    <string name="blog_preview_draft">Preview</string>
+    <string name="blog_back_to_editing">Back to editing</string>
     <string name="blog_lost_formatting_warning">This post has formatting (tables, code blocks, …) from the web editor that this editor doesn\'t preserve -- saving here will flatten it to plain paragraphs. Text, headings, lists, bold/italic/underline, and images are otherwise kept.</string>
     <string name="blog_title_label">Title *</string>
     <string name="blog_date_label">Date</string>

@@ -229,6 +229,9 @@ interface TrailsApiService {
     @GET("api/v1/photos")
     suspend fun listPhotos(@Query("tripId") tripId: String): List<PhotoDto>
 
+    @GET("api/v1/photos")
+    suspend fun listPhotosForOwner(@Query("ownerType") ownerType: String, @Query("ownerId") ownerId: String): List<PhotoDto>
+
     @Multipart
     @POST("api/v1/photos")
     suspend fun uploadPhoto(

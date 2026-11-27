@@ -1740,6 +1740,11 @@ body.has-notify-bar .page:has(.fab) {
   gap: var(--space-4);
 }
 
+.blog-editor-form[hidden],
+.blog-editor-attachments[hidden] {
+  display: none;
+}
+
 .blog-editor-title-input {
   width: 100%;
   border: none;
@@ -2353,7 +2358,8 @@ body.has-notify-bar .page:has(.fab) {
 
 
 @media (max-width: 640px) {
-  .blog-reader-page {
+  .blog-reader-page,
+  .blog-editor-page:has(.blog-editor-form-outer[data-preview="true"]) {
     padding-inline: 8px;
   }
 

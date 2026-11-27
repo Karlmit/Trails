@@ -69,6 +69,16 @@ class DocumentsRepository @Inject constructor(
 
     fun observePhotosForTrip(tripId: String): Flow<List<PhotoEntity>> = photoDao.observeForTrip(tripId)
 
+    suspend fun refreshMissingPhotoMetadata(ownerType: String, ownerId: String, photoIds: Set<String>) {
+        val missing = photoIds.filter { photoDao.getById(it) == null }.toSet()
+        if (missing.isEmpty()) return
+
+        val photos = api.listPhotosForOwner(ownerType, ownerId)
+            .filter { it.id in missing }
+            .map { it.toEntity() }
+        if (photos.isNotEmpty()) photoDao.insertMissing(photos)
+    }
+
     suspend fun attachmentForPreview(id: String): AttachmentEntity? {
         val attachment = attachmentDao.getById(id) ?: return null
         val path = ensureAttachmentCached(attachment) ?: return null

@@ -145,6 +145,7 @@ class BlogEditViewModel @Inject constructor(
     private val tripRepository: TripRepository,
     private val draftStore: BlogDraftStore,
     private val backgroundPublish: BlogPublishCoordinator,
+    internal val playback: BlogVideoPlayback,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val routeId: String = savedStateHandle.get<String>("entryId")
@@ -237,6 +238,26 @@ class BlogEditViewModel @Inject constructor(
     }
 
     internal fun localPhoto(photo: DraftPhoto): File? = draftStore.photoFile(draftScope, photo)
+
+    internal suspend fun cachePreviewPhoto(photo: PhotoEntity) {
+        documentsRepository.ensurePhotoCached(photo)
+    }
+
+    internal suspend fun refreshPreviewPhotoMetadata() {
+        val current = _state.value
+        val entryId = current.entryId ?: return
+        val references = current.blocks.flatMap(EditableBlock::photoItems)
+            .mapNotNull { it.serverPhotoId(current.pendingPhotos[it.id]) }
+            .toSet()
+        if (references.isEmpty()) return
+        try {
+            documentsRepository.refreshMissingPhotoMetadata(OWNER_TYPE, entryId, references)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The preview stays readable from staged and cached files when offline.
+        }
+    }
 
     fun onTitleChange(value: String) = edit { it.copy(title = value) }
     fun onStartAtChange(value: String) = edit { it.copy(startAt = value) }

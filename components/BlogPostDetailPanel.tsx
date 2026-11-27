@@ -4,27 +4,14 @@ import { useLocale, useTranslations } from 'next-intl';
 import { translateApiError } from '@/lib/api-error-messages';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
 import type { BlogPostDTO } from '@/components/BlogPostForm';
-import { BlogBodySkeleton } from '@/components/BlogSkeleton';
+import { BlogReaderContent } from '@/components/BlogReaderContent';
 import { AttachmentList } from '@/components/AttachmentList';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery, type PhotoDTO } from '@/components/PhotoGallery';
-import { formatEntryDateTime, formatEntryEndpointDateOnly } from '@/lib/trip-status';
-
-// See BlogPostForm.tsx's identical comment -- BlockNote can't tolerate
-// this Client Component's own server-render pass.
-const RichTextView = dynamic(() => import('@/components/RichTextEditor').then((m) => m.RichTextView), {
-  ssr: false,
-  loading: () => {
-    const t = useTranslations('tripBlog');
-    return <BlogBodySkeleton label={t('loading')} />;
-  },
-});
-
-const FIELD_LABEL_STYLE = { fontSize: '0.8rem', textTransform: 'uppercase' as const };
+import { formatEntryDateTime } from '@/lib/trip-status';
 
 // FR-18/FR-19: view/publish/unpublish/delete a single Blog Post. Editing is
 // its own dedicated full-page route (app/(web)/trips/[tripId]/blog/
@@ -130,20 +117,12 @@ export function BlogPostDetailPanel({
           )}
         </div>
 
-        <h2 style={{ margin: 0 }}>{post.title}</h2>
-
-        <dl style={{ margin: 0 }}>
-          <dt className="text-soft" style={FIELD_LABEL_STYLE}>
-            {tBlog('dateLabel')}
-          </dt>
-          {/* User-reported: "we do not need a time for blog posts, only
-              date" -- always date-only now, regardless of what's actually
-              stored (a pre-existing post saved back when this field still
-              carried a time shows just its date too). */}
-          <dd style={{ margin: 0 }}>{formatEntryEndpointDateOnly(new Date(post.startAt), null, locale)}</dd>
-        </dl>
-
-        {post.description && <RichTextView content={post.description} visibleCollagePhotoIds={visibleCollagePhotoIds} />}
+        <BlogReaderContent
+          title={post.title}
+          startAt={post.startAt}
+          description={post.description}
+          visibleCollagePhotoIds={visibleCollagePhotoIds}
+        />
 
         {isPublished && (
           <p className="text-soft" style={{ margin: 0, fontSize: '0.85rem' }}>

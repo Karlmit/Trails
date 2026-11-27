@@ -1,17 +1,14 @@
 package com.trails.app.ui.blog
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,37 +21,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil3.compose.AsyncImage
 import com.trails.app.R
 import com.trails.app.ui.components.EmptyState
 import com.trails.app.ui.components.PullToRefreshScreen
 import com.trails.app.ui.theme.TrailsColors
-import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.components.TrailsCard
 import com.trails.app.ui.components.TrailsCardVariant
 import java.io.File
-
-private fun runsToAnnotatedString(runs: List<InlineRun>) = buildAnnotatedString {
-    runs.forEach { run ->
-        withStyle(
-            SpanStyle(
-                fontWeight = if (run.bold) FontWeight.Bold else FontWeight.Normal,
-                fontStyle = if (run.italic) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
-                textDecoration = if (run.underline) TextDecoration.Underline else TextDecoration.None,
-            ),
-        ) { append(run.text) }
-    }
-}
 
 @Composable
 fun BlogListScreen(
@@ -129,55 +105,15 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
                 item {
-                    Text(entry.title, style = MaterialTheme.typography.titleLarge, color = TrailsColors.Brand)
-                    Text(
-                        entry.startAt.take(10),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TrailsColors.TextSoft,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
-                    )
+                    BlogReaderHeading(entry.title, entry.startAt)
                 }
                 if (isPublished) {
                     item { BlogViewStats(stats, onRefresh = viewModel::refreshStats) }
                 }
-                // Numbering restarts at 1 whenever a non-numbered block breaks a
-                // run of consecutive NUMBERED_LIST blocks -- same as an HTML <ol>.
-                val listNumbers = run {
-                    val numbers = IntArray(state.blocks.size)
-                    var counter = 0
-                    state.blocks.forEachIndexed { i, b ->
-                        counter = if (b is BlogBlock.TextBlock && b.kind == TextBlockKind.NUMBERED_LIST) counter + 1 else 0
-                        numbers[i] = counter
-                    }
-                    numbers
-                }
+                val listNumbers = blogListNumbers(state.blocks.map { (it as? BlogBlock.TextBlock)?.kind })
                 itemsIndexed(state.blocks) { index, block ->
                     when (block) {
-                        is BlogBlock.TextBlock -> {
-                            val textStyle = when (block.kind) {
-                                TextBlockKind.HEADING_1 -> MaterialTheme.typography.headlineMedium
-                                TextBlockKind.HEADING_2 -> MaterialTheme.typography.headlineSmall
-                                TextBlockKind.HEADING_3 -> MaterialTheme.typography.titleLarge
-                                else -> MaterialTheme.typography.bodyLarge
-                            }
-                            when (block.kind) {
-                                TextBlockKind.BULLET_LIST, TextBlockKind.NUMBERED_LIST -> Row(modifier = Modifier.padding(bottom = 4.dp)) {
-                                    Text(
-                                        if (block.kind == TextBlockKind.BULLET_LIST) "•" else "${listNumbers[index]}.",
-                                        style = textStyle,
-                                        color = TrailsColors.Text,
-                                        modifier = Modifier.padding(end = 8.dp),
-                                    )
-                                    Text(runsToAnnotatedString(block.runs), style = textStyle, color = TrailsColors.Text)
-                                }
-                                else -> Text(
-                                    runsToAnnotatedString(block.runs),
-                                    style = textStyle,
-                                    color = TrailsColors.Text,
-                                    modifier = Modifier.padding(bottom = 12.dp),
-                                )
-                            }
-                        }
+                        is BlogBlock.TextBlock -> BlogReaderText(block.kind, block.runs, listNumbers[index])
                         is BlogBlock.ImageBlock -> {
                             val photo = state.photosById[block.photoId]
                             if (block.isVideo || photo?.mimeType?.startsWith("video/") == true) {
@@ -189,19 +125,13 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                                     playback = viewModel.playback,
                                 )
                             } else if (photo?.localPath != null) {
-                                AsyncImage(
-                                    model = File(photo.localPath),
-                                    contentDescription = photo.originalFilename,
-                                    contentScale = ContentScale.FillWidth,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(4.dp))
-                                        .clickable { onOpenPhoto(photo.id) },
-                                )
+                                BlogReaderPhoto(File(photo.localPath), photo.originalFilename) { onOpenPhoto(photo.id) }
                             } else if (photo != null) {
                                 Text(photo.originalFilename, modifier = Modifier.clickable { onOpenPhoto(photo.id) }.padding(8.dp))
                             }
                         }
                         is BlogBlock.CollageBlock -> {
-                            val preview: @Composable (Int, Modifier, ContentScale) -> Unit = { photoIndex, modifier, scale ->
+                            BlogReaderCollage(block.photoIds.size) { photoIndex, modifier, scale ->
                                 val photoId = block.photoIds[photoIndex]
                                 val photo = state.photosById[photoId]
                                 CollagePhotoPreview(
@@ -211,13 +141,6 @@ fun BlogDetailScreen(padding: PaddingValues, onOpenPhoto: (String) -> Unit, view
                                     modifier = modifier,
                                     contentScale = scale,
                                 )
-                            }
-                            if (block.photoIds.size == 1) {
-                                preview(0, Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(4.dp)), ContentScale.FillWidth)
-                            } else {
-                                PhotoCollageGrid(block.photoIds.size, Modifier.padding(bottom = 12.dp)) { photoIndex ->
-                                    preview(photoIndex, Modifier.fillMaxSize(), ContentScale.Crop)
-                                }
                             }
                         }
                     }

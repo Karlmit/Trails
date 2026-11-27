@@ -83,6 +83,29 @@ class BlogEditViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
+    fun `preview metadata refresh skips a local draft and looks up only server photo references`() = runTest(dispatcher) {
+        val local = EditableBlock.Image("local", "local")
+        val uploaded = EditableBlock.Image("uploaded", "local-upload", isVideo = true)
+        val stored = EditableBlock.Image("stored", "server-photo")
+        val photos = mapOf(local.id to DraftPhoto("local.jpg"), uploaded.id to DraftPhoto("video.mp4", uploadedId = "server-video"))
+        val draftState = DeviceBlogDraft("local-draft", null, "Draft", "2026-11-27", listOf(local, uploaded, stored), photos, false, false, false)
+        draft = draftState
+        val localEditor = editor()
+        runCurrent()
+        localEditor.refreshPreviewPhotoMetadata()
+        coVerify(exactly = 0) { documents.refreshMissingPhotoMetadata(any(), any(), any()) }
+
+        draft = draftState.copy(entryId = "post")
+        coEvery { documents.refreshMissingPhotoMetadata(any(), any(), any()) } returns Unit
+        val persistedEditor = editor()
+        runCurrent()
+        persistedEditor.refreshPreviewPhotoMetadata()
+        coVerify(exactly = 1) {
+            documents.refreshMissingPhotoMetadata("TIMELINE_ENTRY", "post", setOf("server-video", "server-photo"))
+        }
+    }
+
+    @Test
     fun `compose offline then publish mixed blocks in editor order`() = runTest(dispatcher) {
         val editor = editor()
         runCurrent()
@@ -304,7 +327,7 @@ class BlogEditViewModelTest {
     }
 
     private fun editor() = BlogEditViewModel(
-        SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store, background,
+        SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store, background, mockk(),
     )
 
     private fun serverEntry(): TimelineEntryEntity = mockk<TimelineEntryEntity> {

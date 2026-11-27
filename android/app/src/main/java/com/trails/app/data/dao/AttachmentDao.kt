@@ -1,6 +1,8 @@
 package com.trails.app.data.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.trails.app.data.entity.AttachmentEntity
@@ -53,6 +55,9 @@ interface PhotoDao {
 
     @Upsert
     suspend fun upsertAll(photos: List<PhotoEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMissing(photos: List<PhotoEntity>)
 
     @Query("UPDATE photos SET localPath = :localPath WHERE id = :id")
     suspend fun setLocalPath(id: String, localPath: String?)

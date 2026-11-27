@@ -364,6 +364,8 @@
     "backToPost": "Back to post",
     "newHeading": "New Blog Post",
     "loadingEditor": "Loading editor…",
+    "previewDraft": "Preview",
+    "backToEditing": "Back to editing",
     "loading": "Loading…",
     "titlePlaceholder": "Title",
     "dateLabel": "Date",

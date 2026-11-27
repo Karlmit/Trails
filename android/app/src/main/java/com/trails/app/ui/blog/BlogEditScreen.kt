@@ -59,12 +59,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.trails.app.R
@@ -76,11 +75,9 @@ import com.trails.app.ui.components.PillButton
 import com.trails.app.ui.components.PillButtonVariant
 import com.trails.app.ui.components.ScreenHeading
 import com.trails.app.ui.components.UrlImportDialog
-import com.trails.app.ui.documents.DocumentViewerScreen
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.util.queryDisplayName
-import java.io.File
 
 @Composable
 fun BlogEditScreen(
@@ -98,6 +95,7 @@ fun BlogEditScreen(
         onDispose { if (state.publishing) view.keepScreenOn = previous }
     }
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     var askedForNotifications by rememberSaveable { mutableStateOf(false) }
     val requestNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
@@ -108,6 +106,7 @@ fun BlogEditScreen(
     var pendingCollageUris by rememberSaveable { mutableStateOf<ArrayList<String>?>(null) }
     var urlAfterId by rememberSaveable { mutableStateOf<String?>(null) }
     var localPreviewId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showPreview by rememberSaveable { mutableStateOf(false) }
 
     val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         viewModel.insertImages(uris, { uri -> queryDisplayName(context, uri) }, pickerAfterId)
@@ -134,6 +133,8 @@ fun BlogEditScreen(
     }
 
     LaunchedEffect(state.saved, state.deleted) { if (state.saved || state.deleted) onDone() }
+
+    fun draftMedia(image: EditableBlock.Image) = resolveBlogDraftMedia(image, state.pendingPhotos, photosById, viewModel::localPhoto)
 
     val scrollState = rememberScrollState()
     val drag = remember { BlogBlockDrag() }
@@ -187,6 +188,13 @@ fun BlogEditScreen(
             if (state.error == null) CircularProgressIndicator()
             return@Column
         }
+        TextButton(
+            onClick = {
+                focusManager.clearFocus()
+                showPreview = true
+            },
+            enabled = !state.saving && !state.stagingImages,
+        ) { Text(stringResource(R.string.blog_preview_draft)) }
         if (state.lostFormattingWarning) {
             Surface(color = TrailsColors.BrandMint, shape = TrailsShapes.Input) {
                 Text(
@@ -209,22 +217,7 @@ fun BlogEditScreen(
             color = TrailsColors.TextSoft,
         )
 
-        // Numbering restarts at 1 whenever a non-numbered block breaks a
-        // run of consecutive NUMBERED_LIST blocks -- same as an HTML <ol>,
-        // and the same computation BlogScreens.kt's read-only view does.
-        val listNumberByBlockId = remember(state.blocks) {
-            val map = mutableMapOf<String, Int>()
-            var counter = 0
-            state.blocks.forEach { b ->
-                if (b is EditableBlock.Text && b.kind == TextBlockKind.NUMBERED_LIST) {
-                    counter += 1
-                    map[b.id] = counter
-                } else {
-                    counter = 0
-                }
-            }
-            map
-        }
+        val listNumbers = remember(state.blocks) { blogListNumbers(state.blocks.map { (it as? EditableBlock.Text)?.kind }) }
 
         state.blocks.forEachIndexed { index, block ->
             key(block.id) {
@@ -263,7 +256,7 @@ fun BlogEditScreen(
                     when (block) {
                         is EditableBlock.Text -> TextBlockEditor(
                             block = block,
-                            listNumber = listNumberByBlockId[block.id],
+                            listNumber = listNumbers[index],
                             onRunsChange = { viewModel.updateRuns(block.id, it) },
                             onKindChange = { viewModel.setBlockKind(block.id, it) },
                             onRemove = { viewModel.removeBlock(block.id) },
@@ -271,15 +264,19 @@ fun BlogEditScreen(
                             editable = !state.saving,
                         )
                         is EditableBlock.Image -> {
-                            val staged = state.pendingPhotos[block.id]
-                            val remote = photosById[block.photoId]
-                            val file = staged?.let(viewModel::localPhoto) ?: remote?.localPath?.let(::File)
-                            val label = staged?.filename ?: remote?.originalFilename
-                                ?: stringResource(R.string.blog_image_unavailable)
+                            val media = draftMedia(block)
+                            val staged = media.staged
+                            val remote = media.remote
+                            val file = media.file
+                            val label = media.filename ?: stringResource(R.string.blog_image_unavailable)
+                            val openPhoto = {
+                                if (media.stagedFile != null) localPreviewId = block.id
+                                else onOpenPhoto(remote?.id ?: block.photoId)
+                            }
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                                 if (block.isVideo) {
                                     TextButton(
-                                        onClick = { if (staged != null) localPreviewId = block.id else onOpenPhoto(block.photoId) },
+                                        onClick = openPhoto,
                                         enabled = file != null || remote != null,
                                         modifier = Modifier.weight(1f),
                                     ) { Text(stringResource(R.string.blog_play_video, label)) }
@@ -288,10 +285,7 @@ fun BlogEditScreen(
                                         model = file,
                                         contentDescription = label,
                                         contentScale = ContentScale.FillWidth,
-                                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).clickable {
-                                            if (staged != null) localPreviewId = block.id
-                                            else onOpenPhoto(block.photoId)
-                                        },
+                                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(4.dp)).clickable(onClick = openPhoto),
                                     )
                                 } else {
                                     Column(Modifier.weight(1f).padding(8.dp)) {
@@ -330,13 +324,13 @@ fun BlogEditScreen(
                             }
                             PhotoCollageGrid(block.photos.size) { photoIndex ->
                                 val photo = block.photos[photoIndex]
-                                val staged = state.pendingPhotos[photo.id]
-                                val remote = photosById[photo.photoId]
-                                val file = staged?.let(viewModel::localPhoto) ?: remote?.localPath?.let(::File)
-                                val label = staged?.filename ?: remote?.originalFilename
-                                    ?: stringResource(R.string.blog_collage_photo, photoIndex + 1)
+                                val media = draftMedia(photo)
+                                val staged = media.staged
+                                val file = media.file
+                                val label = media.filename ?: stringResource(R.string.blog_collage_photo, photoIndex + 1)
                                 val openPhoto: (() -> Unit)? = when {
-                                    staged != null && file != null -> ({ localPreviewId = photo.id })
+                                    media.stagedFile != null -> ({ localPreviewId = photo.id })
+                                    media.remote != null -> ({ onOpenPhoto(media.remote.id) })
                                     staged == null -> ({ onOpenPhoto(photo.photoId) })
                                     else -> null
                                 }
@@ -438,19 +432,22 @@ fun BlogEditScreen(
         }
     }
 
+    if (showPreview && state.ready) {
+        LaunchedEffect(state.entryId, state.blocks, state.pendingPhotos) { viewModel.refreshPreviewPhotoMetadata() }
+        BlogDraftPreview(
+            state = state,
+            photosById = photosById,
+            localPhoto = viewModel::localPhoto,
+            cachePhoto = viewModel::cachePreviewPhoto,
+            playback = viewModel.playback,
+            onOpenPhoto = onOpenPhoto,
+            onDismiss = { showPreview = false },
+        )
+    }
+
     localPreviewId?.let { id ->
         val photo = state.pendingPhotos[id]
-        val file = photo?.let(viewModel::localPhoto)
-        if (file != null && photo.mimeType != null) {
-            Dialog(onDismissRequest = { localPreviewId = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                DocumentViewerScreen(
-                    localPath = file.absolutePath,
-                    mimeType = photo.mimeType,
-                    filename = photo.filename,
-                    onBack = { localPreviewId = null },
-                )
-            }
-        }
+        BlogLocalMediaDialog(photo?.let(viewModel::localPhoto), photo?.mimeType, photo?.filename) { localPreviewId = null }
     }
 
     urlAfterId?.let { afterId ->
@@ -533,7 +530,7 @@ private fun BlogPublishStatus(progress: BlogUploadProgress?) {
 @Composable
 private fun TextBlockEditor(
     block: EditableBlock.Text,
-    listNumber: Int?,
+    listNumber: Int,
     onRunsChange: (List<InlineRun>) -> Unit,
     onKindChange: (TextBlockKind) -> Unit,
     onRemove: () -> Unit,
@@ -624,7 +621,7 @@ private fun TextBlockEditor(
                     modifier = Modifier.padding(top = 16.dp, end = 8.dp),
                 )
                 TextBlockKind.NUMBERED_LIST -> Text(
-                    "${listNumber ?: 1}.",
+                    "$listNumber.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TrailsColors.Text,
                     modifier = Modifier.padding(top = 16.dp, end = 8.dp),

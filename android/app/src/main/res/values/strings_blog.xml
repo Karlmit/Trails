@@ -5,6 +5,8 @@
 
     <string name="blog_new_post_title">Nytt blogginlägg</string>
     <string name="blog_edit_post_title">Redigera blogginlägg</string>
+    <string name="blog_preview_draft">Förhandsvisa</string>
+    <string name="blog_back_to_editing">Tillbaka till redigering</string>
     <string name="blog_lost_formatting_warning">Det här inlägget har formatering (tabeller, kodblock, …) från webbredigeraren som den här redigeraren inte bevarar -- om du sparar här plattas den till vanliga stycken. Text, rubriker, listor, fet/kursiv/understruken stil och bilder bevaras däremot.</string>
     <string name="blog_title_label">Titel *</string>
     <string name="blog_date_label">Datum</string>

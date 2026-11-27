@@ -63,14 +63,15 @@ class BlogVideoPlayback @Inject constructor(
     private val client: OkHttpClient,
 ) {
     @OptIn(UnstableApi::class)
-    internal fun create(context: Context, photoId: String, cachedPhoto: PhotoEntity?): ExoPlayer {
-        val remoteUrl = retrofit.baseUrl().newBuilder()
-            .addPathSegments("api/v1/photos")
-            .addPathSegment(photoId)
-            .addPathSegment("file")
-            .build()
-        val localFile = cachedPhoto?.takeIf(::isUsablePhotoCache)?.localPath?.let(::File)
-        val uri = if (localFile != null) Uri.fromFile(localFile) else Uri.parse(remoteUrl.toString())
+    internal fun create(context: Context, photoId: String, cachedPhoto: PhotoEntity?, stagedFile: File?): ExoPlayer {
+        val localFile = stagedFile ?: cachedPhoto?.takeIf(::isUsablePhotoCache)?.localPath?.let(::File)
+        val uri = localFile?.let(Uri::fromFile) ?: Uri.parse(
+            retrofit.baseUrl().newBuilder()
+                .addPathSegments("api/v1/photos")
+                .addPathSegment(photoId)
+                .addPathSegment("file")
+                .build().toString(),
+        )
         val sources = DefaultDataSource.Factory(context, OkHttpDataSource.Factory(client))
         return ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(sources))
@@ -86,9 +87,10 @@ internal fun BlogVideo(
     selected: Boolean,
     onPlay: () -> Unit,
     playback: BlogVideoPlayback,
+    stagedFile: File? = null,
+    filename: String? = photo?.originalFilename,
 ) {
-    val label = photo?.originalFilename
-    val playLabel = if (label != null) stringResource(R.string.blog_play_video, label)
+    val playLabel = if (filename != null) stringResource(R.string.blog_play_video, filename)
     else stringResource(R.string.blog_play_video_generic)
     Box(
         Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(16f / 9f)
@@ -96,7 +98,7 @@ internal fun BlogVideo(
         contentAlignment = Alignment.Center,
     ) {
         if (selected) {
-            PlayingBlogVideo(photoId, photo?.takeIf { it.localPath != null }, playback)
+            PlayingBlogVideo(photoId, photo?.takeIf { it.localPath != null }, playback, stagedFile)
         } else {
             Box(
                 Modifier.fillMaxSize().clickable(role = Role.Button, onClick = onPlay),
@@ -115,11 +117,11 @@ internal fun BlogVideo(
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun PlayingBlogVideo(photoId: String, cachedPhoto: PhotoEntity?, playback: BlogVideoPlayback) {
+private fun PlayingBlogVideo(photoId: String, cachedPhoto: PhotoEntity?, playback: BlogVideoPlayback, stagedFile: File?) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val player = remember(photoId, cachedPhoto?.localPath, cachedPhoto?.sizeBytes, playback) {
-        playback.create(context, photoId, cachedPhoto)
+    val player = remember(photoId, cachedPhoto?.localPath, cachedPhoto?.sizeBytes, playback, stagedFile) {
+        playback.create(context, photoId, cachedPhoto, stagedFile)
     }
     var fullscreen by remember(photoId) { mutableStateOf(false) }
     var failed by remember(player) { mutableStateOf(false) }

@@ -29,6 +29,23 @@ class DocumentsRepositoryTest {
     }
 
     @Test
+    fun `owner metadata lookup inserts only missing references and never downloads media`() = runTest {
+        val existing = photoEntity(localPath = "/cache/cover.jpg", sizeBytes = 2)
+        coEvery { photos.getById(existing.id) } returns existing
+        coEvery { api.listPhotosForOwner("IDEA", "idea") } returns listOf(
+            photoDto(), photoDto().copy(id = "missing"), photoDto().copy(id = "unreferenced"),
+        )
+
+        repository.refreshMissingPhotoMetadata("IDEA", "idea", setOf(existing.id))
+        repository.refreshMissingPhotoMetadata("IDEA", "idea", setOf(existing.id, "missing"))
+
+        coVerify(exactly = 1) { api.listPhotosForOwner("IDEA", "idea") }
+        coVerify(exactly = 1) { photos.insertMissing(match { it.map(PhotoEntity::id) == listOf("missing") }) }
+        coVerify(exactly = 0) { api.listPhotos(any()) }
+        coVerify(exactly = 0) { files.downloadPhoto(any()) }
+    }
+
+    @Test
     fun `photo metadata still syncs when attachment metadata fails`() = runTest {
         coEvery { api.listAttachments("trip") } throws IllegalStateException("attachments failed")
         coEvery { api.listPhotos("trip") } returns listOf(photoDto())

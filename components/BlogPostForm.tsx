@@ -5,13 +5,14 @@ import { translateApiError } from '@/lib/api-error-messages';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRef, useState, type FormEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { OwnerCreateError } from '@/lib/hooks/useOwnerId';
 import { TagList } from '@/components/TagList';
 import { LinkList } from '@/components/LinkList';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { uploadBlogMedia } from '@/lib/blog-media-upload';
 import { AttachmentList } from '@/components/AttachmentList';
+import { BlogReaderContent } from '@/components/BlogReaderContent';
 
 // BlockNote (RichTextEditor.tsx) touches `window` during its own render,
 // so it can't tolerate this Client Component's own server-render pass --
@@ -98,6 +99,31 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
   const submittingRef = useRef(false);
   const collageUploads = useRef(0);
   const [collageUploading, setCollageUploading] = useState(false);
+  const [preview, setPreview] = useState<{ title: string; startAt: string; description: string } | null>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  const editScrollTop = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (preview === null && editScrollTop.current !== null) {
+      window.scrollTo({ top: editScrollTop.current, behavior: 'instant' });
+      editScrollTop.current = null;
+    }
+  }, [preview]);
+
+  function togglePreview() {
+    if (!preview && (submittingRef.current || collageUploads.current > 0)) return;
+    surfaceRef.current?.querySelectorAll('video').forEach((video) => video.pause());
+    if (preview) {
+      setPreview(null);
+    } else {
+      editScrollTop.current = window.scrollY;
+      setPreview({
+        title: title.trim() || tBlog('untitledFallback'),
+        startAt,
+        description: descriptionRef.current,
+      });
+    }
+  }
 
   function beginCollageUpload() {
     if (submittingRef.current) return null;
@@ -168,7 +194,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (submittingRef.current || collageUploads.current > 0) return;
+    if (preview || submittingRef.current || collageUploads.current > 0) return;
     setError(null);
 
     if (!startAt) {
@@ -223,19 +249,25 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
     }
   }
 
+  // The attachment lists contain their own forms and must sit outside the post form.
   return (
-    // User-reported, for Entries and Blog Posts alike: Tags/Links/Photos/
-    // Documents live on the detail panel, and this editor is a whole
-    // separate page -- so they were unreachable exactly while writing the
-    // post. Mounted below the editor now, in both modes. Create mode has no
-    // post id yet and hands each list the same `ensurePostId` the inline
-    // image upload already uses (lib/hooks/useOwnerId.ts): the first attach
-    // creates the Draft, the rest attach to that same row, and Save is
-    // still the PATCH handleSubmit already does. A <form> can't nest inside
-    // another <form> (each list mounts its own for its "Add" control), so
-    // they sit outside this one -- same split ImportantInfoForm uses.
-    <div className="blog-editor-form-outer">
-      <form onSubmit={handleSubmit} className="blog-editor-form">
+    <div className="blog-editor-form-outer" data-preview={preview !== null} ref={surfaceRef}>
+      <div className="row">
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={preview === null && (submitting || collageUploading)}
+          onClick={togglePreview}
+        >
+          {tBlog(preview ? 'backToEditing' : 'previewDraft')}
+        </button>
+      </div>
+      {preview && (
+        <article className="card stack blog-reader-card">
+          <BlogReaderContent {...preview} />
+        </article>
+      )}
+      <form onSubmit={handleSubmit} className="blog-editor-form" hidden={preview !== null}>
       {error && <div className="form-error-banner">{error}</div>}
 
       <input
@@ -286,7 +318,7 @@ export function BlogPostForm({ tripId, mode, post, tripStartDate, cancelHref }: 
       </div>
       </form>
 
-      <div className="blog-editor-attachments stack">
+      <div className="blog-editor-attachments stack" hidden={preview !== null}>
         <TagList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
         <LinkList ownerType="TIMELINE_ENTRY" ownerId={post?.id ?? ''} ensureOwnerId={ensurePostId} />
         <PhotoGallery
