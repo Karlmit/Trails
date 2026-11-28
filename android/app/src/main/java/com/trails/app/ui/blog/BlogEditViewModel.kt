@@ -14,6 +14,7 @@ import com.trails.app.network.apiErrorMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -146,6 +147,7 @@ class BlogEditViewModel @Inject constructor(
     private val draftStore: BlogDraftStore,
     private val backgroundPublish: BlogPublishCoordinator,
     internal val playback: BlogVideoPlayback,
+    private val proofreader: BlogProofreader,
 ) : ViewModel() {
     val tripId: String = checkNotNull(savedStateHandle["tripId"])
     private val routeId: String = savedStateHandle.get<String>("entryId")
@@ -158,6 +160,11 @@ class BlogEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(BlogEditState(entryId = originalEntryId))
     val state: StateFlow<BlogEditState> = _state.asStateFlow()
+
+    private val _proofreading = MutableStateFlow<ProofreadingState?>(null)
+    internal val proofreading = _proofreading.asStateFlow()
+    private var proofreadingSource: EditableBlock.Text? = null
+    private var proofreadingJob: Job? = null
 
     val photosById: StateFlow<Map<String, PhotoEntity>> = _state
         .map { it.entryId }
@@ -218,6 +225,9 @@ class BlogEditViewModel @Inject constructor(
         if (!current.ready || current.saving) return
         val updated = update(current)
         if (updated == current) return
+        proofreadingSource?.let { source ->
+            if (updated.blocks.firstOrNull { it.id == source.id } != source) markProofreadingStale()
+        }
         _state.value = updated
         hasDraft = true
         val write = draftStore.save(draftScope, updated.toDraft())
@@ -267,6 +277,68 @@ class BlogEditViewModel @Inject constructor(
         current.copy(blocks = current.blocks.map {
             if (it is EditableBlock.Text && it.id == id) it.copy(runs = runs) else it
         })
+    }
+
+    internal fun openProofreading(id: String) {
+        val current = _state.value
+        if (!current.ready || current.saving) return
+        val source = current.blocks.firstOrNull { it.id == id } as? EditableBlock.Text ?: return
+        if (source.runs.none { it.text.isNotBlank() }) return
+        proofreadingSource = source
+        requestProofreading(source)
+    }
+
+    internal fun retryProofreading() {
+        val source = proofreadingSource ?: return
+        if (proofreadingJob?.isActive != true) requestProofreading(source)
+    }
+
+    internal fun downloadProofreadingModel() {
+        val source = proofreadingSource ?: return
+        if (_proofreading.value == ProofreadingStatus.Downloadable) requestProofreading(source, download = true)
+    }
+
+    private fun requestProofreading(source: EditableBlock.Text, download: Boolean = false) {
+        proofreadingJob?.cancel()
+        _proofreading.value = ProofreadingStatus.Checking
+        proofreadingJob = viewModelScope.launch {
+            val result = proofreader.proofread(source.runs, download) {
+                ensureActive()
+                _proofreading.value = it
+            }
+            ensureActive()
+            _proofreading.value = result
+        }
+    }
+
+    internal fun dismissProofreading() {
+        proofreadingJob?.cancel()
+        proofreadingSource = null
+        _proofreading.value = null
+    }
+
+    private fun markProofreadingStale() {
+        proofreadingJob?.cancel()
+        proofreadingSource = null
+        _proofreading.value = ProofreadingStatus.Stale
+    }
+
+    internal fun applyProofreading(insert: Boolean) {
+        val source = proofreadingSource ?: return
+        val suggestion = _proofreading.value as? ProofreadingSuggestion ?: return
+        edit { current ->
+            val index = current.blocks.indexOfFirst { it.id == source.id }
+            if (current.blocks.getOrNull(index) != source) {
+                markProofreadingStale()
+                return@edit current
+            }
+            val corrected = source.copy(runs = suggestion.correctedRuns)
+            val blocks = current.blocks.toMutableList()
+            if (insert) blocks.add(index + 1, corrected.copy(id = UUID.randomUUID().toString()))
+            else blocks[index] = corrected
+            dismissProofreading()
+            current.copy(blocks = blocks)
+        }
     }
 
     fun setBlockKind(id: String, kind: TextBlockKind) = edit { current ->

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="blog_proofread_action">Korrekturläs</string>
+    <string name="blog_proofread_title">Korrekturläsning</string>
+    <string name="blog_proofread_close">Stäng korrekturläsning</string>
+    <string name="blog_proofread_insert">Infoga efter</string>
+    <string name="blog_proofread_replace">Ersätt</string>
+    <string name="blog_proofread_deletions">Överstruken text tas bort.</string>
+    <string name="blog_proofread_removed_text">Text som tas bort är %1$s</string>
+    <string name="blog_proofread_checking">Kontrollerar om korrekturläsning är tillgänglig…</string>
+    <string name="blog_proofread_setup">Ladda ner Androids AI-modell via en internetanslutning. Sedan kan du korrekturläsa på enheten även offline.</string>
+    <string name="blog_proofread_download">Ladda ner modellen</string>
+    <string name="blog_proofread_downloading">Laddar ner modellen…</string>
+    <string name="blog_proofread_download_in_progress">Modellen håller på att laddas ner. Kontrollera igen om en stund.</string>
+    <string name="blog_proofread_download_failed">Modellen kunde inte laddas ner. Kontrollera internetanslutningen och försök igen.</string>
+    <string name="blog_proofread_unavailable">Korrekturläsning är inte tillgänglig på den här enheten just nu. Om enheten stöder Android AICore kan du uppdatera tjänsten och kontrollera igen.</string>
+    <string name="blog_proofread_generating">Korrekturläser på enheten…</string>
+    <string name="blog_proofread_too_long">Textblocket är för långt. Dela upp det i mindre block och försök igen.</string>
+    <string name="blog_proofread_no_changes">Inga rättningar föreslogs.</string>
+    <string name="blog_proofread_invalid">Det gick inte att läsa rättningsförslaget. Försök igen.</string>
+    <string name="blog_proofread_failed">Korrekturläsningen kunde inte slutföras. Försök igen.</string>
+    <string name="blog_proofread_stale">Textblocket har ändrats. Stäng och korrekturläs den uppdaterade texten.</string>
+    <string name="blog_proofread_recheck">Kontrollera igen</string>
+    <string name="blog_proofread_retry">Försök igen</string>
+</resources>

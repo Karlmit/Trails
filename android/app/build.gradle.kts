@@ -37,8 +37,8 @@ android {
         applicationId = "com.trails.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 66
-        versionName = "0.66.0"
+        versionCode = 67
+        versionName = "0.67.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -144,6 +144,7 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mlkit.genai.prompt)
 
     implementation(libs.datastore.preferences)
     implementation(libs.work.runtime.ktx)

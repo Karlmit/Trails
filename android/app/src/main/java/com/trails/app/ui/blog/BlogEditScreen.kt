@@ -87,6 +87,7 @@ fun BlogEditScreen(
     viewModel: BlogEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val proofreading by viewModel.proofreading.collectAsState()
     val photosById by viewModel.photosById.collectAsState()
     val view = LocalView.current
     DisposableEffect(view, state.publishing) {
@@ -259,6 +260,10 @@ fun BlogEditScreen(
                             listNumber = listNumbers[index],
                             onRunsChange = { viewModel.updateRuns(block.id, it) },
                             onKindChange = { viewModel.setBlockKind(block.id, it) },
+                            onProofread = {
+                                focusManager.clearFocus()
+                                viewModel.openProofreading(block.id)
+                            },
                             onRemove = { viewModel.removeBlock(block.id) },
                             removeEnabled = !state.saving && !state.stagingImages,
                             editable = !state.saving,
@@ -471,6 +476,18 @@ fun BlogEditScreen(
         )
     }
 
+    proofreading?.let { current ->
+        BlogProofreadingSheet(
+            state = current,
+            canApply = state.ready && !state.saving,
+            onDismiss = viewModel::dismissProofreading,
+            onRetry = viewModel::retryProofreading,
+            onDownload = viewModel::downloadProofreadingModel,
+            onInsert = { viewModel.applyProofreading(insert = true) },
+            onReplace = { viewModel.applyProofreading(insert = false) },
+        )
+    }
+
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -527,12 +544,14 @@ private fun BlogPublishStatus(progress: BlogUploadProgress?) {
  * selection) in sync with the ViewModel's `List<InlineRun>` source of
  * truth, which is what's actually saved.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TextBlockEditor(
     block: EditableBlock.Text,
     listNumber: Int,
     onRunsChange: (List<InlineRun>) -> Unit,
     onKindChange: (TextBlockKind) -> Unit,
+    onProofread: () -> Unit,
     onRemove: () -> Unit,
     removeEnabled: Boolean,
     editable: Boolean,
@@ -589,7 +608,7 @@ private fun TextBlockEditor(
                 }
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        FlowRow(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
             TextButton(onClick = { toggle(bold = true) }, enabled = editable) {
                 Text(
                     "B",
@@ -610,6 +629,11 @@ private fun TextBlockEditor(
                     textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
                     color = if (activeStyle.underline) TrailsColors.BrandAccent else TrailsColors.TextSoft,
                 )
+            }
+            if (blockPlainText.isNotBlank()) {
+                TextButton(onClick = onProofread, enabled = editable) {
+                    Text(stringResource(R.string.blog_proofread_action))
+                }
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {

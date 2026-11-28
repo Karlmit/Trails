@@ -18,6 +18,7 @@ import io.mockk.slot
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -45,6 +47,7 @@ class BlogEditViewModelTest {
     private val documents = mockk<DocumentsRepository>()
     private val trips = mockk<TripRepository>()
     private val store = mockk<BlogDraftStore>()
+    private val proofreader = mockk<BlogProofreader>()
     private var draft: DeviceBlogDraft? = null
 
     private val background = mockk<BlogPublishCoordinator>()
@@ -81,6 +84,116 @@ class BlogEditViewModelTest {
 
     @After
     fun tearDown() = Dispatchers.resetMain()
+
+    @Test
+    fun `proofreading inserts next to the current source position or replaces only that block`() = runTest(dispatcher) {
+        val source = EditableBlock.Text("source", TextBlockKind.HEADING_2, listOf(InlineRun("Malmö", bold = true)))
+        val image = EditableBlock.Image("image", "photo")
+        val video = EditableBlock.Image("video", "clip", isVideo = true)
+        draft = proofreadingDraft(listOf(source, image, video))
+        val suggestion = proofreadingSuggestion(source.runs, "Malmö!")
+        coEvery { proofreader.proofread(source.runs, false, any()) } returns suggestion
+        val editor = editor()
+        runCurrent()
+        editor.openProofreading(source.id)
+        runCurrent()
+        assertEquals(suggestion, editor.proofreading.value)
+        assertEquals(listOf(source, image, video), draft?.blocks)
+
+        editor.moveBlockBefore(source.id, video.id)
+        editor.applyProofreading(insert = true)
+        val inserted = draft!!.blocks[2] as EditableBlock.Text
+        assertTrue(inserted.id != source.id)
+        assertEquals(source.copy(id = inserted.id, runs = suggestion.correctedRuns), inserted)
+        assertEquals(listOf(image, source, inserted, video), draft?.blocks)
+        assertNull(editor.proofreading.value)
+
+        editor.openProofreading(source.id)
+        runCurrent()
+        editor.applyProofreading(insert = false)
+        assertEquals(listOf(image, source.copy(runs = suggestion.correctedRuns), inserted, video), draft?.blocks)
+    }
+
+    @Test
+    fun `a formatting change invalidates proofreading even if the original formatting is restored`() = runTest(dispatcher) {
+        val source = EditableBlock.Text("source", TextBlockKind.PARAGRAPH, listOf(InlineRun("Trre dagar")))
+        draft = proofreadingDraft(listOf(source))
+        coEvery { proofreader.proofread(source.runs, false, any()) } returns proofreadingSuggestion(source.runs, "Tre dagar")
+        val editor = editor()
+        runCurrent()
+        editor.openProofreading(source.id)
+        runCurrent()
+
+        editor.updateRuns(source.id, listOf(InlineRun("Trre dagar", bold = true)))
+        editor.updateRuns(source.id, source.runs)
+        editor.applyProofreading(insert = false)
+        editor.applyProofreading(insert = true)
+        assertEquals(ProofreadingStatus.Stale, editor.proofreading.value)
+        assertEquals(listOf(source), draft?.blocks)
+    }
+
+    @Test
+    fun `proofreading requires an explicit download and dismissing leaves the draft alone`() = runTest(dispatcher) {
+        val source = EditableBlock.Text("source", TextBlockKind.PARAGRAPH, listOf(InlineRun("Trre dagar")))
+        draft = proofreadingDraft(listOf(source))
+        coEvery { proofreader.proofread(source.runs, false, any()) } returns ProofreadingStatus.Downloadable
+        coEvery { proofreader.proofread(source.runs, true, any()) } returns proofreadingSuggestion(source.runs, "Tre dagar")
+        val editor = editor()
+        runCurrent()
+        editor.openProofreading(source.id)
+        runCurrent()
+        assertEquals(ProofreadingStatus.Downloadable, editor.proofreading.value)
+        coVerify(exactly = 0) { proofreader.proofread(any(), true, any()) }
+
+        editor.downloadProofreadingModel()
+        runCurrent()
+        assertTrue(editor.proofreading.value is ProofreadingSuggestion)
+        editor.dismissProofreading()
+        editor.applyProofreading(insert = false)
+        assertNull(editor.proofreading.value)
+        assertEquals(listOf(source), draft?.blocks)
+    }
+
+    @Test
+    fun `dismissing while proofreading is in flight discards a late suggestion`() = runTest(dispatcher) {
+        val source = EditableBlock.Text("source", TextBlockKind.PARAGRAPH, listOf(InlineRun("Trre dagar")))
+        draft = proofreadingDraft(listOf(source))
+        val completion = CompletableDeferred<ProofreadingSuggestion>()
+        val returned = CompletableDeferred<Unit>()
+        coEvery { proofreader.proofread(source.runs, false, any()) } coAnswers {
+            thirdArg<(ProofreadingStatus) -> Unit>()(ProofreadingStatus.Generating)
+            withContext(NonCancellable) {
+                completion.await().also { returned.complete(Unit) }
+            }
+        }
+        val editor = editor()
+        runCurrent()
+        editor.openProofreading(source.id)
+        runCurrent()
+        assertEquals(ProofreadingStatus.Generating, editor.proofreading.value)
+
+        editor.dismissProofreading()
+        completion.complete(proofreadingSuggestion(source.runs, "Tre dagar"))
+        runCurrent()
+        assertTrue(returned.isCompleted)
+        assertNull(editor.proofreading.value)
+        assertEquals(listOf(source), draft?.blocks)
+    }
+
+    @Test
+    fun `a result showing no corrections cannot be applied`() = runTest(dispatcher) {
+        val source = EditableBlock.Text("source", TextBlockKind.PARAGRAPH, listOf(InlineRun("Tre dagar.")))
+        draft = proofreadingDraft(listOf(source))
+        coEvery { proofreader.proofread(source.runs, false, any()) } returns ProofreadingStatus.NoChanges
+        val editor = editor()
+        runCurrent()
+        editor.openProofreading(source.id)
+        runCurrent()
+        editor.applyProofreading(insert = false)
+        editor.applyProofreading(insert = true)
+        assertEquals(ProofreadingStatus.NoChanges, editor.proofreading.value)
+        assertEquals(listOf(source), draft?.blocks)
+    }
 
     @Test
     fun `preview metadata refresh skips a local draft and looks up only server photo references`() = runTest(dispatcher) {
@@ -328,7 +441,11 @@ class BlogEditViewModelTest {
 
     private fun editor() = BlogEditViewModel(
         SavedStateHandle(mapOf("tripId" to "trip", "entryId" to "local-draft")), timeline, documents, trips, store, background, mockk(),
+        proofreader,
     )
+
+    private fun proofreadingDraft(blocks: List<EditableBlock>) =
+        DeviceBlogDraft("local-draft", null, "Draft", "2026-11-27", blocks, emptyMap(), false, false, false)
 
     private fun serverEntry(): TimelineEntryEntity = mockk<TimelineEntryEntity> {
         every { id } returns "post"

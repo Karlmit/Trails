@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="blog_proofread_action">Proofread</string>
+    <string name="blog_proofread_title">Proofreading</string>
+    <string name="blog_proofread_close">Close proofreading</string>
+    <string name="blog_proofread_insert">Insert after</string>
+    <string name="blog_proofread_replace">Replace</string>
+    <string name="blog_proofread_deletions">Crossed-out text will be removed.</string>
+    <string name="blog_proofread_removed_text">Text to remove is %1$s</string>
+    <string name="blog_proofread_checking">Checking if proofreading is available…</string>
+    <string name="blog_proofread_setup">Download the Android AI model with an internet connection. After that, you can proofread on your device while offline.</string>
+    <string name="blog_proofread_download">Download model</string>
+    <string name="blog_proofread_downloading">Downloading the model…</string>
+    <string name="blog_proofread_download_in_progress">The model is downloading. Check again in a moment.</string>
+    <string name="blog_proofread_download_failed">The model could not be downloaded. Check your internet connection and try again.</string>
+    <string name="blog_proofread_unavailable">Proofreading is unavailable on this device right now. If your device supports Android AICore, update it and check again.</string>
+    <string name="blog_proofread_generating">Proofreading on this device…</string>
+    <string name="blog_proofread_too_long">This text block is too long. Split it into shorter blocks and try again.</string>
+    <string name="blog_proofread_no_changes">No corrections were suggested.</string>
+    <string name="blog_proofread_invalid">The suggested correction could not be read. Try again.</string>
+    <string name="blog_proofread_failed">Proofreading could not finish. Try again.</string>
+    <string name="blog_proofread_stale">This text block changed. Close this sheet and proofread the updated text.</string>
+    <string name="blog_proofread_recheck">Check again</string>
+    <string name="blog_proofread_retry">Try again</string>
+</resources>
