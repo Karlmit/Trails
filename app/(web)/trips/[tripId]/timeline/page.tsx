@@ -285,7 +285,7 @@ export default async function TimelinePage({ params }: PageProps) {
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
     include: {
-      sections: { orderBy: { startDate: 'asc' } },
+      sections: { orderBy: [{ startDate: 'asc' }, { id: 'asc' }] },
       // AD-10: a Draft Blog Post is unconditionally excluded from the
       // Timeline, for every viewer (not just Guests) -- `timelineVisibleEntryWhere()`
       // is the one shared predicate for this, also used by GET
@@ -363,8 +363,7 @@ export default async function TimelinePage({ params }: PageProps) {
           const trunkColor = section
             ? (section.color && sectionCustomColorSolid(section.color)) ?? sectionColorSolid(day.sectionIndex!)
             : undefined;
-          const previousSectionIndex = index > 0 ? laidOutDays[index - 1].sectionIndex : null;
-          const showSectionLabel = section !== null && day.sectionIndex !== previousSectionIndex;
+          const startingSections = day.startingSectionIndices.map((i) => trip.sections[i]);
           // User-requested: the day a Section ends and the next begins
           // reads as an abrupt hard cut between two solid-colored rows --
           // splitting this one day's own band half-and-half (this
@@ -378,7 +377,11 @@ export default async function TimelinePage({ params }: PageProps) {
           const dayLabel = formatDayLabel(day.dateKey, locale);
 
           return (
-            <div key={day.dateKey} className="timeline-grid-row">
+            <div
+              key={day.dateKey}
+              className="timeline-grid-row"
+              style={{ '--timeline-section-label-rows': Math.ceil(startingSections.length / 2) } as React.CSSProperties}
+            >
               <div
                 id={`day-${day.dateKey}`}
                 className={`timeline-row-bg${day.isToday ? ' is-today' : ''}${nextBandColor ? ' is-section-transition' : ''}`}
@@ -452,14 +455,16 @@ export default async function TimelinePage({ params }: PageProps) {
               </div>
 
               <div className="timeline-content-cell" style={{ gridRow: rowLine, gridColumn: 3 }}>
-                {showSectionLabel && section && (
-                  <div className="timeline-section-label">
-                    {section.emoji && (
-                      <span className="timeline-section-label-emoji" aria-hidden="true">
-                        {section.emoji}
-                      </span>
-                    )}
-                    <span className="timeline-section-label-name">{section.name}</span>
+                {startingSections.length > 0 && (
+                  <div className="timeline-section-labels">
+                    {startingSections.map((start) => (
+                      <div key={start.id} className="timeline-section-label" title={start.name}>
+                        {start.emoji && (
+                          <span className="timeline-section-label-emoji" aria-hidden="true">{start.emoji}</span>
+                        )}
+                        <span className="timeline-section-label-name">{start.name}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {day.isToday && (

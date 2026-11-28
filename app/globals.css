@@ -783,6 +783,8 @@ body.has-notify-bar .page:has(.fab) {
    several content lines) simply grows to fit both columns' matching
    rhythm, with no special-casing. */
 .timeline-grid {
+  --timeline-section-label-height: 1.75rem;
+  --timeline-section-label-gap: 4px;
   display: grid;
   grid-template-columns: var(--timeline-graph-width) 84px minmax(0, 1fr);
   column-gap: var(--space-3);
@@ -886,6 +888,8 @@ body.has-notify-bar .page:has(.fab) {
   flex-direction: column;
   gap: var(--space-1);
   height: 100%;
+  padding-block-start: calc(var(--timeline-section-label-rows) *
+    (var(--timeline-section-label-height) + var(--timeline-section-label-gap)));
 }
 
 /* Mirrors .entry-dot-list's own per-line rhythm exactly (same gap above,
@@ -952,15 +956,23 @@ body.has-notify-bar .page:has(.fab) {
   min-width: 0;
 }
 
+.timeline-section-labels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: var(--timeline-section-label-height);
+  align-items: center;
+  gap: var(--timeline-section-label-gap);
+  margin-block-end: var(--timeline-section-label-gap);
+  margin-inline-end: 6px;
+}
+
 .timeline-section-label {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-3);
-  z-index: 2;
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  max-width: 260px;
+  max-width: min(100%, 260px);
+  min-width: 0;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   background: var(--color-surface);
@@ -972,6 +984,15 @@ body.has-notify-bar .page:has(.fab) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.timeline-section-label:nth-child(even),
+.timeline-section-label:last-child {
+  justify-self: end;
+}
+
+.timeline-section-label:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .timeline-section-label-emoji {
@@ -1466,10 +1487,17 @@ body.has-notify-bar .page:has(.fab) {
     padding-inline-end: 5px;
   }
 
+  .timeline-section-labels {
+    grid-auto-rows: auto;
+    margin-inline-end: 0;
+  }
+
   .timeline-section-label {
-    position: static;
-    max-width: 100%;
-    margin-bottom: 4px;
+    white-space: normal;
+  }
+
+  .timeline-section-label-name {
+    overflow-wrap: anywhere;
   }
 
   .entry-dot-list {

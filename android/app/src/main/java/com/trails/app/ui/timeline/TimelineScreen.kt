@@ -27,14 +27,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.trails.app.R
+import com.trails.app.data.entity.SectionEntity
 import com.trails.app.ui.theme.TrailsColors
 import com.trails.app.ui.theme.TrailsShapes
 import com.trails.app.ui.theme.ClayMetrics
@@ -88,9 +94,7 @@ fun TimelineScreen(
                 }
                 LazyColumn(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                     itemsIndexed(layout.days, key = { _, day -> day.day.dateKey }) { index, day ->
-                        val previousSectionIndex = if (index > 0) layout.days[index - 1].day.sectionIndex else null
                         val section = day.day.sectionIndex?.let { state.sections.getOrNull(it) }
-                        val showSectionLabel = section != null && day.day.sectionIndex != previousSectionIndex
                         // User-requested: the day a Section ends and the
                         // next begins gets a half-and-half band instead of
                         // a flat color -- see DayRow's own comment.
@@ -106,12 +110,10 @@ fun TimelineScreen(
                         DayRow(
                             day = day,
                             graphWidth = graphWidth,
-                            sectionName = section?.name,
-                            sectionEmoji = section?.emoji,
+                            startingSections = day.day.startingSectionIndices.mapNotNull(state.sections::getOrNull),
                             trunkColor = section?.let { sectionSolidColor(day.day.sectionIndex!!, it.color) },
                             bandColor = section?.let { sectionBandColor(day.day.sectionIndex!!, it.color) },
                             nextBandColor = nextBandColor,
-                            showSectionLabel = showSectionLabel,
                             runBoundary = runBoundary,
                             tripTimezone = trip.timezone,
                             onOpenEntry = onOpenEntry,
@@ -127,12 +129,10 @@ fun TimelineScreen(
 private fun DayRow(
     day: TimelineDayWithEntries,
     graphWidth: androidx.compose.ui.unit.Dp,
-    sectionName: String?,
-    sectionEmoji: String?,
+    startingSections: List<SectionEntity>,
     trunkColor: androidx.compose.ui.graphics.Color?,
     bandColor: androidx.compose.ui.graphics.Color?,
     nextBandColor: androidx.compose.ui.graphics.Color?,
-    showSectionLabel: Boolean,
     runBoundary: SectionRunBoundary,
     tripTimezone: String,
     onOpenEntry: (String, String) -> Unit,
@@ -165,6 +165,7 @@ private fun DayRow(
     } else {
         Modifier.fillMaxWidth().height(IntrinsicSize.Min)
     }
+    var sectionLabelHeight by remember { mutableIntStateOf(0) }
     Row(modifier = rowModifier) {
         TimelineGraphColumn(
             day = day,
@@ -172,6 +173,7 @@ private fun DayRow(
             canvasBackground = TrailsColors.Canvas,
             insetTop = runBoundary.roundsTop,
             insetBottom = runBoundary.roundsBottom,
+            sectionLabelHeight = { sectionLabelHeight },
             modifier = Modifier.width(graphWidth).fillMaxHeight(),
         )
         Column(modifier = Modifier.widthIn(min = 56.dp).padding(horizontal = 8.dp, vertical = 8.dp)) {
@@ -180,18 +182,30 @@ private fun DayRow(
             Text(label.weekday.take(3), style = MaterialTheme.typography.bodySmall, color = TrailsColors.TextSoft)
         }
         Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp)) {
-            if (showSectionLabel && sectionName != null) {
-                Surface(
-                    color = TrailsColors.Surface,
-                    shape = TrailsShapes.Pill,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                ) {
-                    Text(
-                        text = if (sectionEmoji != null) "$sectionEmoji $sectionName" else sectionName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TrailsColors.Text,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
+            Column(modifier = Modifier.onSizeChanged { sectionLabelHeight = it.height }) {
+                startingSections.chunked(2).forEach { sections ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 6.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        sections.forEachIndexed { index, section ->
+                            val alignEnd = index == sections.lastIndex
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart,
+                            ) {
+                                Surface(color = TrailsColors.Surface, shape = TrailsShapes.Pill) {
+                                    Text(
+                                        text = section.emoji?.let { "$it ${section.name}" } ?: section.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = TrailsColors.Text,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             if (day.day.isToday) {

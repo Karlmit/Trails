@@ -55,7 +55,7 @@ class TimelineViewModel @Inject constructor(
             TimelineUiState(isSyncing = syncing)
         } else {
             val todayKey = todayKeyIfActive(trip)
-            val sortedSections = sections.sortedBy { it.startDate }
+            val sortedSections = sections.sortedWith(compareBy({ it.startDate }, { it.id }))
             val days = buildTimelineDays(
                 tripStartDateKey = trip.startDate,
                 tripEndDateKey = trip.endDate,

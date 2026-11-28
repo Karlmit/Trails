@@ -3,6 +3,7 @@ import { dateKeyOfDateColumn, entryEndpointDateKey } from '@/lib/trip-status';
 export interface TimelineDay {
   dateKey: string; // YYYY-MM-DD
   sectionIndex: number | null;
+  startingSectionIndices: number[];
   isToday: boolean;
 }
 
@@ -78,11 +79,26 @@ export function buildTimelineDays(
     );
   }
 
+  const firstDayKey = dateKeyOfDateColumn(cursor);
+  const startsByDate = new Map<string, number[]>();
+  sections.forEach((section, index) => {
+    if (dateKeyOfDateColumn(section.endDate) < firstDayKey) return;
+    const startKey = dateKeyOfDateColumn(section.startDate);
+    const dateKey = startKey < firstDayKey ? firstDayKey : startKey;
+    const starts = startsByDate.get(dateKey) ?? [];
+    starts.push(index);
+    startsByDate.set(dateKey, starts);
+  });
+
   while (cursor.getTime() <= end.getTime()) {
     const dateKey = dateKeyOfDateColumn(cursor);
     days.push({
       dateKey,
       sectionIndex: sectionIndexForDateKey(dateKey, sections),
+      startingSectionIndices: (startsByDate.get(dateKey) ?? []).sort(
+        (a, b) => sections[a].startDate.getTime() - sections[b].startDate.getTime()
+          || sections[a].endDate.getTime() - sections[b].endDate.getTime(),
+      ),
       isToday: dateKey === todayKey,
     });
     cursor.setUTCDate(cursor.getUTCDate() + 1);

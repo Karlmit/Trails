@@ -40,6 +40,7 @@ fun TimelineGraphColumn(
     canvasBackground: Color,
     insetTop: Boolean = false,
     insetBottom: Boolean = false,
+    sectionLabelHeight: () -> Int = { 0 },
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
@@ -104,10 +105,11 @@ fun TimelineGraphColumn(
         // every later line's dot would drift from its own text line.
         val visibleLines = day.lines.filterNot { it.entryType == "STAY" && !it.isStart && !it.isEnd }
         val lineCount = visibleLines.size.coerceAtLeast(1)
-        val slotHeight = h / lineCount
+        val labelHeight = sectionLabelHeight().toFloat().coerceAtMost(h)
+        val slotHeight = (h - labelHeight) / lineCount
         visibleLines.forEachIndexed { index, line ->
             if (line.isStart && line.isEnd) {
-                val cy = slotHeight * index + slotHeight / 2
+                val cy = labelHeight + slotHeight * index + slotHeight / 2
                 drawCircle(canvasBackground, radius = 6.dp.toPx(), center = Offset(trunkX, cy))
                 drawCircle(entryTypeColor(line.entryType), radius = 5.dp.toPx(), center = Offset(trunkX, cy))
             }

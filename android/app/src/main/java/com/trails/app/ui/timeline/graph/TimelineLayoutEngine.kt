@@ -30,7 +30,12 @@ data class EntryForLayout(
     val typeDetailsJson: String? = null,
 )
 
-data class TimelineDay(val dateKey: String, val sectionIndex: Int?, val isToday: Boolean)
+data class TimelineDay(
+    val dateKey: String,
+    val sectionIndex: Int?,
+    val isToday: Boolean,
+    val startingSectionIndices: List<Int>,
+)
 
 data class TimelineDayLine(
     val entryId: String,
@@ -85,12 +90,23 @@ fun buildTimelineDays(
     sections: List<SectionRange>,
     todayKey: String?,
 ): List<TimelineDay> {
+    val startsByDate = sections.indices
+        .filter { sections[it].endDateKey >= tripStartDateKey }
+        .groupBy { sections[it].startDateKey.coerceAtLeast(tripStartDateKey) }
+    val startOrder = compareBy<Int>({ sections[it].startDateKey }, { sections[it].endDateKey })
     val days = mutableListOf<TimelineDay>()
     var cursor = LocalDate.parse(tripStartDateKey)
     val end = LocalDate.parse(tripEndDateKey)
     while (!cursor.isAfter(end)) {
         val dateKey = cursor.toString()
-        days.add(TimelineDay(dateKey, sectionIndexForDateKey(dateKey, sections), dateKey == todayKey))
+        days.add(
+            TimelineDay(
+                dateKey = dateKey,
+                sectionIndex = sectionIndexForDateKey(dateKey, sections),
+                isToday = dateKey == todayKey,
+                startingSectionIndices = startsByDate[dateKey].orEmpty().sortedWith(startOrder),
+            ),
+        )
         cursor = cursor.plusDays(1)
     }
     return days

@@ -54,6 +54,23 @@ describe('buildTimelineDays (FR-8)', () => {
     expect(boundaryDay?.sectionIndex).not.toBeNull();
   });
 
+  it('places both labels on their shared start date while the previous section still owns the band', () => {
+    const trip = { startDate: dateOnly('2026-11-17'), endDate: dateOnly('2026-11-27') };
+    const sections = [
+      { startDate: dateOnly('2026-11-16'), endDate: dateOnly('2026-11-23') },
+      { startDate: dateOnly('2026-11-23'), endDate: dateOnly('2026-11-27') },
+      { startDate: dateOnly('2026-11-23'), endDate: dateOnly('2026-11-23') },
+      { startDate: dateOnly('2026-11-10'), endDate: dateOnly('2026-11-15') },
+    ];
+    const days = buildTimelineDays(trip, sections);
+    const sharedStart = days.find((day) => day.dateKey === '2026-11-23');
+
+    expect(sharedStart?.sectionIndex).toBe(0);
+    expect(sharedStart?.startingSectionIndices).toEqual([2, 1]);
+    expect(days.find((day) => day.dateKey === '2026-11-24')?.startingSectionIndices).toEqual([]);
+    expect(days[0].startingSectionIndices).toEqual([0]);
+  });
+
   // FR-9/FR-10: the current-position marker and auto-scroll target both key
   // off `isToday` on the day the caller identifies as "today" (an Active
   // Trip only -- see dateKeyInTimezone/computeTripStatus in trip-status.ts).

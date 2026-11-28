@@ -26,6 +26,27 @@ class TimelineLayoutEngineTest {
     }
 
     @Test
+    fun `starts are listed on the shared date even while the previous section owns the band`() {
+        val days = buildTimelineDays(
+            tripStartDateKey = "2026-11-17",
+            tripEndDateKey = "2026-11-27",
+            sections = listOf(
+                SectionRange("previous", "2026-11-16", "2026-11-23"),
+                SectionRange("long", "2026-11-23", "2026-11-27"),
+                SectionRange("short", "2026-11-23", "2026-11-23"),
+                SectionRange("past", "2026-11-10", "2026-11-15"),
+            ),
+            todayKey = null,
+        )
+        val sharedStart = days.first { it.dateKey == "2026-11-23" }
+
+        assertEquals(0, sharedStart.sectionIndex)
+        assertEquals(listOf(2, 1), sharedStart.startingSectionIndices)
+        assertEquals(emptyList<Int>(), days.first { it.dateKey == "2026-11-24" }.startingSectionIndices)
+        assertEquals(listOf(0), days.first().startingSectionIndices)
+    }
+
+    @Test
     fun `a single-day entry produces one line with no branch`() {
         val days = buildTimelineDays("2026-08-01", "2026-08-03", emptyList(), null)
         val entry = EntryForLayout(
