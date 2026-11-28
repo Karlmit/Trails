@@ -4,21 +4,34 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModelStoreOwner
@@ -81,6 +94,12 @@ fun SettingsScreen(
                 }
             }
         }
+        ProofreadingSettings(
+            state = state,
+            onProviderChange = viewModel::setUseChatGpt,
+            onSaveKey = viewModel::saveProofreadingKey,
+            onRemoveKey = viewModel::removeProofreadingKey,
+        )
         TrailsCard(
             variant = TrailsCardVariant.Standard,
             contentPadding = PaddingValues(24.dp),
@@ -112,6 +131,90 @@ fun SettingsScreen(
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ProofreadingSettings(
+    state: SettingsUiState,
+    onProviderChange: (Boolean) -> Unit,
+    onSaveKey: (String) -> Unit,
+    onRemoveKey: () -> Unit,
+) {
+    var draftKey by remember(state.useChatGpt) { mutableStateOf("") }
+    LaunchedEffect(state.proofreadingKeyMessage) {
+        if (state.proofreadingKeyMessage == R.string.settings_proofread_key_saved) draftKey = ""
+    }
+    TrailsCard(
+        variant = TrailsCardVariant.Standard,
+        contentPadding = PaddingValues(24.dp),
+    ) {
+        Text(
+            stringResource(R.string.blog_proofread_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = TrailsColors.Brand,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().toggleable(
+                value = state.useChatGpt,
+                role = Role.Switch,
+                onValueChange = onProviderChange,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.settings_proofread_use_chatgpt),
+                modifier = Modifier.weight(1f),
+            )
+            Switch(checked = state.useChatGpt, onCheckedChange = null)
+        }
+        Text(
+            stringResource(
+                if (state.useChatGpt) R.string.settings_proofread_cloud_description
+                else R.string.settings_proofread_local_description,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = TrailsColors.TextSoft,
+        )
+        if (state.useChatGpt || state.hasProofreadingKey) {
+            OutlinedTextField(
+                value = draftKey,
+                onValueChange = { draftKey = it },
+                label = { Text(stringResource(R.string.settings_proofread_key)) },
+                supportingText = if (state.hasProofreadingKey) {
+                    { Text(stringResource(R.string.settings_proofread_key_configured)) }
+                } else null,
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                enabled = !state.updatingProofreadingKey,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PillButton(
+                text = stringResource(R.string.settings_proofread_key_save),
+                onClick = { onSaveKey(draftKey) },
+                enabled = draftKey.isNotBlank() && !state.updatingProofreadingKey,
+                variant = PillButtonVariant.Outline,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (state.hasProofreadingKey) {
+                PillButton(
+                    text = stringResource(R.string.settings_proofread_key_remove),
+                    onClick = onRemoveKey,
+                    enabled = !state.updatingProofreadingKey,
+                    variant = PillButtonVariant.Outline,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        state.proofreadingKeyMessage?.let {
+            Text(
+                stringResource(it),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
         }
     }
 }

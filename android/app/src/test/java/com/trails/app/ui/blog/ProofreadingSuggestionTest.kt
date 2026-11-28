@@ -73,12 +73,12 @@ class ProofreadingSuggestionTest {
     @Test
     fun `unchanged text has no diff`() {
         val runs = listOf(InlineRun("Vi gick.", bold = true))
-        assertEquals(ProofreadingSuggestion(runs, emptyList()), proofreadingSuggestion(runs, runs.single().text))
+        assertEquals(ProofreadingSuggestion(runs, runs, emptyList()), proofreadingSuggestion(runs, runs.single().text))
     }
 
     @Test
     fun `input over the limit is rejected before AICore is opened`() = runTest {
-        val result = BlogProofreader().proofread(
+        val result = BlogProofreader { error("AICore should not be opened") }.proofread(
             listOf(InlineRun("a".repeat(MAX_PROOFREADING_INPUT_LENGTH)), InlineRun("b")),
             download = false,
             onStatus = { error("No SDK status should be needed") },

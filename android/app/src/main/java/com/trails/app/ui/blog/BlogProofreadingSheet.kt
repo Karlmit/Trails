@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,22 +24,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.trails.app.R
@@ -87,7 +90,7 @@ internal fun BlogProofreadingSheet(
                             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         )
                         if (state == ProofreadingStatus.Checking || state == ProofreadingStatus.Generating ||
-                            state == ProofreadingStatus.Downloading
+                            state == ProofreadingStatus.Downloading || state == ProofreadingStatus.CloudGenerating
                         ) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                         }
@@ -111,7 +114,8 @@ internal fun BlogProofreadingSheet(
                     Text(stringResource(R.string.blog_proofread_recheck))
                 }
                 ProofreadingStatus.DownloadFailed, ProofreadingStatus.Failed,
-                ProofreadingStatus.InvalidSuggestion -> OutlinedButton(onClick = onRetry) {
+                ProofreadingStatus.InvalidSuggestion, ProofreadingStatus.CloudConnectionFailed,
+                ProofreadingStatus.CloudRateLimited, ProofreadingStatus.CloudFailed -> OutlinedButton(onClick = onRetry) {
                     Text(stringResource(R.string.blog_proofread_retry))
                 }
                 else -> Unit
@@ -123,16 +127,14 @@ internal fun BlogProofreadingSheet(
 @Composable
 private fun SuggestionText(suggestion: ProofreadingSuggestion) {
     val corrected = remember(suggestion) { suggestion.correctedRuns.toAnnotatedString() }
+    var showOriginal by remember(suggestion) { mutableStateOf(false) }
+    val originalHeading = remember { BringIntoViewRequester() }
     val additions = SpanStyle(background = TrailsColors.BlogSurface, color = TrailsColors.BlogInk)
-    val deletions = SpanStyle(color = TrailsColors.Danger, textDecoration = TextDecoration.LineThrough)
-    val preview = remember(suggestion, additions, deletions) {
+    val preview = remember(suggestion, additions) {
         buildAnnotatedString {
             var cursor = 0
             for (change in suggestion.changes) {
                 append(corrected, cursor, change.start)
-                if (change.removed.isNotEmpty()) {
-                    withStyle(deletions) { append(change.removed) }
-                }
                 if (change.start < change.end) {
                     withStyle(additions) { append(corrected, change.start, change.end) }
                 }
@@ -141,22 +143,35 @@ private fun SuggestionText(suggestion: ProofreadingSuggestion) {
             append(corrected, cursor, corrected.length)
         }
     }
-    val removedText = suggestion.changes.mapNotNull { it.removed.takeIf(String::isNotEmpty) }
-    val removalDescription = if (removedText.isEmpty()) null else {
-        Text(stringResource(R.string.blog_proofread_deletions), style = MaterialTheme.typography.bodySmall)
-        stringResource(R.string.blog_proofread_removed_text, removedText.joinToString(", "))
-    }
+    Text(stringResource(R.string.blog_proofread_suggestion), style = MaterialTheme.typography.labelLarge)
     Text(
         text = preview,
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier.fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
-            .padding(16.dp)
-            .clearAndSetSemantics {
-                text = corrected
-                if (removalDescription != null) stateDescription = removalDescription
-            },
+            .padding(16.dp),
     )
+    if (suggestion.changes.any { it.start == it.end && it.removed.isNotEmpty() }) {
+        Text(stringResource(R.string.blog_proofread_removal_notice), style = MaterialTheme.typography.bodySmall)
+    }
+    TextButton(onClick = { showOriginal = !showOriginal }) {
+        Text(stringResource(if (showOriginal) R.string.blog_proofread_hide_original else R.string.blog_proofread_show_original))
+    }
+    if (showOriginal) {
+        Text(
+            stringResource(R.string.blog_proofread_original),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.bringIntoViewRequester(originalHeading).semantics { heading() },
+        )
+        LaunchedEffect(originalHeading) { originalHeading.bringIntoView() }
+        Text(
+            text = remember(suggestion) { suggestion.originalRuns.toAnnotatedString() },
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+                .padding(16.dp),
+        )
+    }
 }
 
 private val ProofreadingStatus.messageRes: Int
@@ -172,5 +187,12 @@ private val ProofreadingStatus.messageRes: Int
         ProofreadingStatus.NoChanges -> R.string.blog_proofread_no_changes
         ProofreadingStatus.InvalidSuggestion -> R.string.blog_proofread_invalid
         ProofreadingStatus.Failed -> R.string.blog_proofread_failed
+        ProofreadingStatus.CloudGenerating -> R.string.blog_proofread_cloud_generating
+        ProofreadingStatus.CloudKeyMissing -> R.string.blog_proofread_cloud_key_missing
+        ProofreadingStatus.CloudKeyUnreadable -> R.string.blog_proofread_cloud_key_unreadable
+        ProofreadingStatus.CloudKeyRejected -> R.string.blog_proofread_cloud_key_rejected
+        ProofreadingStatus.CloudConnectionFailed -> R.string.blog_proofread_cloud_connection
+        ProofreadingStatus.CloudRateLimited -> R.string.blog_proofread_cloud_rate
+        ProofreadingStatus.CloudFailed -> R.string.blog_proofread_cloud_failed
         ProofreadingStatus.Stale -> R.string.blog_proofread_stale
     }

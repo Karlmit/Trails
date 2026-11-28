@@ -5,8 +5,11 @@
     <string name="blog_proofread_close">Close proofreading</string>
     <string name="blog_proofread_insert">Insert after</string>
     <string name="blog_proofread_replace">Replace</string>
-    <string name="blog_proofread_deletions">Crossed-out text will be removed.</string>
-    <string name="blog_proofread_removed_text">Text to remove is %1$s</string>
+    <string name="blog_proofread_suggestion">Suggestion</string>
+    <string name="blog_proofread_removal_notice">The suggestion removes text or punctuation. Compare it with the original.</string>
+    <string name="blog_proofread_original">Original</string>
+    <string name="blog_proofread_show_original">Show original</string>
+    <string name="blog_proofread_hide_original">Hide original</string>
     <string name="blog_proofread_checking">Checking if proofreading is available…</string>
     <string name="blog_proofread_setup">Download the Android AI model with an internet connection. After that, you can proofread on your device while offline.</string>
     <string name="blog_proofread_download">Download model</string>
@@ -22,4 +25,22 @@
     <string name="blog_proofread_stale">This text block changed. Close this sheet and proofread the updated text.</string>
     <string name="blog_proofread_recheck">Check again</string>
     <string name="blog_proofread_retry">Try again</string>
+    <string name="settings_proofread_use_chatgpt">Use ChatGPT</string>
+    <string name="settings_proofread_local_description">Local AI is selected. Proofreading runs on this device.</string>
+    <string name="settings_proofread_cloud_description">When you tap Proofread, the app sends that paragraph to OpenAI using your API key. Requests use your API credits or billing.</string>
+    <string name="settings_proofread_key">OpenAI API key</string>
+    <string name="settings_proofread_key_configured">An API key is saved on this device.</string>
+    <string name="settings_proofread_key_save">Save API key</string>
+    <string name="settings_proofread_key_remove">Remove API key</string>
+    <string name="settings_proofread_key_saved">API key saved.</string>
+    <string name="settings_proofread_key_removed">API key removed.</string>
+    <string name="settings_proofread_key_invalid">Paste an OpenAI API key starting with sk-.</string>
+    <string name="settings_proofread_key_storage_error">Could not update the API key on this device.</string>
+    <string name="blog_proofread_cloud_generating">Proofreading with ChatGPT…</string>
+    <string name="blog_proofread_cloud_key_missing">Add your OpenAI API key under Settings → Proofreading.</string>
+    <string name="blog_proofread_cloud_key_unreadable">The saved API key could not be read. Replace it under Settings → Proofreading.</string>
+    <string name="blog_proofread_cloud_key_rejected">Check or replace your API key under Settings → Proofreading and verify that the key can use the OpenAI API.</string>
+    <string name="blog_proofread_cloud_connection">Could not reach OpenAI. Check your internet connection and try again.</string>
+    <string name="blog_proofread_cloud_rate">OpenAI rejected the request due to a rate or usage limit. Try again later or check your API credits.</string>
+    <string name="blog_proofread_cloud_failed">OpenAI could not complete proofreading. Try again.</string>
 </resources>

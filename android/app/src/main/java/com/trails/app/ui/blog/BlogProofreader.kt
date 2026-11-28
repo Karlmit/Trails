@@ -18,8 +18,15 @@ import javax.inject.Inject
 private const val MAX_OUTPUT_TOKENS = 1_536
 private val lineBreak = Regex("\\r\\n|[\\r\\n\\u2028\\u2029]")
 
-class BlogProofreader internal constructor(private val createModel: () -> GenerativeModel) {
-    @Inject constructor() : this({ Generation.getClient() })
+class BlogProofreader internal constructor(
+    private val preferences: ProofreadingPreferences?,
+    private val openAi: OpenAiProofreader?,
+    private val createModel: () -> GenerativeModel,
+) {
+    @Inject constructor(preferences: ProofreadingPreferences, openAi: OpenAiProofreader) :
+        this(preferences, openAi, { Generation.getClient() })
+
+    internal constructor(createModel: () -> GenerativeModel) : this(null, null, createModel)
 
     internal suspend fun proofread(
         runs: List<InlineRun>,
@@ -29,6 +36,22 @@ class BlogProofreader internal constructor(private val createModel: () -> Genera
         if (runs.sumOf { it.text.length } > MAX_PROOFREADING_INPUT_LENGTH) return ProofreadingStatus.TooLong
         val source = runs.joinToString("") { it.text }
         if (source.isBlank()) return ProofreadingStatus.NoChanges
+
+        val settings = preferences
+        if (settings != null && settings.useChatGpt) {
+            val key = try {
+                withContext(Dispatchers.IO) { settings.readApiKey() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                return ProofreadingStatus.CloudKeyUnreadable
+            } ?: return ProofreadingStatus.CloudKeyMissing
+            onStatus(ProofreadingStatus.CloudGenerating)
+            return when (val result = checkNotNull(openAi).correct(source, key)) {
+                is OpenAiProofreadingResult.Error -> result.status
+                is OpenAiProofreadingResult.Correction -> validatedSuggestion(runs, source, result.text)
+            }
+        }
 
         var downloading = false
         return try {
@@ -73,7 +96,8 @@ class BlogProofreader internal constructor(private val createModel: () -> Genera
     ): ProofreadingState {
         val prompt = TextPart(proofreadingPrompt(source))
         val inputTokens = model.countTokens(generateContentRequest(prompt) {}).totalTokens
-        val outputTokens = (inputTokens + 128).coerceAtMost(MAX_OUTPUT_TOKENS)
+        val sourceTokens = model.countTokens(generateContentRequest(TextPart(source)) {}).totalTokens
+        val outputTokens = (sourceTokens + 128).coerceAtMost(MAX_OUTPUT_TOKENS)
         if (inputTokens + outputTokens > model.getTokenLimit()) return ProofreadingStatus.TooLong
         val request = generateContentRequest(prompt) {
             temperature = 0.1f
@@ -89,6 +113,14 @@ class BlogProofreader internal constructor(private val createModel: () -> Genera
         }
         val correction = parseProofreadingCorrection(candidate.text)
             ?: return ProofreadingStatus.InvalidSuggestion
+        return validatedSuggestion(runs, source, correction)
+    }
+
+    private suspend fun validatedSuggestion(
+        runs: List<InlineRun>,
+        source: String,
+        correction: String,
+    ): ProofreadingState {
         if (lineBreak.findAll(correction).count() != lineBreak.findAll(source).count()) {
             return ProofreadingStatus.InvalidSuggestion
         }

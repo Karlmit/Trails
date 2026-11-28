@@ -64,6 +64,18 @@ class BlogProofreaderTest {
     }
 
     @Test
+    fun `proofreading examples count toward input only`() = runTest {
+        readyModel()
+        coEvery { model.countTokens(any<GenerateContentRequest>()) } returnsMany
+            listOf(CountTokensResponse(500), CountTokensResponse(200))
+        coEvery { model.getTokenLimit() } returns 900
+        stubCandidate("Tre dagar.")
+
+        assertEquals(ProofreadingStatus.NoChanges, proofreader.proofread(listOf(InlineRun("Tre dagar.")), false) {})
+        coVerify { model.generateContent(match<GenerateContentRequest> { it.maxOutputTokens == 328 }) }
+    }
+
+    @Test
     fun `a correction must preserve the number of paragraph line breaks`() = runTest {
         readyModel()
         val source = listOf(InlineRun("Tre dagr.\r\nVi gick hem."))
@@ -76,6 +88,19 @@ class BlogProofreaderTest {
         stubCandidate(corrected)
         val suggestion = proofreader.proofread(source, false) {} as ProofreadingSuggestion
         assertEquals(corrected, suggestion.correctedRuns.joinToString("") { it.text })
+    }
+
+    @Test
+    fun `local provider does not read the cloud credential or send text to OpenAI`() = runTest {
+        readyModel()
+        stubCandidate("Tre dagar.")
+        val preferences = mockk<ProofreadingPreferences> { every { useChatGpt } returns false }
+        val cloud = mockk<OpenAiProofreader>()
+        val router = BlogProofreader(preferences, cloud) { model }
+
+        assertEquals(ProofreadingStatus.NoChanges, router.proofread(listOf(InlineRun("Tre dagar.")), false) {})
+        verify(exactly = 0) { preferences.readApiKey() }
+        coVerify(exactly = 0) { cloud.correct(any(), any()) }
     }
 
     private fun readyModel() {
